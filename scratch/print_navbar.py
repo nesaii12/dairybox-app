@@ -1,0 +1,35 @@
+import os
+from playwright.sync_api import sync_playwright
+
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+        
+        # Guest page
+        page.goto("http://127.0.0.1:8000/")
+        page.wait_for_load_state("networkidle")
+        print("=== GUEST HEADER NAVIGATION ===")
+        header_html = page.eval_on_selector("header", "el => el.outerHTML")
+        print(header_html)
+        
+        # Login
+        page.goto("http://127.0.0.1:8000/login")
+        page.wait_for_load_state("networkidle")
+        page.fill("input[name='email']", "maria@example.com")
+        page.fill("input[name='password']", "password")
+        page.click("button[type='submit']")
+        page.wait_for_load_state("networkidle")
+        
+        # Navigate to home
+        page.goto("http://127.0.0.1:8000/")
+        page.wait_for_load_state("networkidle")
+        print("\n=== LOGGED IN CUSTOMER HEADER NAVIGATION ===")
+        header_html_auth = page.eval_on_selector("header", "el => el.outerHTML")
+        print(header_html_auth)
+        
+        browser.close()
+
+if __name__ == "__main__":
+    main()
