@@ -122,18 +122,7 @@
                 </a>
             </div>
 
-            <!-- Demo accounts credentials info panel -->
-            <div class="mt-6 p-4 bg-sky-50/50 border border-sky-100/50 rounded-xl text-xs text-slate-600 space-y-1.5">
-                <span class="font-bold text-sky-800">Quick Test Credentials (pass: password):</span>
-                <div class="grid grid-cols-2 gap-1 font-mono text-[10px]">
-                    <div>Admin:</div>
-                    <div class="font-semibold">admin@dairybox.com</div>
-                    <div>Rider:</div>
-                    <div class="font-semibold">rider@dairybox.com</div>
-                    <div>Customer:</div>
-                    <div class="font-semibold">maria@example.com</div>
-                </div>
-            </div>
+
 
         </div>
     </div>
