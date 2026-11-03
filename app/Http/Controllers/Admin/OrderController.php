@@ -50,10 +50,12 @@ class OrderController extends Controller
     {
         $request->validate([
             'order_status' => 'required|in:Pending,Confirmed,Preparing,Ready for Pickup,Out for Delivery,Delivered,Cancelled',
+            'cancellation_reason' => 'nullable|string|max:255',
         ]);
 
         $oldStatus = $order->order_status;
         $newStatus = $request->order_status;
+        $cancellationReason = trim($request->input('cancellation_reason')) ?: 'Cancelled by administrator.';
 
         if ($oldStatus === $newStatus) {
             return redirect()->back()->with('success', 'Order status updated (no changes).');
@@ -62,17 +64,53 @@ class OrderController extends Controller
         try {
             DB::beginTransaction();
 
-            $order->update(['order_status' => $newStatus]);
+            $orderData = ['order_status' => $newStatus];
+            if ($newStatus === 'Cancelled') {
+                $orderData['cancellation_reason'] = $cancellationReason;
+            }
+            $order->update($orderData);
 
             // If cancelled, return the inventory back using FIFO additions
             if ($newStatus === 'Cancelled') {
+                if ($order->delivery) {
+                    $order->delivery->update([
+                        'delivery_status' => 'Cancelled',
+                        'cancellation_reason' => $cancellationReason,
+                    ]);
+                }
+
                 foreach ($order->orderItems as $item) {
                     InventoryService::addStock(
                         $item->product_id, 
                         $item->quantity, 
                         $item->product->expiration_date,
-                        "Order Cancelled #{$order->order_number}"
+                        "Order Cancelled #{$order->order_number}: {$cancellationReason}"
                     );
+                }
+
+                // If admin requested restricting customer upon cancellation
+                if ($request->boolean('restrict_customer')) {
+                    $banDurationDays = 3;
+                    $until = now()->addDays($banDurationDays);
+                    $order->customer->update([
+                        'status' => 'restricted',
+                        'restricted_until' => $until,
+                    ]);
+
+                    AppNotification::create([
+                        'user_id' => $order->customer_id,
+                        'title' => 'Ordering Privileges Suspended (3 Days)',
+                        'message' => "Your ordering privileges have been suspended for {$banDurationDays} days until " . $until->format('M d, Y h:i A') . ". Reason: Order #{$order->order_number} cancellation ({$cancellationReason}).",
+                        'link' => route('customer.orders.index'),
+                        'is_read' => false,
+                    ]);
+
+                    AuditLog::create([
+                        'user_id' => auth()->id(),
+                        'action' => 'CUSTOMER_RESTRICTED',
+                        'details' => "Restricted customer {$order->customer->name} for {$banDurationDays} days due to cancellation of Order #{$order->order_number}",
+                        'ip_address' => $request->ip(),
+                    ]);
                 }
             }
 
@@ -98,17 +136,22 @@ class OrderController extends Controller
             }
 
             // Create notification for customer
+            $customerMsg = ($newStatus === 'Cancelled')
+                ? "Your order {$order->order_number} has been cancelled by store administration. Reason: {$cancellationReason}"
+                : "Your order {$order->order_number} status has been updated to '{$newStatus}'.";
+
             AppNotification::create([
                 'user_id' => $order->customer_id,
                 'title' => "Order {$newStatus}",
-                'message' => "Your order {$order->order_number} status has been updated to '{$newStatus}'.",
+                'message' => $customerMsg,
+                'link' => route('customer.orders.show', $order->id),
                 'is_read' => false,
             ]);
 
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'action' => 'ORDER_STATUS_CHANGED',
-                'details' => "Updated order {$order->order_number} status from {$oldStatus} to {$newStatus}",
+                'details' => "Updated order {$order->order_number} status from {$oldStatus} to {$newStatus}" . ($newStatus === 'Cancelled' ? ". Reason: {$cancellationReason}" : ""),
                 'ip_address' => $request->ip(),
             ]);
 
@@ -156,6 +199,7 @@ class OrderController extends Controller
                 'user_id' => $rider->id,
                 'title' => 'New Delivery Assigned',
                 'message' => "You have been assigned to deliver order {$order->order_number} to {$order->delivery_address}.",
+                'link' => route('rider.dashboard'),
                 'is_read' => false,
             ]);
 
@@ -164,6 +208,7 @@ class OrderController extends Controller
                 'user_id' => $order->customer_id,
                 'title' => 'Order Out for Delivery',
                 'message' => "Your order {$order->order_number} is out for delivery. Assigned rider: {$rider->name} ({$rider->phone}).",
+                'link' => route('customer.orders.show', $order->id),
                 'is_read' => false,
             ]);
 

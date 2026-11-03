@@ -73,14 +73,21 @@
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white">
                 @forelse($orders as $order)
-                <tr class="hover:bg-slate-50/50 transition-colors">
+                <tr id="order-{{ $order->id }}" data-record-id="order-{{ $order->id }}" data-record-number="{{ $order->order_number }}" class="hover:bg-slate-50/50 transition-colors record-highlight-target">
                     <!-- Order number -->
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">
                         {{ $order->order_number }}
                     </td>
                     <!-- Customer -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-semibold text-slate-800">{{ $order->customer->name }}</div>
+                        <div class="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                            <span>{{ $order->customer->name }}</span>
+                            @if($order->customer->isRestricted())
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700" title="Restricted from ordering until {{ $order->customer->restricted_until->format('M d, Y h:i A') }}">
+                                    <i class="bi bi-shield-slash-fill mr-0.5"></i> Restricted (3-Day)
+                                </span>
+                            @endif
+                        </div>
                         <div class="text-[10px] text-slate-400 font-mono">{{ $order->customer->email }}</div>
                     </td>
                     <!-- Fulfillment -->
@@ -103,8 +110,21 @@
                         @endif
                     </td>
                     <!-- Total Amount -->
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-950">
-                        ₱{{ number_format($order->total_amount, 2) }}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm font-bold text-slate-950 block">₱{{ number_format($order->total_amount, 2) }}</span>
+                        @if($order->isPaid())
+                            <span class="inline-flex items-center text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 mt-0.5">
+                                <i class="bi bi-check-circle-fill text-[8px] mr-1 text-emerald-600"></i> Paid
+                            </span>
+                        @elseif($order->isOnlinePayment())
+                            <span class="inline-flex items-center text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 mt-0.5">
+                                <i class="bi bi-clock-fill text-[8px] mr-1 text-amber-600"></i> Xendit Unpaid
+                            </span>
+                        @else
+                            <span class="inline-flex items-center text-[9px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 mt-0.5">
+                                Cash
+                            </span>
+                        @endif
                     </td>
                     <!-- Status Badge -->
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -120,16 +140,16 @@
                             ];
                             $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
                         @endphp
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border {{ $color }}">
+                        <span class="order-status-badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border {{ $color }}">
                             {{ $order->order_status }}
                         </span>
                     </td>
                     <!-- Rider -->
                     <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-600">
                         @if($order->rider)
-                            <span class="font-bold text-slate-800"><i class="bi bi-person mr-1"></i>{{ $order->rider->name }}</span>
+                            <span class="order-rider-name font-bold text-slate-800"><i class="bi bi-person mr-1"></i>{{ $order->rider->name }}</span>
                         @else
-                            <span class="text-slate-400 italic">Unassigned</span>
+                            <span class="order-rider-name text-slate-400 italic">Unassigned</span>
                         @endif
                     </td>
                     <!-- Actions -->

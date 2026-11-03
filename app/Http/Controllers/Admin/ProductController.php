@@ -21,7 +21,8 @@ class ProductController extends Controller
 
         $products = Product::with('category')->latest()->paginate($perPage)->withQueryString();
         $categories = Category::all();
-        return view('admin.products.index', compact('products', 'categories'));
+        $flavorPresets = Product::getFlavorPresets();
+        return view('admin.products.index', compact('products', 'categories', 'flavorPresets'));
     }
 
     public function create()
@@ -30,7 +31,8 @@ class ProductController extends Controller
         if ($categories->isEmpty()) {
             return redirect()->route('admin.categories.index')->with('error', 'Please create a category first before adding products.');
         }
-        return view('admin.products.create', compact('categories'));
+        $flavorPresets = Product::getFlavorPresets();
+        return view('admin.products.create', compact('categories', 'flavorPresets'));
     }
 
     public function store(Request $request)
@@ -38,18 +40,23 @@ class ProductController extends Controller
         $request->validate([
             'product_name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
+            'flavor' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'milk_type' => 'required|in:Carabao,Cow',
             'size' => 'required|in:Small,Medium,Large',
             'price' => 'required|numeric|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'preset_image' => 'nullable|string|max:255',
             'initial_stock' => 'required|integer|min:0',
-            'expiration_date' => 'nullable|date|after:today',
+            'manufacturing_date' => 'nullable|date|before_or_equal:today',
+            'expiration_date' => 'nullable|date|after_or_equal:manufacturing_date',
         ]);
 
         $imagePath = null;
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('products', 'public');
+        } elseif ($request->filled('preset_image')) {
+            $imagePath = $request->preset_image;
         }
 
         $product = Product::create([
@@ -57,10 +64,12 @@ class ProductController extends Controller
             'product_name' => $request->product_name,
             'description' => $request->description,
             'milk_type' => $request->milk_type,
+            'flavor' => $request->flavor,
             'size' => $request->size,
             'price' => $request->price,
             'image' => $imagePath,
             'stock' => 0, // Stock-in using FIFO service below will sync this correctly
+            'manufacturing_date' => $request->manufacturing_date,
             'expiration_date' => $request->expiration_date,
             'status' => 'active',
         ]);
@@ -71,16 +80,19 @@ class ProductController extends Controller
                 $product->id, 
                 $request->initial_stock, 
                 $request->expiration_date ? $request->expiration_date : null,
-                'Initial stock upload'
+                'Initial stock upload',
+                $request->manufacturing_date ? $request->manufacturing_date : null
             );
         }
 
         AuditLog::create([
             'user_id' => auth()->id(),
             'action' => 'PRODUCT_CREATED',
-            'details' => "Created product: {$product->product_name} (Size: {$product->size}, Milk: {$product->milk_type}, Initial Stock: {$request->initial_stock})",
+            'details' => "Created product: {$product->product_name} (Flavor: {$product->flavor}, Size: {$product->size}, Milk: {$product->milk_type}, Initial Stock: {$request->initial_stock})",
             'ip_address' => $request->ip(),
         ]);
+
+        \App\Services\ExpiryNotificationService::checkProduct($product);
 
         return redirect()->route('admin.products.index')->with('success', 'Product created successfully with FIFO batch registration.');
     }
@@ -91,19 +103,21 @@ class ProductController extends Controller
         return view('admin.products.show', compact('product', 'qrCode'));
     }
 
-
-
     public function update(Request $request, Product $product)
     {
         $request->validate([
             'product_name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
+            'flavor' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'milk_type' => 'required|in:Carabao,Cow',
             'size' => 'required|in:Small,Medium,Large',
             'price' => 'required|numeric|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'preset_image' => 'nullable|string|max:255',
             'status' => 'required|in:active,inactive',
+            'manufacturing_date' => 'nullable|date|before_or_equal:today',
+            'expiration_date' => 'nullable|date|after_or_equal:manufacturing_date',
         ]);
 
         $data = [
@@ -111,17 +125,25 @@ class ProductController extends Controller
             'product_name' => $request->product_name,
             'description' => $request->description,
             'milk_type' => $request->milk_type,
+            'flavor' => $request->flavor,
             'size' => $request->size,
             'price' => $request->price,
             'status' => $request->status,
+            'manufacturing_date' => $request->manufacturing_date,
+            'expiration_date' => $request->expiration_date,
         ];
 
         if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($product->image) {
+            // Delete old custom image if exists and not a shared preset
+            if ($product->image && !str_starts_with($product->image, 'products/presets/')) {
                 Storage::disk('public')->delete($product->image);
             }
             $data['image'] = $request->file('image')->store('products', 'public');
+        } elseif ($request->filled('preset_image')) {
+            if ($product->image && !str_starts_with($product->image, 'products/presets/')) {
+                Storage::disk('public')->delete($product->image);
+            }
+            $data['image'] = $request->preset_image;
         }
 
         $product->update($data);
@@ -133,6 +155,8 @@ class ProductController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
+        \App\Services\ExpiryNotificationService::checkProduct($product);
+
         return redirect()->route('admin.products.index')->with('success', 'Product updated successfully.');
     }
 
@@ -140,8 +164,8 @@ class ProductController extends Controller
     {
         $name = $product->product_name;
         
-        // Delete image if exists
-        if ($product->image) {
+        // Delete image only if custom uploaded (not a preset)
+        if ($product->image && !str_starts_with($product->image, 'products/presets/')) {
             Storage::disk('public')->delete($product->image);
         }
 

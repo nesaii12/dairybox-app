@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @auth
+    <meta name="user-id" content="{{ auth()->id() }}">
+    <meta name="user-role" content="{{ auth()->user()->role }}">
+    @endauth
     <title>@yield('title', 'DairyBox Storefront') | DairyBox</title>
     <!-- Favicon Links -->
     <link rel="icon" type="image/png" href="{{ asset('favicon-96x96.png') }}" sizes="96x96" />
@@ -128,12 +133,12 @@
                 <!-- Logo -->
                 <div class="flex items-center space-x-8">
                     <a href="{{ url('/') }}" class="flex items-center space-x-2.5 hover:opacity-90 transition-opacity">
-                        <div class="w-9 h-9 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white shadow-xs">
-                            <svg class="w-5.5 h-5.5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 2h6M9 6h6m-7 4v10a2 2 0 002 2h6a2 2 0 002-2V10M8 10c0-2 2-3 4-3s4 1 4 3" />
-                            </svg>
+                        <div class="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center p-1 border border-sky-100 shadow-xs">
+                            <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox" class="w-full h-full object-contain">
                         </div>
-                        <span class="text-xl font-bold tracking-tight text-slate-900 font-serif">DairyBox</span>
+                        <span class="text-xl font-bold tracking-tight text-slate-900">
+                            Dairy<span class="text-[#0ea5e9]">Box</span>
+                        </span>
                     </a>
 
                     <!-- Desktop Navigation Links -->
@@ -206,8 +211,8 @@
                                     <!-- Body (Scrollable list) -->
                                     <div class="overflow-y-auto divide-y divide-slate-100 max-h-[350px]">
                                         @forelse($allNotifications as $notif)
-                                        <div class="p-3.5 flex items-start justify-between gap-3 transition-colors hover:bg-slate-50/50 {{ !$notif->is_read ? 'bg-sky-50/10' : '' }}">
-                                            <div class="flex space-x-2.5">
+                                        <div class="group relative p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/40 {{ !$notif->is_read ? 'bg-sky-50/15' : '' }}">
+                                            <a href="{{ route('notifications.readAndRedirect', $notif->id) }}" class="flex space-x-2.5 flex-1 min-w-0 pr-2 block">
                                                 <!-- Read indicator dot -->
                                                 <div class="mt-1 flex-shrink-0">
                                                     @if(!$notif->is_read)
@@ -216,17 +221,25 @@
                                                         <span class="block w-2 h-2 rounded-full bg-slate-200"></span>
                                                     @endif
                                                 </div>
-                                                <div>
-                                                    <h4 class="text-xs font-bold {{ !$notif->is_read ? 'text-slate-900' : 'text-slate-700' }}">{{ $notif->title }}</h4>
-                                                    <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{{ $notif->message }}</p>
-                                                    <span class="block text-[8px] text-slate-400 mt-1 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center justify-between">
+                                                        <h4 class="text-xs font-bold {{ !$notif->is_read ? 'text-slate-900 group-hover:text-sky-600' : 'text-slate-700 group-hover:text-sky-600' }} transition-colors">
+                                                            {{ $notif->title }}
+                                                        </h4>
+                                                        <i class="bi bi-arrow-right text-[10px] text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all ml-1 flex-shrink-0"></i>
+                                                    </div>
+                                                    <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed break-words">{{ $notif->message }}</p>
+                                                    <div class="flex items-center space-x-2 mt-1">
+                                                        <span class="block text-[8px] text-slate-400 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
+                                                        <span class="text-[8px] font-semibold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">View details &rarr;</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </a>
 
                                             @if(!$notif->is_read)
-                                            <form action="{{ route('customer.notifications.read', $notif->id) }}" method="POST" class="flex-shrink-0">
+                                            <form action="{{ route('customer.notifications.read', $notif->id) }}" method="POST" class="flex-shrink-0 z-10" onclick="event.stopPropagation();">
                                                 @csrf
-                                                <button type="submit" class="p-1 px-1.5 border border-slate-200 rounded-lg text-[8px] font-bold text-slate-600 hover:text-slate-900 bg-white transition-all shadow-sm cursor-pointer">
+                                                <button type="submit" class="p-1 px-1.5 border border-slate-200 rounded-lg text-[8px] font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 transition-all shadow-2xs cursor-pointer" title="Mark as read without redirecting">
                                                     Mark read
                                                 </button>
                                             </form>
@@ -244,13 +257,11 @@
                             </div>
 
                             <!-- Shopping Cart -->
-                            <a href="{{ route('customer.cart.index') }}" class="relative p-2 text-slate-500 hover:text-[#0ea5e9] hover:bg-sky-50/50 rounded-xl transition-all" title="Shopping Cart">
+                            <a href="{{ route('customer.cart.index') }}" id="navCartButton" class="nav-cart-btn relative p-2 text-slate-500 hover:text-[#0ea5e9] hover:bg-sky-50/50 rounded-xl transition-all" title="Shopping Cart">
                                 <i class="bi bi-cart3 text-xl"></i>
-                                @if($cartItemCount > 0)
-                                    <span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#0ea5e9] text-[9px] font-bold text-white ring-2 ring-white">
-                                        {{ $cartItemCount }}
-                                    </span>
-                                @endif
+                                <span class="cart-nav-badge absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#0ea5e9] text-[9px] font-bold text-white ring-2 ring-white {{ $cartItemCount > 0 ? '' : 'hidden' }}">
+                                    {{ $cartItemCount }}
+                                </span>
                             </a>
 
                             <!-- Divider -->
@@ -268,21 +279,70 @@
                             @endif
                         @endif
 
-                        <!-- Profile Dropdown (Shared for all roles when logged in) -->
-                        <div class="relative flex items-center space-x-3 pl-2">
-                            <div class="hidden sm:block text-right">
-                                <p class="text-xs font-semibold text-slate-800">{{ auth()->user()->name }}</p>
-                                <p class="text-[10px] text-slate-400">{{ ucfirst(auth()->user()->role) }}</p>
+                        <!-- Profile Dropdown Menu Trigger -->
+                        <div class="relative pl-2" id="customerUserDropdownContainer">
+                            <button id="customerUserDropdownBtn" type="button" class="flex items-center space-x-2.5 p-1 rounded-xl hover:bg-slate-100/70 transition-all cursor-pointer focus:outline-none group">
+                                <div class="hidden sm:block text-right">
+                                    <p class="text-xs font-bold text-slate-800 leading-tight group-hover:text-sky-600 transition-colors">{{ auth()->user()->name }}</p>
+                                    <p class="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">{{ ucfirst(auth()->user()->role) }}</p>
+                                </div>
+                                <div class="w-9 h-9 rounded-full bg-sky-50 text-sky-700 flex items-center justify-center font-bold text-xs tracking-wider border border-sky-200/80 shadow-2xs group-hover:border-sky-300">
+                                    {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
+                                </div>
+                                <i id="customerUserChevron" class="bi bi-chevron-down text-[10px] text-slate-400 group-hover:text-slate-600 transition-transform duration-200"></i>
+                            </button>
+
+                            <!-- Dropdown Menu -->
+                            <div id="customerUserDropdownMenu" class="absolute right-0 mt-2 w-64 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all">
+                                <!-- Dropdown Header -->
+                                <div class="p-4 bg-slate-50/70 border-b border-slate-100 flex items-center space-x-3">
+                                    <div class="w-10 h-10 rounded-full bg-sky-50 text-sky-700 font-bold border border-sky-200 flex items-center justify-center text-xs tracking-wider shadow-2xs flex-shrink-0">
+                                        {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-xs font-bold text-slate-900 truncate">{{ auth()->user()->name }}</p>
+                                        <p class="text-[10px] text-slate-500 truncate">{{ auth()->user()->email }}</p>
+                                        <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-100">
+                                            {{ ucfirst(auth()->user()->role) }} Account
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Dropdown Navigation Links -->
+                                <div class="p-1.5 space-y-0.5">
+                                    @if(auth()->user()->isCustomer())
+                                        <a href="{{ route('customer.settings.index') }}" class="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-sky-600 hover:bg-sky-50/60 transition-colors">
+                                            <i class="bi bi-gear-fill text-slate-400 text-sm"></i>
+                                            <span>Account Settings</span>
+                                        </a>
+                                    @elseif(auth()->user()->isAdmin())
+                                        <a href="{{ route('admin.dashboard') }}" class="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-sky-600 hover:bg-sky-50/60 transition-colors">
+                                            <i class="bi bi-grid-fill text-slate-400 text-sm"></i>
+                                            <span>Admin Dashboard</span>
+                                        </a>
+                                        <a href="{{ route('admin.settings.index') }}" class="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-sky-600 hover:bg-sky-50/60 transition-colors">
+                                            <i class="bi bi-gear-fill text-slate-400 text-sm"></i>
+                                            <span>Admin Settings</span>
+                                        </a>
+                                    @elseif(auth()->user()->isRider())
+                                        <a href="{{ route('rider.dashboard') }}" class="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-emerald-600 hover:bg-emerald-50/60 transition-colors">
+                                            <i class="bi bi-bicycle text-slate-400 text-sm"></i>
+                                            <span>Rider Dashboard</span>
+                                        </a>
+                                    @endif
+                                </div>
+
+                                <!-- Divider & Sign Out Form -->
+                                <div class="p-1.5 border-t border-slate-100 bg-slate-50/40">
+                                    <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Are you sure you want to sign out?')">
+                                        @csrf
+                                        <button type="submit" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-left">
+                                            <i class="bi bi-box-arrow-right text-sm text-rose-500"></i>
+                                            <span>Sign Out</span>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                            <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold border border-slate-200">
-                                {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
-                            </div>
-                            <form action="{{ route('logout') }}" method="POST" class="inline">
-                                @csrf
-                                <button type="submit" class="p-1.5 text-slate-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-all" title="Logout">
-                                    <i class="bi bi-box-arrow-right text-lg"></i>
-                                </button>
-                            </form>
                         </div>
                     @else
                         <!-- Shopping Cart Icon for Guest (Redirects to Login via Auth Middleware) -->
@@ -314,11 +374,26 @@
                             <i class="bi bi-clock-history text-lg"></i>
                             <span>Orders</span>
                         </a>
+                        <a href="{{ route('customer.settings.index') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->routeIs('customer.settings.*') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
+                            <i class="bi bi-person-gear text-lg"></i>
+                            <span>Settings</span>
+                        </a>
                     @endif
                 @endauth
             </div>
         </div>
     </nav>
+
+    @auth
+        @if(auth()->user()->isCustomer() && auth()->user()->isRestricted())
+            <div class="bg-rose-50 border-b border-rose-200 text-rose-800 text-xs py-2.5 px-4 font-medium">
+                <div class="max-w-7xl mx-auto flex items-center justify-center gap-2">
+                    <i class="bi bi-shield-slash-fill text-rose-600 text-sm"></i>
+                    <span>Your ordering privileges are temporarily suspended until <strong class="font-bold">{{ auth()->user()->restricted_until->format('M d, Y h:i A') }}</strong> due to an order cancellation policy violation.</span>
+                </div>
+            </div>
+        @endif
+    @endauth
 
     <!-- Main Container -->
     <main class="flex-grow py-8 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
@@ -401,6 +476,13 @@
             if (bellBtn) {
                 bellBtn.addEventListener('click', function(e) {
                     e.preventDefault();
+                    // Close user dropdown if open
+                    const uMenu = document.getElementById('customerUserDropdownMenu');
+                    const uChevron = document.getElementById('customerUserChevron');
+                    if (uMenu && !uMenu.classList.contains('hidden')) {
+                        uMenu.classList.add('hidden');
+                        if (uChevron) uChevron.style.transform = 'rotate(0deg)';
+                    }
                     window.toggleNotificationsModal();
                 });
             }
@@ -413,6 +495,39 @@
                     }
                 }
             });
+
+            // Customer user dropdown interactions
+            const userBtn = document.getElementById('customerUserDropdownBtn');
+            const userMenu = document.getElementById('customerUserDropdownMenu');
+            const userChevron = document.getElementById('customerUserChevron');
+
+            if (userBtn && userMenu) {
+                userBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // Close notification modal if open
+                    if (dropdown && !dropdown.classList.contains('hidden')) {
+                        dropdown.classList.add('hidden');
+                    }
+                    const isHidden = userMenu.classList.toggle('hidden');
+                    if (userChevron) {
+                        userChevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+                    }
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!userMenu.contains(e.target) && !userBtn.contains(e.target)) {
+                        userMenu.classList.add('hidden');
+                        if (userChevron) userChevron.style.transform = 'rotate(0deg)';
+                    }
+                });
+
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        userMenu.classList.add('hidden');
+                        if (userChevron) userChevron.style.transform = 'rotate(0deg)';
+                    }
+                });
+            }
 
             @if(session('success') === 'Notification marked as read.' || session('success') === 'All notifications marked as read.')
             window.toggleNotificationsModal();

@@ -16,10 +16,12 @@ class Product extends Model
         'product_name',
         'description',
         'milk_type',
+        'flavor',
         'size',
         'price',
         'image',
         'stock',
+        'manufacturing_date',
         'expiration_date',
         'status',
     ];
@@ -28,6 +30,7 @@ class Product extends Model
     {
         return [
             'price' => 'decimal:2',
+            'manufacturing_date' => 'date',
             'expiration_date' => 'date',
         ];
     }
@@ -96,6 +99,27 @@ class Product extends Model
     public function averageRating(): float
     {
         return $this->ratings()->avg('rating') ?? 0.0;
+    }
+
+    /**
+     * Get predefined flavor presets with curated imagery and styling colors.
+     */
+    public static function getFlavorPresets(): array
+    {
+        return [
+            ['name' => 'Chocolate', 'category' => 'Flavored Milk', 'image' => 'products/presets/chocolate_milk.png', 'color' => '#845339'],
+            ['name' => 'Strawberry', 'category' => 'Flavored Milk', 'image' => 'products/presets/strawberry_milk.png', 'color' => '#f43f5e'],
+            ['name' => 'Vanilla', 'category' => 'Flavored Milk', 'image' => 'products/presets/vanilla_milk.jpg', 'color' => '#eab308'],
+            ['name' => 'Ube', 'category' => 'Flavored Milk', 'image' => 'products/presets/ube_milk.jpg', 'color' => '#9333ea'],
+            ['name' => 'Melon', 'category' => 'Flavored Milk', 'image' => 'products/presets/melon_milk.jpg', 'color' => '#22c55e'],
+            ['name' => 'Matcha', 'category' => 'Flavored Milk', 'image' => 'products/presets/matcha_milk.jpg', 'color' => '#16a34a'],
+            ['name' => 'Taro', 'category' => 'Flavored Milk', 'image' => 'products/presets/taro_milk.jpg', 'color' => '#a855f7'],
+            ['name' => 'Caramel', 'category' => 'Flavored Milk', 'image' => 'products/presets/caramel_milk.jpg', 'color' => '#d97706'],
+            ['name' => 'Mango', 'category' => 'Ice Cream', 'image' => 'products/presets/mango_ice_cream.png', 'color' => '#f59e0b'],
+            ['name' => 'Cheese', 'category' => 'Ice Cream', 'image' => 'products/presets/cheese_ice_cream.jpg', 'color' => '#eab308'],
+            ['name' => 'Cookies & Cream', 'category' => 'Ice Cream', 'image' => 'products/presets/cookies_cream.jpg', 'color' => '#475569'],
+            ['name' => 'Avocado', 'category' => 'Ice Cream', 'image' => 'products/presets/avocado_ice_cream.png', 'color' => '#84cc16'],
+        ];
     }
 
     /**

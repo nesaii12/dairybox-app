@@ -12,11 +12,25 @@ Route::get('/', function () {
 // Guest Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:3,1');
+
+    // Google OAuth Routes
+    Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+
+    // Password Reset Routes
+    Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
+    Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email')->middleware('throttle:5,1');
+    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
 });
+
+// OTP Email Verification Routes
+Route::get('/verify-otp', [AuthController::class, 'showOtpVerification'])->name('otp.verify');
+Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->name('otp.submit')->middleware('throttle:10,1');
+Route::post('/verify-otp/resend', [AuthController::class, 'resendOtp'])->name('otp.resend')->middleware('throttle:5,1');
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
@@ -30,6 +44,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Categories
     Route::get('/categories', [\App\Http\Controllers\Admin\CategoryController::class, 'index'])->name('categories.index');
     Route::post('/categories', [\App\Http\Controllers\Admin\CategoryController::class, 'store'])->name('categories.store');
+    Route::delete('/categories/{category}', [\App\Http\Controllers\Admin\CategoryController::class, 'destroy'])->name('categories.destroy');
     
     // Inventory
     Route::get('/inventory', [\App\Http\Controllers\Admin\InventoryController::class, 'index'])->name('inventory.index');
@@ -45,7 +60,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');
     Route::post('/customers/{customer}/restrict', [\App\Http\Controllers\Admin\CustomerController::class, 'restrict'])->name('customers.restrict');
+    Route::post('/customers/{customer}/unrestrict', [\App\Http\Controllers\Admin\CustomerController::class, 'unrestrict'])->name('customers.unrestrict');
     
+    // Delivery Monitoring & Incident Handling
+    Route::get('/deliveries', [\App\Http\Controllers\Admin\DeliveryController::class, 'index'])->name('deliveries.index');
+    Route::post('/deliveries/{delivery}/verify-restrict', [\App\Http\Controllers\Admin\DeliveryController::class, 'verifyAndRestrict'])->name('deliveries.verifyRestrict');
+    Route::post('/deliveries/{delivery}/cancel', [\App\Http\Controllers\Admin\DeliveryController::class, 'cancelDelivery'])->name('deliveries.cancel');
+
     // Riders
     Route::resource('riders', \App\Http\Controllers\Admin\RiderController::class)->except('edit');
     
@@ -59,6 +80,16 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Forecasting
     Route::get('/forecast', [\App\Http\Controllers\Admin\ForecastController::class, 'index'])->name('forecast.index');
     Route::post('/forecast/generate', [\App\Http\Controllers\Admin\ForecastController::class, 'generate'])->name('forecast.generate');
+
+    // Notifications
+    Route::post('/notifications/read-all', [\App\Http\Controllers\Admin\NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
+    Route::post('/notifications/{notification}/read', [\App\Http\Controllers\Admin\NotificationController::class, 'markAsRead'])->name('notifications.read');
+
+    // Settings
+    Route::get('/settings', [\App\Http\Controllers\Admin\SettingController::class, 'index'])->name('settings.index');
+    Route::put('/settings/profile', [\App\Http\Controllers\Admin\SettingController::class, 'updateProfile'])->name('settings.updateProfile');
+    Route::put('/settings/password', [\App\Http\Controllers\Admin\SettingController::class, 'updatePassword'])->name('settings.updatePassword');
+    Route::put('/settings/store', [\App\Http\Controllers\Admin\SettingController::class, 'updateStore'])->name('settings.updateStore');
 });
 
 // Public Customer Catalog Routes
@@ -68,7 +99,7 @@ Route::prefix('customer')->name('customer.')->group(function () {
 });
 
 // Customer Routes (Role: customer)
-Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer.')->group(function () {
+Route::middleware(['auth', 'role:customer', 'otp.verified'])->prefix('customer')->name('customer.')->group(function () {
     // Cart
     Route::get('/cart', [\App\Http\Controllers\Customer\CartController::class, 'index'])->name('cart.index');
     Route::post('/cart/add/{product}', [\App\Http\Controllers\Customer\CartController::class, 'add'])->name('cart.add');
@@ -78,7 +109,9 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     // Checkout (requires check.restriction to ensure restricted users can't place orders)
     Route::middleware('check.restriction')->group(function () {
         Route::get('/checkout', [\App\Http\Controllers\Customer\CartController::class, 'checkout'])->name('checkout.index');
-        Route::post('/checkout/place', [\App\Http\Controllers\Customer\CartController::class, 'placeOrder'])->name('checkout.placeOrder');
+        Route::post('/checkout/place', [\App\Http\Controllers\Customer\CartController::class, 'placeOrder'])
+            ->name('checkout.placeOrder')
+            ->middleware('throttle:10,1');
     });
     
     // Orders
@@ -87,16 +120,36 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::post('/orders/{order}/cancel', [\App\Http\Controllers\Customer\OrderController::class, 'cancel'])->name('orders.cancel');
     
     // Ratings & Reviews
-    Route::post('/products/{product}/rate', [\App\Http\Controllers\Customer\RatingController::class, 'store'])->name('ratings.store');
+    Route::post('/products/{product}/rate', [\App\Http\Controllers\Customer\RatingController::class, 'store'])
+        ->name('ratings.store')
+        ->middleware('throttle:10,1');
     
     // Notifications
     Route::post('/notifications/read-all', [\App\Http\Controllers\Customer\NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
     Route::post('/notifications/{notification}/read', [\App\Http\Controllers\Customer\NotificationController::class, 'markAsRead'])->name('notifications.read');
+
+    // Account Settings
+    Route::get('/settings', [\App\Http\Controllers\Customer\SettingController::class, 'index'])->name('settings.index');
+    Route::put('/settings/profile', [\App\Http\Controllers\Customer\SettingController::class, 'updateProfile'])->name('settings.updateProfile');
+    Route::put('/settings/password', [\App\Http\Controllers\Customer\SettingController::class, 'updatePassword'])->name('settings.updatePassword');
+
+    // Payments (Xendit Return & Retry)
+    Route::get('/orders/{order}/payment/success', [\App\Http\Controllers\Customer\PaymentController::class, 'success'])->name('orders.payment.success');
+    Route::get('/orders/{order}/payment/failure', [\App\Http\Controllers\Customer\PaymentController::class, 'failure'])->name('orders.payment.failure');
+    Route::get('/orders/{order}/payment/retry', [\App\Http\Controllers\Customer\PaymentController::class, 'retry'])->name('orders.payment.retry');
 });
+
+// Xendit Webhook (CSRF excluded in bootstrap/app.php)
+Route::post('/api/webhooks/xendit', [\App\Http\Controllers\Webhook\XenditWebhookController::class, 'handle'])->name('webhooks.xendit');
+
+// Global Authenticated Notification Click & Redirect Route (Applies to Admin, Customer, and Rider)
+Route::middleware('auth')->get('/notifications/{notification}/go', [\App\Http\Controllers\NotificationClickController::class, 'handleClick'])
+    ->name('notifications.readAndRedirect');
 
 // Rider Routes (Role: rider)
 Route::middleware(['auth', 'role:rider'])->prefix('rider')->name('rider.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\Rider\RiderController::class, 'index'])->name('dashboard');
+    Route::post('/deliveries/{delivery}/mark-arrived', [\App\Http\Controllers\Rider\RiderController::class, 'markArrived'])->name('deliveries.markArrived');
     Route::post('/deliveries/{delivery}/update-status', [\App\Http\Controllers\Rider\RiderController::class, 'updateStatus'])->name('deliveries.updateStatus');
     Route::get('/history', [\App\Http\Controllers\Rider\RiderController::class, 'history'])->name('history');
 });

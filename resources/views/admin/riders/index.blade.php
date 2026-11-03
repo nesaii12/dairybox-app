@@ -195,15 +195,15 @@
                                                 </div>
 
                                                 <div class="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[10px] text-slate-500 leading-relaxed text-left flex items-start space-x-2">
-                                                    <i class="bi bi-info-circle text-slate-400 mt-0.5"></i> 
-                                                    <span>Leave the password fields blank if you do not wish to change the rider's current password.</span>
+                                                    <i class="bi bi-shield-lock text-sky-600 mt-0.5"></i> 
+                                                    <span>Leave blank to keep existing password. If updating, password must be at least 8 characters and include uppercase, lowercase, numbers, and symbols.</span>
                                                 </div>
 
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     <!-- Password -->
                                                     <div class="space-y-1.5 text-left">
                                                         <label for="password_{{ $rider->id }}" class="block text-xs font-bold text-slate-700">New Password</label>
-                                                        <input type="password" name="password" id="password_{{ $rider->id }}" placeholder="Minimum 8 characters"
+                                                        <input type="password" name="password" id="password_{{ $rider->id }}" placeholder="Min 8 chars, mixed, #, & symbol"
                                                             class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all focus:bg-white">
                                                     </div>
 

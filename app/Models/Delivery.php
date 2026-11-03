@@ -11,14 +11,59 @@ class Delivery extends Model
         'order_id',
         'rider_id',
         'delivery_status',
+        'arrived_at',
+        'cancelled_after_arrival',
+        'cancellation_reason',
+        'admin_verified_at',
         'delivered_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'arrived_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'admin_verified_at' => 'datetime',
+            'cancelled_after_arrival' => 'boolean',
         ];
+    }
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Delivery $delivery) {
+            try {
+                broadcast(new \App\Events\DeliveryUpdated($delivery, 'created'));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Delivery broadcast failed: ' . $e->getMessage());
+            }
+        });
+
+        static::updated(function (Delivery $delivery) {
+            try {
+                broadcast(new \App\Events\DeliveryUpdated($delivery, 'updated'));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Delivery broadcast failed: ' . $e->getMessage());
+            }
+        });
+    }
+
+    /**
+     * Check if the rider has arrived at the customer location.
+     */
+    public function hasArrived(): bool
+    {
+        return !is_null($this->arrived_at);
+    }
+
+    /**
+     * Check if the order was cancelled after the rider arrived.
+     */
+    public function wasCancelledAfterArrival(): bool
+    {
+        return (bool) $this->cancelled_after_arrival;
     }
 
     /**

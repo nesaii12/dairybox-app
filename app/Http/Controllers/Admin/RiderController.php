@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class RiderController extends Controller
 {
@@ -44,7 +45,7 @@ class RiderController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'phone' => 'required|string|max:20',
         ]);
 
@@ -83,7 +84,7 @@ class RiderController extends Controller
                 'max:255',
                 Rule::unique('users')->ignore($rider->id),
             ],
-            'password' => 'nullable|string|min:8|confirmed',
+            'password' => ['nullable', 'string', 'confirmed', Password::defaults()],
             'phone' => 'required|string|max:20',
             'status' => 'required|in:active,restricted',
         ]);

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50">
+<html lang="en" class="min-h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,27 +24,43 @@
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+<body class="min-h-screen flex flex-col justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
     
-    <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
-
-        <!-- Logo -->
-        <div class="inline-flex w-14 h-14 rounded-2xl bg-sky-600 items-center justify-center text-white shadow-xl shadow-sky-200 mb-4">
-            <i class="bi bi-box-seam-fill text-2xl"></i>
+    <div class="sm:mx-auto sm:w-full sm:max-w-md my-auto">
+        <!-- Logo & Header -->
+        <div class="text-center mb-6">
+            <a href="{{ url('/') }}" class="inline-flex flex-col items-center group">
+                <div class="w-16 h-16 rounded-2xl bg-white p-2.5 flex items-center justify-center shadow-lg shadow-sky-100 border border-slate-100 mb-3 group-hover:scale-105 transition-transform">
+                    <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox Logo" class="w-full h-full object-contain">
+                </div>
+            </a>
+            <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Create Account</h2>
+            <p class="mt-2 text-sm text-slate-600">
+                Join DairyBox to order fresh milk & ice creams!
+            </p>
         </div>
-        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Create Account</h2>
-        <p class="mt-2 text-sm text-slate-600">
-            Join DairyBox to order fresh milk & ice creams!
-        </p>
-    </div>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div class="bg-white pt-14 pb-8 px-6 shadow-xl shadow-slate-100 sm:rounded-2xl border border-slate-100 relative">
+        <div class="bg-white pt-12 pb-8 px-6 shadow-xl shadow-slate-100 rounded-2xl border border-slate-100 relative">
             <!-- Back to Home Arrow -->
             <a href="{{ url('/') }}" class="absolute top-4 left-4 inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-50 border border-slate-200 text-slate-400 hover:text-slate-800 transition-all hover:bg-slate-100 shadow-2xs hover:scale-105" title="Back to Home">
                 <i class="bi bi-arrow-left text-sm font-bold"></i>
             </a>
             
+            <!-- Alert message flashes -->
+            @if(session('success'))
+            <div class="mb-4 bg-emerald-50 border border-emerald-100 text-emerald-800 px-4 py-2.5 rounded-xl flex items-center space-x-2 text-sm" role="alert">
+                <i class="bi bi-check-circle-fill text-emerald-500"></i>
+                <span class="font-medium">{{ session('success') }}</span>
+            </div>
+            @endif
+
+            @if(session('error'))
+            <div class="mb-4 bg-rose-50 border border-rose-100 text-rose-800 px-4 py-2.5 rounded-xl flex items-center space-x-2 text-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill text-rose-500"></i>
+                <span class="font-medium">{{ session('error') }}</span>
+            </div>
+            @endif
+
             <form class="space-y-4" action="{{ route('register') }}" method="POST">
                 @csrf
                 
@@ -100,12 +116,40 @@
                             <i class="bi bi-lock text-slate-400 text-sm"></i>
                         </div>
                         <input id="password" name="password" type="password" required
-                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
-                            placeholder="Min. 8 characters">
+                            class="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            placeholder="Create a strong password">
+                        <button type="button" onclick="togglePasswordVisibility('password', 'toggle-pass-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
+                            <i id="toggle-pass-icon" class="bi bi-eye text-sm"></i>
+                        </button>
                     </div>
                     @error('password')
                         <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                     @enderror
+
+                    <!-- Password Requirements Checklist -->
+                    <div class="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <p class="text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
+                            <i class="bi bi-shield-check text-sky-600"></i> Password Requirements:
+                        </p>
+                        <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                            <div id="rule-length" class="flex items-center gap-1.5 text-slate-500 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                                <span>8+ characters</span>
+                            </div>
+                            <div id="rule-case" class="flex items-center gap-1.5 text-slate-500 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                                <span>Upper & lowercase</span>
+                            </div>
+                            <div id="rule-number" class="flex items-center gap-1.5 text-slate-500 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                                <span>At least 1 number</span>
+                            </div>
+                            <div id="rule-symbol" class="flex items-center gap-1.5 text-slate-500 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                                <span>At least 1 symbol</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div>
@@ -115,16 +159,38 @@
                             <i class="bi bi-shield-check text-slate-400 text-sm"></i>
                         </div>
                         <input id="password_confirmation" name="password_confirmation" type="password" required
-                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            class="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
                             placeholder="Re-type password">
+                        <button type="button" onclick="togglePasswordVisibility('password_confirmation', 'toggle-confirm-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
+                            <i id="toggle-confirm-icon" class="bi bi-eye text-sm"></i>
+                        </button>
                     </div>
+                    <p id="match-hint" class="hidden text-[11px] font-medium mt-1"></p>
                 </div>
 
                 <div class="pt-2">
                     <button type="submit"
-                        class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-all hover:-translate-y-0.5">
+                        class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-all hover:-translate-y-0.5 cursor-pointer">
                         Register Account
                     </button>
+                </div>
+
+                <div class="relative flex items-center justify-center my-3">
+                    <div class="border-t border-slate-200/80 w-full"></div>
+                    <span class="absolute px-3 bg-white text-[11px] font-semibold text-slate-400 uppercase tracking-wider">or</span>
+                </div>
+
+                <div>
+                    <a href="{{ route('auth.google') }}"
+                        class="w-full flex items-center justify-center py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300 transition-all shadow-xs hover:shadow-sm">
+                        <svg class="w-4 h-4 mr-2.5 flex-shrink-0" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Continue with Google</span>
+                    </a>
                 </div>
             </form>
 
@@ -138,5 +204,79 @@
         </div>
     </div>
 
+    <script>
+        function togglePasswordVisibility(fieldId, iconId) {
+            const input = document.getElementById(fieldId);
+            const icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'bi bi-eye-slash text-sm text-sky-600';
+            } else {
+                input.type = 'password';
+                icon.className = 'bi bi-eye text-sm text-slate-400';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const passwordInput = document.getElementById('password');
+            const confirmInput = document.getElementById('password_confirmation');
+            const matchHint = document.getElementById('match-hint');
+
+            const rules = {
+                length: { el: document.getElementById('rule-length'), test: (val) => val.length >= 8 },
+                case: { el: document.getElementById('rule-case'), test: (val) => /[a-z]/.test(val) && /[A-Z]/.test(val) },
+                number: { el: document.getElementById('rule-number'), test: (val) => /[0-9]/.test(val) },
+                symbol: { el: document.getElementById('rule-symbol'), test: (val) => /[^A-Za-z0-9]/.test(val) },
+            };
+
+            function updatePasswordRules() {
+                const val = passwordInput.value;
+                for (const key in rules) {
+                    const rule = rules[key];
+                    if (!rule.el) continue;
+                    const passed = rule.test(val);
+                    const icon = rule.el.querySelector('i');
+
+                    if (passed) {
+                        rule.el.className = 'flex items-center gap-1.5 text-emerald-600 font-medium transition-colors';
+                        if (icon) icon.className = 'bi bi-check-circle-fill text-[11px] text-emerald-600';
+                    } else {
+                        rule.el.className = 'flex items-center gap-1.5 text-slate-500 transition-colors';
+                        if (icon) icon.className = 'bi bi-circle text-[9px] text-slate-400';
+                    }
+                }
+                checkMatch();
+            }
+
+            function checkMatch() {
+                if (!confirmInput || !matchHint) return;
+                const passVal = passwordInput.value;
+                const confirmVal = confirmInput.value;
+
+                if (!confirmVal) {
+                    matchHint.classList.add('hidden');
+                    return;
+                }
+
+                matchHint.classList.remove('hidden');
+                if (passVal === confirmVal) {
+                    matchHint.className = 'text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1';
+                    matchHint.innerHTML = '<i class="bi bi-check-circle-fill text-xs text-emerald-600"></i> Passwords match';
+                } else {
+                    matchHint.className = 'text-[11px] font-medium text-rose-500 mt-1 flex items-center gap-1';
+                    matchHint.innerHTML = '<i class="bi bi-exclamation-circle text-xs text-rose-500"></i> Passwords do not match';
+                }
+            }
+
+            if (passwordInput) {
+                passwordInput.addEventListener('input', updatePasswordRules);
+            }
+            if (confirmInput) {
+                confirmInput.addEventListener('input', checkMatch);
+            }
+        });
+    </script>
 </body>
 </html>

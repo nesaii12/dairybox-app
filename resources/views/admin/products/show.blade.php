@@ -36,7 +36,13 @@
 
             <div class="py-6 space-y-4">
                 <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Specifications</h3>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    @if($product->flavor)
+                    <div class="p-3 bg-sky-50/70 border border-sky-100 rounded-xl">
+                        <span class="block text-[10px] font-semibold text-sky-600 uppercase">Flavor</span>
+                        <span class="text-sm font-bold text-sky-950">{{ $product->flavor }}</span>
+                    </div>
+                    @endif
                     <div class="p-3 bg-slate-50 rounded-xl">
                         <span class="block text-[10px] font-semibold text-slate-400 uppercase">Milk Type</span>
                         <span class="text-sm font-bold text-slate-800">{{ $product->milk_type }} Milk</span>
@@ -48,6 +54,10 @@
                     <div class="p-3 bg-slate-50 rounded-xl">
                         <span class="block text-[10px] font-semibold text-slate-400 uppercase">Current Stock</span>
                         <span class="text-sm font-bold {{ $product->stock < 10 ? 'text-rose-600' : 'text-slate-800' }}">{{ $product->stock }} units</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-xl">
+                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Manufacturing Date</span>
+                        <span class="text-sm font-bold text-slate-800">{{ $product->manufacturing_date ? \Carbon\Carbon::parse($product->manufacturing_date)->format('M d, Y') : 'N/A' }}</span>
                     </div>
                     <div class="p-3 bg-slate-50 rounded-xl">
                         <span class="block text-[10px] font-semibold text-slate-400 uppercase">Nearest Expiration</span>

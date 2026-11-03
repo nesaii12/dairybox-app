@@ -65,6 +65,7 @@ class CheckLowStock extends Command
                         'user_id' => $admin->id,
                         'title' => $title,
                         'message' => $message,
+                        'link' => route('admin.inventory.index'),
                         'is_read' => false,
                     ]);
                 }
@@ -72,29 +73,9 @@ class CheckLowStock extends Command
             $this->line("Notified admins about low stock on product #{$product->id}");
         }
 
-        // 2. Process Near Expiration Alerts
-        foreach ($nearExpiryProducts as $product) {
-            $daysLeft = Carbon::parse($product->expiration_date)->diffInDays(Carbon::now());
-            $title = "Near Expiration Alert: {$product->product_name}";
-            $message = "The nearest batch for product '{$product->product_name} ({$product->size})' is set to expire on " . Carbon::parse($product->expiration_date)->format('M d, Y') . " ({$daysLeft} days remaining). Please handle FIFO rotation or mark down price.";
-
-            foreach ($admins as $admin) {
-                $exists = AppNotification::where('user_id', $admin->id)
-                    ->where('title', $title)
-                    ->where('is_read', false)
-                    ->exists();
-
-                if (!$exists) {
-                    AppNotification::create([
-                        'user_id' => $admin->id,
-                        'title' => $title,
-                        'message' => $message,
-                        'is_read' => false,
-                    ]);
-                }
-            }
-            $this->line("Notified admins about approaching expiration on product #{$product->id}");
-        }
+        // 2. Process Near Expiration Alerts via ExpiryNotificationService
+        $expiryAlertsCount = \App\Services\ExpiryNotificationService::checkAndNotify(true);
+        $this->line("Dispatched {$expiryAlertsCount} near-expiration alert(s) to administrators.");
 
         $this->info('Stock threshold checks completed successfully.');
         return 0;

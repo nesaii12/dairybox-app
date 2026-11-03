@@ -23,11 +23,16 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'email_verified_at',
+        'google_id',
+        'avatar',
         'password',
         'phone',
         'role',
         'status',
         'restricted_until',
+        'verification_otp',
+        'verification_otp_expires_at',
     ];
 
     /**
@@ -83,9 +88,21 @@ class User extends Authenticatable
      */
     public function isRestricted(): bool
     {
-        return $this->status === 'restricted'
-            && $this->restricted_until
-            && $this->restricted_until->isFuture();
+        if ($this->status === 'restricted' && $this->restricted_until) {
+            if ($this->restricted_until->isFuture()) {
+                return true;
+            }
+            // Auto-heal status if 3-day restriction has elapsed
+            if ($this->exists) {
+                $this->update([
+                    'status' => 'active',
+                    'restricted_until' => null,
+                ]);
+            }
+            return false;
+        }
+
+        return false;
     }
 
     /**
@@ -127,4 +144,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(AppNotification::class);
     }
+
+    /**
+     * Send the password reset notification.
+     *
+     * @param string $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notifyNow(new \App\Notifications\ResetPasswordNotification($token));
+    }
 }
+

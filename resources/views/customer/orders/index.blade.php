@@ -23,7 +23,7 @@
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white text-xs text-slate-600">
                 @forelse($orders as $order)
-                <tr class="hover:bg-slate-50/50 transition-colors">
+                <tr id="order-{{ $order->id }}" data-record-id="order-{{ $order->id }}" data-record-number="{{ $order->order_number }}" class="hover:bg-slate-50/50 transition-colors record-highlight-target">
                     <td class="py-4 px-6 font-bold text-slate-950">
                         {{ $order->order_number }}
                     </td>
@@ -60,9 +60,14 @@
                             ];
                             $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
                         @endphp
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border {{ $color }} shadow-2xs">
+                        <span class="order-status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border {{ $color }} shadow-2xs">
                             {{ $order->order_status }}
                         </span>
+                        @if($order->isPaid())
+                            <span class="text-[9px] text-emerald-600 font-bold block mt-1"><i class="bi bi-check-circle-fill text-[8px] mr-0.5"></i> Paid</span>
+                        @elseif($order->isOnlinePayment())
+                            <span class="text-[9px] text-amber-600 font-bold block mt-1"><i class="bi bi-clock-fill text-[8px] mr-0.5"></i> Unpaid</span>
+                        @endif
                     </td>
                     <td class="py-4 px-6 text-center">
                         <a href="{{ route('customer.orders.show', $order->id) }}" class="inline-flex items-center space-x-1.5 py-1.5 px-3.5 rounded-xl text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 transition-all border border-sky-100 shadow-2xs hover:shadow-xs cursor-pointer">

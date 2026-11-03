@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @auth
+    <meta name="user-id" content="{{ auth()->id() }}">
+    <meta name="user-role" content="{{ auth()->user()->role }}">
+    @endauth
     <title>@yield('title', 'Rider Portal') | DairyBox</title>
     <!-- Favicon Links -->
     <link rel="icon" type="image/png" href="{{ asset('favicon-96x96.png') }}" sizes="96x96" />
@@ -91,17 +96,17 @@
         nav[role="navigation"] a:hover {
             background-color: #f8fafc !important;
             border-color: #cbd5e1 !important;
-            color: #10b981 !important; /* emerald-500 */
+            color: #0ea5e9 !important; /* sky-500 */
             transform: translateY(-1px) !important;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
         }
         /* Active page state */
         nav[role="navigation"] span[aria-current="page"] > span {
-            background-color: #10b981 !important; /* emerald-500 */
-            border-color: #10b981 !important;
+            background-color: #0ea5e9 !important; /* sky-500 */
+            border-color: #0ea5e9 !important;
             color: #ffffff !important;
             font-weight: 700 !important;
-            box-shadow: 0 4px 12px -2px rgba(16, 185, 129, 0.3) !important;
+            box-shadow: 0 4px 12px -2px rgba(14, 165, 233, 0.35) !important;
         }
         /* Disabled state */
         nav[role="navigation"] span[aria-disabled="true"] > span {
@@ -130,32 +135,95 @@
             <div class="flex items-center space-x-1.5">
                 <i class="bi bi-reception-4 text-[9px]"></i>
                 <i class="bi bi-wifi text-[10px]"></i>
-                <i class="bi bi-battery-full text-emerald-600 text-sm"></i>
+                <i class="bi bi-battery-full text-slate-700 text-sm"></i>
             </div>
         </div>
 
         <!-- Header -->
-        <header class="bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm">
-            <div class="flex items-center space-x-2">
-                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-md shadow-emerald-500/10">
-                    <i class="bi bi-bicycle text-sm font-bold text-white"></i>
+        <header class="bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center p-1 border border-sky-100 shadow-xs flex-shrink-0">
+                    <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox" class="w-full h-full object-contain">
                 </div>
                 <div>
-                    <span class="text-sm font-black tracking-tight text-slate-900">Dairy<span class="text-emerald-500">Box</span></span>
-                    <span class="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded ml-1 font-bold uppercase tracking-wider">Rider</span>
+                    <span class="text-sm font-black tracking-tight text-slate-900 leading-none">Dairy<span class="text-[#0ea5e9]">Box</span></span>
+                    <span class="text-[9px] bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded ml-1 font-bold uppercase tracking-wider">Rider</span>
                 </div>
             </div>
             
-            <div class="flex items-center space-x-3">
+            @php
+                $riderNotifCount = auth()->check() ? \App\Models\AppNotification::where('user_id', auth()->id())->where('is_read', false)->count() : 0;
+                $riderNotifications = auth()->check() ? \App\Models\AppNotification::where('user_id', auth()->id())->latest()->take(20)->get() : collect();
+            @endphp
+            
+            <div class="flex items-center space-x-2.5">
+                <!-- Rider Notifications -->
+                <div class="relative">
+                    <button id="riderNotifBellBtn" class="relative p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all cursor-pointer focus:outline-none" title="Notifications">
+                        <i class="bi bi-bell text-lg"></i>
+                        @if($riderNotifCount > 0)
+                            <span class="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-white animate-pulse">
+                                {{ $riderNotifCount }}
+                            </span>
+                        @endif
+                    </button>
+
+                    <!-- Rider Notifications Modal -->
+                    <div id="riderNotifModal" class="absolute right-0 mt-2 w-72 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
+                        <div class="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                            <h4 class="text-xs font-bold text-slate-900">Notifications</h4>
+                            @if($riderNotifCount > 0)
+                                <span class="text-[9px] font-bold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full border border-sky-100">
+                                    {{ $riderNotifCount }} new
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="overflow-y-auto divide-y divide-slate-100 max-h-[300px]">
+                            @forelse($riderNotifications as $notif)
+                                <div class="group relative p-3 flex items-start justify-between gap-2.5 transition-all hover:bg-sky-50/40 {{ !$notif->is_read ? 'bg-sky-50/15' : '' }}">
+                                    <a href="{{ route('notifications.readAndRedirect', $notif->id) }}" class="flex space-x-2 flex-1 min-w-0 block">
+                                        <div class="mt-0.5 flex-shrink-0">
+                                            @if(!$notif->is_read)
+                                                <span class="block w-2 h-2 rounded-full bg-sky-500 ring-4 ring-sky-100"></span>
+                                            @else
+                                                <span class="block w-2 h-2 rounded-full bg-slate-200"></span>
+                                            @endif
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center justify-between">
+                                                <h5 class="text-[11px] font-bold {{ !$notif->is_read ? 'text-slate-900 group-hover:text-sky-600' : 'text-slate-700 group-hover:text-sky-600' }} transition-colors truncate">
+                                                    {{ $notif->title }}
+                                                </h5>
+                                                <i class="bi bi-arrow-right text-[9px] text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all ml-1 flex-shrink-0"></i>
+                                            </div>
+                                            <p class="text-[10px] text-slate-500 mt-0.5 leading-snug break-words">{{ $notif->message }}</p>
+                                            <div class="flex items-center space-x-2 mt-1">
+                                                <span class="block text-[8px] text-slate-400 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
+                                                <span class="text-[8px] font-semibold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">View record &rarr;</span>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
+                            @empty
+                                <div class="py-8 text-center text-slate-400 text-xs">
+                                    <i class="bi bi-bell-slash text-2xl text-slate-200 mb-1 block"></i>
+                                    <span>No new notifications.</span>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
                 <div class="text-right">
                     <p class="text-[10px] font-bold text-slate-900 leading-none">{{ auth()->user()->name }}</p>
-                    <p class="text-[8px] text-emerald-500 mt-0.5 flex items-center justify-end font-semibold">
+                    <p class="text-[8px] text-emerald-600 mt-0.5 flex items-center justify-end font-semibold">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Active
                     </p>
                 </div>
                 <form action="{{ route('logout') }}" method="POST" class="inline">
                     @csrf
-                    <button type="submit" class="p-2 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 transition-all cursor-pointer" title="Logout">
+                    <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 transition-all cursor-pointer" title="Logout">
                         <i class="bi bi-power text-sm"></i>
                     </button>
                 </form>
@@ -205,14 +273,14 @@
         </main>
 
         <!-- Mobile Bottom Tab Navigation -->
-        <nav class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-3 flex items-center justify-around z-40 shadow-[0_-8px_24px_rgba(0,0,0,0.03)] md:rounded-b-[36px]">
-            <a href="{{ route('rider.dashboard') }}" class="flex flex-col items-center space-y-1 text-[10px] font-bold transition-all {{ request()->routeIs('rider.dashboard') ? 'text-emerald-600 scale-105' : 'text-slate-400 hover:text-slate-600' }}">
-                <i class="bi bi-journal-text text-lg"></i>
-                <span>Active Queue</span>
+        <nav class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-2.5 flex items-center justify-around z-40 shadow-[0_-8px_24px_rgba(0,0,0,0.03)] md:rounded-b-[36px]">
+            <a href="{{ route('rider.dashboard') }}" class="flex flex-col items-center py-1 px-4 rounded-2xl transition-all {{ request()->routeIs('rider.dashboard') ? 'text-sky-600 font-extrabold bg-sky-50/70 scale-102' : 'text-slate-400 hover:text-slate-600 font-medium' }}">
+                <i class="bi bi-box-seam text-lg leading-none mb-1"></i>
+                <span class="text-[10px] tracking-tight">Active Queue</span>
             </a>
-            <a href="{{ route('rider.history') }}" class="flex flex-col items-center space-y-1 text-[10px] font-bold transition-all {{ request()->routeIs('rider.history') ? 'text-emerald-600 scale-105' : 'text-slate-400 hover:text-slate-600' }}">
-                <i class="bi bi-clock-history text-lg"></i>
-                <span>History Log</span>
+            <a href="{{ route('rider.history') }}" class="flex flex-col items-center py-1 px-4 rounded-2xl transition-all {{ request()->routeIs('rider.history') ? 'text-sky-600 font-extrabold bg-sky-50/70 scale-102' : 'text-slate-400 hover:text-slate-600 font-medium' }}">
+                <i class="bi bi-clock-history text-lg leading-none mb-1"></i>
+                <span class="text-[10px] tracking-tight">History Log</span>
             </a>
         </nav>
     </div>
@@ -247,6 +315,21 @@
                     form.removeAttribute('onsubmit');
                 }
             });
+
+            // Rider notification dropdown toggle
+            const riderBellBtn = document.getElementById('riderNotifBellBtn');
+            const riderModal = document.getElementById('riderNotifModal');
+            if (riderBellBtn && riderModal) {
+                riderBellBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    riderModal.classList.toggle('hidden');
+                });
+                document.addEventListener('click', (e) => {
+                    if (!riderModal.contains(e.target) && !riderBellBtn.contains(e.target)) {
+                        riderModal.classList.add('hidden');
+                    }
+                });
+            }
         });
 
         // Global confirmation interceptor using SweetAlert2
@@ -268,7 +351,7 @@
                     text: message,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#10b981',
+                    confirmButtonColor: '#0ea5e9',
                     cancelButtonColor: '#64748b',
                     confirmButtonText: 'Yes, proceed!',
                     cancelButtonText: 'Cancel',

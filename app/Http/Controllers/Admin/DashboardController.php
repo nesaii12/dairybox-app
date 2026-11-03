@@ -26,8 +26,8 @@ class DashboardController extends Controller
 
         $nearExpirationAlerts = Product::where('status', 'active')
             ->whereNotNull('expiration_date')
+            ->where('stock', '>', 0)
             ->where('expiration_date', '<=', Carbon::now()->addDays(7))
-            ->where('expiration_date', '>', Carbon::now())
             ->count();
 
         // 2. Recent Orders

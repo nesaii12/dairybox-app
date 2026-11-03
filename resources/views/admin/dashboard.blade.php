@@ -7,45 +7,45 @@
 <!-- KPI Cards Row -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
     <!-- Sales Card -->
-    <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between">
+    <div class="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:border-slate-300 transition-colors flex items-center justify-between">
         <div>
-            <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Total Revenue</span>
+            <span class="text-slate-500 text-[11px] font-bold uppercase tracking-wider block">Total Revenue</span>
             <span class="text-xl sm:text-2xl font-black text-slate-900 block mt-1">₱{{ number_format($totalSales, 2) }}</span>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-2xs">
             <i class="bi bi-wallet2 text-lg"></i>
         </div>
     </div>
 
     <!-- Orders Card -->
-    <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between">
+    <div class="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:border-slate-300 transition-colors flex items-center justify-between">
         <div>
-            <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Total Orders</span>
+            <span class="text-slate-500 text-[11px] font-bold uppercase tracking-wider block">Total Orders</span>
             <span class="text-xl sm:text-2xl font-black text-slate-900 block mt-1">{{ $totalOrders }}</span>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100">
+        <div class="w-10 h-10 rounded-xl bg-slate-900 text-sky-400 flex items-center justify-center border border-slate-800 shadow-2xs">
             <i class="bi bi-cart-check text-lg"></i>
         </div>
     </div>
 
     <!-- Customers Card -->
-    <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between">
+    <div class="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:border-slate-300 transition-colors flex items-center justify-between">
         <div>
-            <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Customers</span>
+            <span class="text-slate-500 text-[11px] font-bold uppercase tracking-wider block">Customers</span>
             <span class="text-xl sm:text-2xl font-black text-slate-900 block mt-1">{{ $totalCustomers }}</span>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-2xs">
             <i class="bi bi-people text-lg"></i>
         </div>
     </div>
 
     <!-- Products Card -->
-    <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between">
+    <div class="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:border-slate-300 transition-colors flex items-center justify-between">
         <div>
-            <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Active Catalog</span>
+            <span class="text-slate-500 text-[11px] font-bold uppercase tracking-wider block">Active Catalog</span>
             <span class="text-xl sm:text-2xl font-black text-slate-900 block mt-1">{{ $totalProducts }}</span>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shadow-2xs">
             <i class="bi bi-egg-fried text-lg"></i>
         </div>
     </div>
@@ -85,7 +85,7 @@
 <!-- Charts Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
     <!-- Sales trend Line Chart -->
-    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6">
         <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center space-x-1.5">
             <i class="bi bi-graph-up text-sky-600"></i>
             <span>Monthly Revenue Sales Trend</span>
@@ -96,7 +96,7 @@
     </div>
 
     <!-- Best Seller Bar Chart -->
-    <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+    <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6">
         <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center space-x-1.5">
             <i class="bi bi-bar-chart-fill text-sky-600"></i>
             <span>Best Selling Product Volumes</span>
@@ -108,10 +108,10 @@
 </div>
 
 <!-- Bottom Area: Recent Orders -->
-<div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+<div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-950 font-bold">Recent Customer Placements</h3>
-        <a href="{{ route('admin.orders.index') }}" class="text-xs text-sky-600 hover:text-sky-500 font-bold">See All Orders</a>
+        <a href="{{ route('admin.orders.index') }}" class="text-xs text-sky-600 hover:text-sky-700 font-bold">See All Orders</a>
     </div>
 
     <div class="overflow-x-auto">

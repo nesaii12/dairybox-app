@@ -14,7 +14,7 @@
     <div class="bg-white rounded-2xl border border-slate-200/80 p-6 flex flex-col items-center justify-center shadow-sm">
         <div class="w-full h-80 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100/50 flex items-center justify-center shadow-inner mb-6">
             @if($product->image)
-                <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->product_name }}" class="h-full w-full object-cover">
+                <img src="{{ asset('storage/' . $product->image) }}" id="productMainImage" alt="{{ $product->product_name }}" class="h-full w-full object-cover product-main-img">
             @else
                 <i class="bi bi-image text-slate-300 text-6xl"></i>
             @endif
@@ -70,8 +70,16 @@
                 <p class="text-sm text-slate-600 leading-relaxed">{{ $product->description ? $product->description : 'Fresh, premium quality product processed directly from dairy sources.' }}</p>
             </div>
 
-            <!-- Specs Grid -->
-            <div class="grid grid-cols-2 gap-4 mt-6">
+            <!-- Specs & Freshness Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
+                @if($product->flavor)
+                <div class="p-3.5 bg-sky-50/60 border border-sky-100 rounded-2xl">
+                    <span class="block text-[9px] font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1">
+                        <i class="bi bi-tag-fill text-[9px]"></i> Flavor
+                    </span>
+                    <span class="text-xs font-bold text-sky-950">{{ $product->flavor }}</span>
+                </div>
+                @endif
                 <div class="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Milk Source</span>
                     <span class="text-xs font-bold text-slate-800">{{ $product->milk_type }} Milk</span>
@@ -80,34 +88,96 @@
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Container Size</span>
                     <span class="text-xs font-bold text-slate-800">{{ $product->size }}</span>
                 </div>
+                @if($product->manufacturing_date)
+                <div class="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <i class="bi bi-calendar-check text-sky-500"></i> Manufactured
+                    </span>
+                    <span class="text-xs font-bold text-slate-800">{{ \Carbon\Carbon::parse($product->manufacturing_date)->format('M d, Y') }}</span>
+                </div>
+                @endif
+                @if($product->expiration_date)
+                @php
+                    $isNearExpiry = \Carbon\Carbon::parse($product->expiration_date)->isFuture() && \Carbon\Carbon::parse($product->expiration_date)->diffInDays(now()) <= 7;
+                @endphp
+                <div class="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <i class="bi bi-clock-history {{ $isNearExpiry ? 'text-amber-500' : 'text-emerald-500' }}"></i> Best Before / Exp
+                    </span>
+                    <span class="text-xs font-bold {{ $isNearExpiry ? 'text-amber-700' : 'text-slate-800' }}">
+                        {{ \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') }}
+                    </span>
+                </div>
+                @endif
             </div>
         </div>
 
         <!-- Purchase Action Form -->
         <div class="mt-8 pt-6 border-t border-slate-100">
+            @php
+                $cartQty = $cartItemQuantity ?? 0;
+                $availableToAdd = max(0, $product->stock - $cartQty);
+                $allStockInCart = ($cartQty >= $product->stock) && ($product->stock > 0);
+            @endphp
+
             @if($product->stock > 0)
                 @auth
-                    <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="space-y-4">
-                        @csrf
-                        <div class="flex items-center justify-between">
-                            <label for="quantity" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Order Quantity</label>
-                            <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 w-32 justify-between">
-                                <button type="button" onclick="decrementQty()" class="px-3 py-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
-                                    <i class="bi bi-dash-lg"></i>
-                                </button>
-                                <input type="number" name="quantity" id="quantity" value="1" min="1" max="{{ $product->stock }}" 
-                                    class="w-10 text-center text-sm font-bold bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-900 select-none">
-                                <button type="button" onclick="incrementQty()" class="px-3 py-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
-                                    <i class="bi bi-plus-lg"></i>
-                                </button>
+                    @if(auth()->user()->isRestricted())
+                        <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+                            <div class="flex items-center gap-1.5 font-bold text-rose-900">
+                                <i class="bi bi-shield-slash-fill text-rose-600"></i>
+                                <span>Ordering Privileges Restricted</span>
                             </div>
+                            <p class="text-[11px] leading-relaxed">
+                                Your account is temporarily restricted from placing orders until {{ auth()->user()->restricted_until->format('M d, Y h:i A') }} due to an order cancellation policy violation.
+                            </p>
                         </div>
-
-                        <button type="submit" class="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-[#0ea5e9] hover:bg-sky-600 transition-all shadow-md shadow-sky-100 cursor-pointer">
-                            <i class="bi bi-cart-plus-fill text-base"></i>
-                            <span>Add to Shopping Cart</span>
+                        <button disabled class="w-full mt-3 py-3 px-4 rounded-xl text-sm font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed text-center flex items-center justify-center space-x-2">
+                            <i class="bi bi-lock-fill"></i>
+                            <span>Ordering Restricted</span>
                         </button>
-                    </form>
+                    @elseif($allStockInCart)
+                        <div class="p-4 bg-sky-50/60 border border-sky-100 rounded-2xl text-xs text-sky-800 space-y-1">
+                            <div class="flex items-center gap-1.5 font-bold text-sky-900">
+                                <i class="bi bi-cart-check-fill text-sky-600 text-sm"></i>
+                                <span>All Available Units in Cart</span>
+                            </div>
+                            <p class="text-[11px] leading-relaxed">
+                                You already have all {{ $product->stock }} available unit(s) of this item in your shopping cart.
+                            </p>
+                        </div>
+                        <a href="{{ route('customer.cart.index') }}" class="w-full mt-3 py-3 px-4 rounded-xl text-sm font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all text-center flex items-center justify-center space-x-2">
+                            <i class="bi bi-cart3"></i>
+                            <span>View in Shopping Cart</span>
+                        </a>
+                    @else
+                        <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="space-y-4 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}" data-in-cart="{{ $cartQty }}">
+                            @csrf
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <label for="quantity" class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Order Quantity</label>
+                                    @if($cartQty > 0)
+                                        <span class="text-[10px] text-sky-600 font-semibold">{{ $cartQty }} already in cart ({{ $availableToAdd }} more available)</span>
+                                    @endif
+                                </div>
+                                <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 w-32 justify-between">
+                                    <button type="button" onclick="decrementQty()" class="px-3 py-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <i class="bi bi-dash-lg"></i>
+                                    </button>
+                                    <input type="number" name="quantity" id="quantity" value="1" min="1" max="{{ $availableToAdd }}" 
+                                        class="w-10 text-center text-sm font-bold bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-900 select-none">
+                                    <button type="button" onclick="incrementQty()" class="px-3 py-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="add-to-cart-btn w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-[#0ea5e9] hover:bg-sky-600 transition-all shadow-md shadow-sky-100 cursor-pointer">
+                                <i class="bi bi-cart-plus-fill text-base"></i>
+                                <span>Add to Shopping Cart</span>
+                            </button>
+                        </form>
+                    @endif
                 @else
                     <a href="{{ route('login') }}" class="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-[#0ea5e9] hover:bg-sky-600 transition-all shadow-md shadow-sky-100 text-center cursor-pointer">
                         <i class="bi bi-cart-plus-fill text-base"></i>
@@ -194,22 +264,59 @@
 
 @section('scripts')
 <script>
-    const maxStock = {{ $product->stock }};
+    const maxStock = {{ $availableToAdd ?? $product->stock }};
+    const totalStock = {{ $product->stock }};
+    const inCart = {{ $cartQty ?? 0 }};
     const qtyInput = document.getElementById('quantity');
 
     function incrementQty() {
         if (!qtyInput) return;
-        let val = parseInt(qtyInput.value);
+        let val = parseInt(qtyInput.value, 10) || 1;
         if (val < maxStock) {
             qtyInput.value = val + 1;
+        } else {
+            showStockLimitNotice();
         }
     }
 
     function decrementQty() {
         if (!qtyInput) return;
-        let val = parseInt(qtyInput.value);
+        let val = parseInt(qtyInput.value, 10) || 1;
         if (val > 1) {
             qtyInput.value = val - 1;
+        }
+    }
+
+    if (qtyInput) {
+        qtyInput.addEventListener('input', () => {
+            let val = parseInt(qtyInput.value, 10);
+            if (val > maxStock) {
+                qtyInput.value = maxStock;
+                showStockLimitNotice();
+            } else if (val < 1 && qtyInput.value !== '') {
+                qtyInput.value = 1;
+            }
+        });
+
+        qtyInput.addEventListener('blur', () => {
+            let val = parseInt(qtyInput.value, 10);
+            if (isNaN(val) || val < 1) qtyInput.value = 1;
+            if (val > maxStock) qtyInput.value = maxStock;
+        });
+    }
+
+    function showStockLimitNotice() {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Stock Limit',
+                text: inCart > 0 
+                    ? `You already have ${inCart} in your cart. Only ${maxStock} more unit(s) can be added (Total stock: ${totalStock}).` 
+                    : `Maximum available stock is ${totalStock} unit(s).`,
+                timer: 2500,
+                showConfirmButton: false,
+                customClass: { popup: 'rounded-2xl border border-slate-100 shadow-xl' }
+            });
         }
     }
 </script>

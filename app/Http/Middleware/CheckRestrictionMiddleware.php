@@ -21,8 +21,8 @@ class CheckRestrictionMiddleware
         if ($user && $user->isRestricted()) {
             $until = $user->restricted_until->format('M d, Y h:i A');
 
-            return redirect()->back()->with('error',
-                "Your account is temporarily restricted until {$until} due to a policy violation. Please contact support if you believe this is an error."
+            return redirect()->route('customer.cart.index')->with('error',
+                "Your account is temporarily restricted from ordering until {$until} due to a cancelled order policy violation."
             );
         }
 

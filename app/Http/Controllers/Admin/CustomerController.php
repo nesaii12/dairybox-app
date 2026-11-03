@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Order;
 use App\Models\AuditLog;
+use App\Models\AppNotification;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -76,7 +77,47 @@ class CustomerController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return redirect()->route('admin.customers.show', $customer->id)
+        // In-app notification for the customer
+        AppNotification::create([
+            'user_id' => $customer->id,
+            'title' => 'Ordering Privileges Suspended (3 Days)',
+            'message' => "Your ordering privileges have been temporarily suspended for {$banDurationDays} days until " . $until->format('M d, Y h:i A') . ". Reason: {$request->reason}",
+            'link' => route('customer.orders.index'),
+            'is_read' => false,
+        ]);
+
+        return redirect()->back(fallback: route('admin.customers.index'))
             ->with('success', "Customer account has been suspended for {$banDurationDays} days (until " . $until->format('M d, Y h:i A') . ").");
+    }
+
+    public function unrestrict(Request $request, User $customer)
+    {
+        if ($customer->role !== 'customer') {
+            abort(404);
+        }
+
+        $customer->update([
+            'status' => 'active',
+            'restricted_until' => null,
+        ]);
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'CUSTOMER_UNRESTRICTED',
+            'details' => "Admin restored ordering privileges for customer {$customer->name} (#{$customer->id})",
+            'ip_address' => $request->ip(),
+        ]);
+
+        // In-app notification for the customer
+        AppNotification::create([
+            'user_id' => $customer->id,
+            'title' => 'Ordering Privileges Restored',
+            'message' => "Your ordering privileges have been restored. You can now place orders again.",
+            'link' => route('customer.catalog'),
+            'is_read' => false,
+        ]);
+
+        return redirect()->back(fallback: route('admin.customers.index'))
+            ->with('success', "Ordering privileges for {$customer->name} have been restored.");
     }
 }

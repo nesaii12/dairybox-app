@@ -17,6 +17,12 @@ class Order extends Model
         'customer_id',
         'rider_id',
         'order_type',
+        'payment_method',
+        'payment_status',
+        'payment_channel',
+        'xendit_invoice_id',
+        'xendit_invoice_url',
+        'paid_at',
         'delivery_address',
         'schedule_date',
         'schedule_time',
@@ -24,6 +30,8 @@ class Order extends Model
         'delivery_fee',
         'total_amount',
         'order_status',
+        'cancelled_after_arrival',
+        'cancellation_reason',
     ];
 
     protected function casts(): array
@@ -33,7 +41,41 @@ class Order extends Model
             'subtotal' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'cancelled_after_arrival' => 'boolean',
+            'paid_at' => 'datetime',
         ];
+    }
+
+    public function isPaid(): bool
+    {
+        return strtolower($this->payment_status) === 'paid';
+    }
+
+    public function isOnlinePayment(): bool
+    {
+        return strtolower($this->payment_method) === 'xendit';
+    }
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Order $order) {
+            try {
+                broadcast(new \App\Events\OrderUpdated($order, 'created'));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Order broadcast failed: ' . $e->getMessage());
+            }
+        });
+
+        static::updated(function (Order $order) {
+            try {
+                broadcast(new \App\Events\OrderUpdated($order, 'updated'));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Order broadcast failed: ' . $e->getMessage());
+            }
+        });
     }
 
     /**

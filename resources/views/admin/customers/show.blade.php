@@ -50,7 +50,7 @@
             </div>
         </div>
 
-        <!-- Abuse Verification Suspension Form (Only if active) -->
+        <!-- Abuse Verification Suspension Form / Lift Restriction -->
         @if(!$isSuspended)
         <div class="bg-white rounded-2xl border border-rose-100/80 shadow-sm p-6 relative overflow-hidden">
             <!-- Warning indicator strip -->
@@ -77,6 +77,23 @@
                 <button type="submit" class="w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-all shadow-md shadow-rose-100 cursor-pointer">
                     <i class="bi bi-exclamation-triangle-fill"></i>
                     <span>Enforce 3-day lockout</span>
+                </button>
+            </form>
+        </div>
+        @else
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 relative overflow-hidden">
+            <h3 class="text-sm font-bold text-slate-950 mb-1 flex items-center space-x-2 text-slate-800">
+                <i class="bi bi-shield-check text-emerald-600"></i>
+                <span>Ordering Privileges Restricted</span>
+            </h3>
+            <p class="text-[11px] text-slate-500 mb-4 leading-relaxed">
+                This customer is currently restricted until <strong class="text-slate-700">{{ $customer->restricted_until->format('M d, Y h:i A') }}</strong>. You can restore ordering access early if the issue has been resolved.
+            </p>
+            <form action="{{ route('admin.customers.unrestrict', $customer->id) }}" method="POST" onsubmit="return confirm('Restore ordering privileges for {{ $customer->name }} early?');">
+                @csrf
+                <button type="submit" class="w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-all shadow-xs cursor-pointer">
+                    <i class="bi bi-arrow-counterclockwise mr-1"></i>
+                    <span>Lift Restriction Early</span>
                 </button>
             </form>
         </div>

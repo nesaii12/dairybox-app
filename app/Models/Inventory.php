@@ -15,6 +15,7 @@ class Inventory extends Model
         'stock_in',
         'stock_out',
         'remaining_stock',
+        'manufacturing_date',
         'expiration_date',
         'remarks',
     ];
@@ -22,6 +23,7 @@ class Inventory extends Model
     protected function casts(): array
     {
         return [
+            'manufacturing_date' => 'date',
             'expiration_date' => 'date',
         ];
     }

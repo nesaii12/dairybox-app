@@ -40,7 +40,7 @@
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attributes</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Price</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Current Stock</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Expiration</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Dates</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                     <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -49,13 +49,19 @@
                 @forelse($products as $product)
                 @php
                     $isLowStock = $product->stock < 10;
+                    $isExpired = false;
                     $isNearExpiration = false;
-                    if ($product->expiration_date) {
-                        $expiryDate = \Carbon\Carbon::parse($product->expiration_date);
-                        $isNearExpiration = $expiryDate->isFuture() && $expiryDate->diffInDays(now()) <= 7;
+                    if ($product->expiration_date && $product->stock > 0) {
+                        $expiryDate = \Carbon\Carbon::parse($product->expiration_date)->startOfDay();
+                        $today = now()->startOfDay();
+                        if ($expiryDate->lt($today)) {
+                            $isExpired = true;
+                        } elseif ($expiryDate->diffInDays($today) <= 7) {
+                            $isNearExpiration = true;
+                        }
                     }
                 @endphp
-                <tr class="hover:bg-slate-50/50 transition-colors">
+                <tr id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name . ' (' . $product->size . ')') }}" class="hover:bg-slate-50/50 transition-colors record-highlight-target">
                     <!-- Product details -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center space-x-3">
@@ -79,6 +85,11 @@
                     <!-- Attributes -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex flex-col space-y-1">
+                            @if($product->flavor)
+                                <span class="inline-flex items-center w-max px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-100">
+                                    <i class="bi bi-tag-fill mr-1 text-[9px] text-sky-500"></i> {{ $product->flavor }}
+                                </span>
+                            @endif
                             <span class="inline-flex items-center w-max px-2 py-0.5 rounded-md text-[10px] font-bold {{ $product->milk_type == 'Carabao' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800' }}">
                                 {{ $product->milk_type }} Milk
                             </span>
@@ -104,14 +115,23 @@
                             @endif
                         </div>
                     </td>
-                    <!-- Expiration -->
+                    <!-- Dates -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex flex-col space-y-1">
-                            <span class="text-xs text-slate-600 font-medium">
-                                {{ $product->expiration_date ? \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') : 'N/A' }}
+                        <div class="flex flex-col space-y-0.5">
+                            @if($product->manufacturing_date)
+                                <span class="text-[10px] text-slate-500 font-medium">
+                                    <span class="font-bold text-slate-400">Mfg:</span> {{ \Carbon\Carbon::parse($product->manufacturing_date)->format('M d, Y') }}
+                                </span>
+                            @endif
+                            <span class="text-xs text-slate-700 font-semibold">
+                                <span class="font-bold text-slate-400 text-[10px]">Exp:</span> {{ $product->expiration_date ? \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') : 'N/A' }}
                             </span>
-                            @if($isNearExpiration)
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 animate-pulse">
+                            @if($isExpired)
+                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                    <i class="bi bi-x-circle mr-1"></i> Expired
+                                </span>
+                            @elseif($isNearExpiration)
+                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
                                     <i class="bi bi-clock mr-1"></i> Near Expiry
                                 </span>
                             @endif
@@ -215,6 +235,47 @@
                                                      </select>
                                                  </div>
 
+<!-- Product Flavor -->
+                                                 <div class="sm:col-span-2 space-y-1 text-left p-3.5 bg-slate-50/70 border border-slate-200/80 rounded-xl">
+                                                     <div class="flex items-center justify-between mb-1">
+                                                         <label for="flavor_{{ $product->id }}" class="block text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                                                             <i class="bi bi-palette2 text-sky-600"></i>
+                                                             <span>Product Flavor</span>
+                                                         </label>
+                                                         <span class="text-[10px] text-slate-400">Preset or custom</span>
+                                                     </div>
+                                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                         <select onchange="handleEditFlavorSelect({{ $product->id }}, this)"
+                                                             class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all cursor-pointer font-medium">
+                                                             <option value="">-- Choose Preset Flavor --</option>
+                                                             @foreach($flavorPresets as $fp)
+                                                                 <option value="{{ $fp['name'] }}" data-image="{{ $fp['image'] }}" {{ old('flavor', $product->flavor) == $fp['name'] ? 'selected' : '' }}>
+                                                                     {{ $fp['name'] }}
+                                                                 </option>
+                                                             @endforeach
+                                                             <option value="CUSTOM">Custom Flavor...</option>
+                                                         </select>
+                                                         <input type="text" name="flavor" id="flavor_{{ $product->id }}" value="{{ old('flavor', $product->flavor) }}"
+                                                             class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all font-semibold"
+                                                             placeholder="Flavor name...">
+                                                     </div>
+                                                 </div>
+
+
+                                                 <!-- Manufacturing Date -->
+                                                 <div class="space-y-1 text-left">
+                                                     <label for="manufacturing_date_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Manufacturing Date</label>
+                                                     <input type="date" name="manufacturing_date" id="manufacturing_date_{{ $product->id }}" value="{{ old('manufacturing_date', $product->manufacturing_date ? \Carbon\Carbon::parse($product->manufacturing_date)->format('Y-m-d') : '') }}" max="{{ date('Y-m-d') }}"
+                                                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all">
+                                                 </div>
+
+                                                 <!-- Expiration Date -->
+                                                 <div class="space-y-1 text-left">
+                                                     <label for="expiration_date_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Expiration Date</label>
+                                                     <input type="date" name="expiration_date" id="expiration_date_{{ $product->id }}" value="{{ old('expiration_date', $product->expiration_date ? \Carbon\Carbon::parse($product->expiration_date)->format('Y-m-d') : '') }}"
+                                                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all">
+                                                 </div>
+
                                                  <!-- Status -->
                                                  <div class="space-y-1 sm:col-span-2 text-left">
                                                      <label for="status_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Catalog Visibility Status</label>
@@ -303,6 +364,72 @@
 </div>
 @section('scripts')
 <script>
+    function handleEditFlavorSelect(productId, select) {
+        const val = select.value;
+        const flavorInput = document.getElementById('flavor_' + productId);
+        if (!val) return;
+        if (val === 'CUSTOM') {
+            flavorInput.value = '';
+            flavorInput.focus();
+            return;
+        }
+        flavorInput.value = val;
+        const selectedOpt = select.options[select.selectedIndex];
+        const imgPath = selectedOpt.getAttribute('data-image');
+        if (imgPath) {
+            selectEditPreset(productId, imgPath, val);
+        }
+    }
+
+    function selectEditPreset(productId, imagePath, flavorName) {
+        const presetInput = document.getElementById('edit_preset_image_' + productId);
+        const fileInput = document.getElementById('image_' + productId);
+        const previewImg = document.getElementById('edit_preview_' + productId);
+        const previewPlaceholder = document.getElementById('edit_preview_placeholder_' + productId);
+        const previewTitle = document.getElementById('edit_preview_title_' + productId);
+        const previewSub = document.getElementById('edit_preview_sub_' + productId);
+
+        if (presetInput) presetInput.value = imagePath;
+        if (fileInput) fileInput.value = '';
+        if (previewImg) {
+            previewImg.src = '{{ asset("storage") }}/' + imagePath;
+            previewImg.classList.remove('hidden');
+        }
+        if (previewPlaceholder) previewPlaceholder.classList.add('hidden');
+        if (previewTitle) previewTitle.textContent = 'Selected Preset: ' + flavorName;
+        if (previewSub) previewSub.textContent = 'Path: storage/' + imagePath;
+
+        const flavorInput = document.getElementById('flavor_' + productId);
+        if (flavorInput && (!flavorInput.value || flavorInput.value.trim() === '')) {
+            flavorInput.value = flavorName;
+        }
+    }
+
+    function previewEditCustomImage(productId, input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const presetInput = document.getElementById('edit_preset_image_' + productId);
+            const previewImg = document.getElementById('edit_preview_' + productId);
+            const previewPlaceholder = document.getElementById('edit_preview_placeholder_' + productId);
+            const previewTitle = document.getElementById('edit_preview_title_' + productId);
+            const previewSub = document.getElementById('edit_preview_sub_' + productId);
+
+            if (presetInput) presetInput.value = '';
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (previewImg) {
+                    previewImg.src = e.target.result;
+                    previewImg.classList.remove('hidden');
+                }
+                if (previewPlaceholder) previewPlaceholder.classList.add('hidden');
+                if (previewTitle) previewTitle.textContent = 'Custom Upload: ' + file.name;
+                if (previewSub) previewSub.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
     function toggleEditProductModal(id) {
         const modal = document.getElementById('editProductModal-' + id);
         if (modal) {

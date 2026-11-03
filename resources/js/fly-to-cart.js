@@ -1,0 +1,246 @@
+/**
+ * DairyBox - Professional Fly-to-Cart Animation & Live Counter
+ */
+
+document.addEventListener('DOMContentLoaded', () => {
+    initFlyToCart();
+});
+
+function initFlyToCart() {
+    document.addEventListener('submit', async (e) => {
+        const form = e.target.closest('form.add-to-cart-form, form[action*="/customer/cart/add"]');
+        if (!form) return;
+
+        // Ensure this is an add-to-cart action
+        if (!form.action || !form.action.includes('/customer/cart/add')) return;
+
+        // Prevent default navigation to cart page
+        e.preventDefault();
+
+        // Prevent concurrent double submissions
+        if (form.dataset.submitting === 'true') return;
+        form.dataset.submitting = 'true';
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+
+        // Add subtle loading state on the button
+        if (submitBtn) {
+            submitBtn.style.pointerEvents = 'none';
+            submitBtn.classList.add('opacity-80', 'scale-95');
+        }
+
+        // Find visual source element (product image or button)
+        const productCard = form.closest('.record-highlight-target, .group, [data-record-id]') || form.closest('.grid > div') || form.parentElement;
+        const mainDetailImg = document.getElementById('productMainImage') || document.querySelector('.product-main-img');
+        const cardImg = productCard ? productCard.querySelector('img') : null;
+        const sourceImg = mainDetailImg || cardImg;
+        const sourceElement = (sourceImg && sourceImg.getBoundingClientRect().width > 20) ? sourceImg : submitBtn;
+
+        // Find target cart icon in the navbar
+        const cartBtn = document.getElementById('navCartButton') || document.querySelector('.nav-cart-btn') || document.querySelector('a[href*="/customer/cart"]');
+
+        try {
+            const formData = new FormData(form);
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                // Run the flying animation ONLY on verified successful addition
+                if (sourceElement && cartBtn) {
+                    animateFlyToCart(sourceElement, cartBtn);
+                }
+
+                // If no more units are available to add, update button to show max reached
+                if (data.available_left === 0 && submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.remove('bg-[#0ea5e9]', 'hover:bg-sky-600', 'text-white');
+                    submitBtn.classList.add('bg-sky-50', 'text-sky-600', 'border', 'border-sky-200', 'cursor-not-allowed');
+                    submitBtn.title = 'All available units are now in your cart';
+                    submitBtn.innerHTML = '<i class="bi bi-check2 text-base font-bold"></i>';
+                }
+
+                // Wait for the flyer to land before triggering cart bounce & badge update
+                setTimeout(() => {
+                    // 1. Bounce cart icon
+                    bounceCartIcon(cartBtn);
+
+                    // 2. Update cart badges
+                    updateCartBadges(data.cart_count);
+
+                    // 3. Show sleek floating toast notification
+                    showFlyCartToast(data.product_name, data.cart_count, data.product_image);
+                }, 600);
+            } else {
+                // If restricted or stock limit error
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: response.status === 403 ? 'warning' : 'warning',
+                        title: response.status === 403 ? 'Ordering Restricted' : 'Stock Limit',
+                        text: data.message || 'Cannot add more units than available in stock.',
+                        confirmButtonColor: '#0ea5e9',
+                        customClass: {
+                            popup: 'rounded-2xl border border-slate-100 shadow-xl'
+                        }
+                    });
+                } else {
+                    alert(data.message || 'Cannot add more units than available in stock.');
+                }
+            }
+        } catch (error) {
+            console.error('Add to cart failed:', error);
+            // Fallback: If network fails or non-JSON returned, submit normally
+            form.submit();
+        } finally {
+            if (submitBtn) {
+                submitBtn.style.pointerEvents = '';
+                submitBtn.classList.remove('opacity-80', 'scale-95');
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+            delete form.dataset.submitting;
+        }
+    });
+}
+
+/**
+ * Creates and animates the flying product thumbnail into the navbar cart
+ */
+function animateFlyToCart(sourceEl, targetCartEl) {
+    const sourceRect = sourceEl.getBoundingClientRect();
+    const targetRect = targetCartEl.getBoundingClientRect();
+
+    const startX = sourceRect.left + sourceRect.width / 2;
+    const startY = sourceRect.top + sourceRect.height / 2;
+    const targetX = targetRect.left + targetRect.width / 2;
+    const targetY = targetRect.top + targetRect.height / 2;
+
+    const flyer = document.createElement('div');
+    flyer.className = 'fly-to-cart-thumbnail';
+
+    // Style flyer capsule
+    const size = Math.min(Math.max(sourceRect.width * 0.4, 52), 80);
+    Object.assign(flyer.style, {
+        position: 'fixed',
+        zIndex: '999999',
+        pointerEvents: 'none',
+        width: `${size}px`,
+        height: `${size}px`,
+        left: `${startX - size / 2}px`,
+        top: `${startY - size / 2}px`,
+        borderRadius: '50%',
+        overflow: 'hidden',
+        border: '2.5px solid #0ea5e9',
+        boxShadow: '0 12px 30px -4px rgba(14, 165, 233, 0.55), 0 0 15px rgba(56, 189, 248, 0.45)',
+        backgroundColor: '#ffffff',
+        transform: 'translate(0px, 0px) scale(1) rotate(0deg)',
+        opacity: '1',
+        transition: 'transform 0.65s cubic-bezier(0.2, 0.85, 0.25, 1), opacity 0.65s cubic-bezier(0.4, 0, 1, 1), scale 0.65s cubic-bezier(0.2, 0.85, 0.25, 1)',
+        willChange: 'transform, opacity'
+    });
+
+    if (sourceEl.tagName === 'IMG' && sourceEl.src) {
+        flyer.innerHTML = `<img src="${sourceEl.src}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+    } else {
+        flyer.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white;"><i class="bi bi-cart-plus-fill" style="font-size: 1.35rem;"></i></div>`;
+    }
+
+    document.body.appendChild(flyer);
+
+    // Trigger curve transition in next animation frames
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            const deltaX = targetX - startX;
+            const deltaY = targetY - startY;
+
+            flyer.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.22) rotate(18deg)`;
+            flyer.style.opacity = '0.35';
+        });
+    });
+
+    // Remove flyer upon landing
+    setTimeout(() => {
+        if (flyer.parentElement) {
+            flyer.remove();
+        }
+    }, 700);
+}
+
+/**
+ * Triggers a satisfying pop/bounce animation on the cart icon
+ */
+function bounceCartIcon(cartBtn) {
+    if (!cartBtn) return;
+    cartBtn.classList.remove('cart-icon-pop');
+    void cartBtn.offsetWidth; // Force reflow
+    cartBtn.classList.add('cart-icon-pop');
+
+    setTimeout(() => {
+        cartBtn.classList.remove('cart-icon-pop');
+    }, 650);
+}
+
+/**
+ * Updates all cart badge counters in headers and navbars
+ */
+function updateCartBadges(newCount) {
+    document.querySelectorAll('.cart-nav-badge').forEach(badge => {
+        badge.textContent = newCount;
+        if (newCount > 0) {
+            badge.classList.remove('hidden');
+        }
+        badge.classList.remove('cart-badge-pop');
+        void badge.offsetWidth; // Force reflow
+        badge.classList.add('cart-badge-pop');
+
+        setTimeout(() => {
+            badge.classList.remove('cart-badge-pop');
+        }, 550);
+    });
+}
+
+/**
+ * Displays a sleek, non-blocking floating toast in the top right
+ */
+function showFlyCartToast(productName, cartCount, productImgUrl) {
+    let container = document.getElementById('dairybox-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'dairybox-toast-container';
+        container.className = 'fixed top-20 right-4 sm:right-6 z-[99999] flex flex-col items-end space-y-2 pointer-events-none';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'pointer-events-auto flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-sky-100 shadow-xl shadow-sky-500/10 toast-enter max-w-sm transition-all';
+    toast.innerHTML = `
+        <div class="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100/80 flex items-center justify-center flex-shrink-0 overflow-hidden text-sky-600">
+            ${productImgUrl ? `<img src="${productImgUrl}" alt="" class="w-full h-full object-cover">` : `<i class="bi bi-cart-check-fill text-xl text-sky-600"></i>`}
+        </div>
+        <div class="min-w-0 pr-1">
+            <h4 class="text-xs font-bold text-slate-900 truncate">${productName}</h4>
+            <p class="text-[11px] text-slate-500 font-medium">Added to cart &bull; ${cartCount} ${cartCount === 1 ? 'item' : 'items'} in cart</p>
+        </div>
+        <a href="/customer/cart" class="text-xs font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100/80 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 flex-shrink-0 cursor-pointer">
+            <span>View</span>
+            <i class="bi bi-arrow-right text-xs"></i>
+        </a>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.remove('toast-enter');
+        toast.classList.add('toast-exit');
+        setTimeout(() => toast.remove(), 320);
+    }, 3200);
+}
+
+export { initFlyToCart };

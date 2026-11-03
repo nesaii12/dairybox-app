@@ -6,7 +6,15 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
+use App\Services\GoogleAuthService;
+use App\Services\OtpService;
 
 class AuthController extends Controller
 {
@@ -18,7 +26,7 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request)
+    public function login(Request $request, OtpService $otpService)
     {
         $credentials = $request->validate([
             'email' => 'required|email',
@@ -31,10 +39,25 @@ class AuthController extends Controller
 
             if ($user->status === 'restricted' && $user->isRestricted()) {
                 Auth::logout();
-                $until = $user->restricted_until->format('M d, Y h:i A');
+                $until = $user->restricted_until ? $user->restricted_until->format('M d, Y h:i A') : 'further notice';
                 return back()->withErrors([
                     'email' => "Your account is temporarily restricted until {$until} due to policy violations.",
+                ])->onlyInput('email');
+            }
+
+            // Check if customer email is not verified yet
+            if ($user->role === 'customer' && !$user->hasVerifiedEmail()) {
+                Auth::logout();
+                session([
+                    'pending_otp_user_id' => $user->id,
+                    'pending_otp_email' => $user->email,
                 ]);
+
+                if ($otpService->canResend($user)) {
+                    $otpService->generateAndSend($user);
+                }
+
+                return redirect()->route('otp.verify')->with('info', 'Please enter your 6-digit verification code to activate your account.');
             }
 
             return $this->redirectBasedOnRole($user);
@@ -53,12 +76,12 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
-    public function register(Request $request)
+    public function register(Request $request, OtpService $otpService)
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'phone' => 'required|string|max:20',
         ]);
 
@@ -75,9 +98,96 @@ class AuthController extends Controller
             'status' => 'active',
         ]);
 
-        Auth::login($user);
+        // Generate and send 6-digit OTP code to the newly created user's email
+        $otpService->generateAndSend($user);
 
-        return redirect()->route('customer.catalog')->with('success', 'Registration successful! Welcome to DairyBox.');
+        // Store pending user in session for OTP verification
+        session([
+            'pending_otp_user_id' => $user->id,
+            'pending_otp_email' => $user->email,
+        ]);
+
+        return redirect()->route('otp.verify')->with('success', 'Verification code sent to ' . $user->email . '. Please enter the 6-digit code to activate your account.');
+    }
+
+    /**
+     * Show the OTP verification form.
+     */
+    public function showOtpVerification(OtpService $otpService)
+    {
+        $userId = session('pending_otp_user_id') ?? Auth::id();
+        $user = $userId ? User::find($userId) : null;
+
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'Please log in or register to verify your account.');
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            if (!Auth::check()) {
+                Auth::login($user);
+            }
+            return $this->redirectBasedOnRole($user);
+        }
+
+        $remainingCooldown = $otpService->getRemainingCooldownSeconds($user);
+
+        return view('auth.verify-otp', [
+            'user' => $user,
+            'email' => $user->email,
+            'remainingCooldown' => $remainingCooldown,
+        ]);
+    }
+
+    /**
+     * Verify the entered 6-digit OTP code.
+     */
+    public function verifyOtp(Request $request, OtpService $otpService)
+    {
+        $request->validate([
+            'otp' => 'required|string',
+        ]);
+
+        $userId = session('pending_otp_user_id') ?? Auth::id();
+        $user = $userId ? User::find($userId) : null;
+
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'Session expired. Please log in again.');
+        }
+
+        if ($otpService->verify($user, $request->otp)) {
+            session()->forget(['pending_otp_user_id', 'pending_otp_email']);
+            Auth::login($user);
+
+            return redirect()->route('customer.catalog')->with('success', 'Email verified successfully! Welcome to DairyBox.');
+        }
+
+        return back()->withErrors([
+            'otp' => 'The verification code you entered is invalid or has expired. Please try again.',
+        ]);
+    }
+
+    /**
+     * Resend OTP code.
+     */
+    public function resendOtp(Request $request, OtpService $otpService)
+    {
+        $userId = session('pending_otp_user_id') ?? Auth::id();
+        $user = $userId ? User::find($userId) : null;
+
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'Session expired. Please register or log in again.');
+        }
+
+        if (!$otpService->canResend($user)) {
+            $seconds = $otpService->getRemainingCooldownSeconds($user);
+            return back()->withErrors([
+                'otp' => "Please wait {$seconds} seconds before requesting a new code.",
+            ]);
+        }
+
+        $otpService->generateAndSend($user);
+
+        return back()->with('success', 'A new 6-digit verification code has been sent to ' . $user->email . '.');
     }
 
     public function logout(Request $request)
@@ -87,6 +197,175 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login')->with('success', 'You have been logged out.');
+    }
+
+    /**
+     * Redirect user to Google OAuth endpoint.
+     */
+    public function redirectToGoogle(GoogleAuthService $googleAuth)
+    {
+        if (Auth::check()) {
+            return $this->redirectBasedOnRole(Auth::user());
+        }
+
+        if (!$googleAuth->isConfigured()) {
+            return redirect()->route('login')->with('error', 'Google Sign-In is not configured yet. Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file.');
+        }
+
+        return redirect()->away($googleAuth->getAuthUrl());
+    }
+
+    /**
+     * Handle the callback returned from Google OAuth.
+     */
+    public function handleGoogleCallback(Request $request, GoogleAuthService $googleAuth)
+    {
+        if ($request->has('error')) {
+            $errorMsg = $request->input('error_description', 'Google sign-in was cancelled or encountered an error.');
+            return redirect()->route('login')->with('error', $errorMsg);
+        }
+
+        $code = $request->input('code');
+        $state = $request->input('state');
+
+        if (!$code) {
+            return redirect()->route('login')->with('error', 'Google authorization code was missing.');
+        }
+
+        try {
+            $user = $googleAuth->handleCallback($code, $state);
+        } catch (\Throwable $e) {
+            return redirect()->route('login')->with('error', $e->getMessage());
+        }
+
+        // Check account restriction
+        if ($user->status === 'restricted' && $user->isRestricted()) {
+            $until = $user->restricted_until ? $user->restricted_until->format('M d, Y h:i A') : 'further notice';
+            return redirect()->route('login')->withErrors([
+                'email' => "Your account is temporarily restricted until {$until} due to policy violations.",
+            ]);
+        }
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        return $this->redirectBasedOnRole($user);
+    }
+
+    /**
+     * Show the forgot password form.
+     */
+    public function showForgotPassword()
+    {
+        if (Auth::check()) {
+            return $this->redirectBasedOnRole(Auth::user());
+        }
+
+        return view('auth.forgot-password');
+    }
+
+    /**
+     * Send password reset link to user.
+     */
+    public function sendResetLinkEmail(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return back()->withErrors([
+                'email' => "We couldn't find an account registered with that email address.",
+            ])->onlyInput('email');
+        }
+
+        $token = PasswordBroker::broker()->createToken($user);
+        $user->sendPasswordResetNotification($token);
+
+        if (config('mail.default') === 'log' && app()->environment('local')) {
+            session()->flash('dev_reset_url', route('password.reset', ['token' => $token, 'email' => $user->email]));
+        }
+
+        return back()->with('status', 'We have emailed your password reset link!');
+    }
+
+    /**
+     * Show the password reset form with 60 seconds countdown.
+     */
+    public function showResetPassword(Request $request, $token = null)
+    {
+        if (Auth::check()) {
+            return $this->redirectBasedOnRole(Auth::user());
+        }
+
+        $email = $request->email;
+        $remainingSeconds = 0;
+        $isExpired = false;
+
+        if ($email && $token) {
+            $record = DB::table('password_reset_tokens')->where('email', $email)->first();
+            if ($record && Hash::check($token, $record->token)) {
+                $createdAt = Carbon::parse($record->created_at);
+                $expiresAt = $createdAt->copy()->addSeconds(60);
+                $diff = (int) now()->diffInSeconds($expiresAt, false);
+                if ($diff > 0) {
+                    $remainingSeconds = min(60, $diff);
+                } else {
+                    $isExpired = true;
+                }
+            } else {
+                $isExpired = true;
+            }
+        } else {
+            $isExpired = true;
+        }
+
+        return view('auth.reset-password', [
+            'token' => $token,
+            'email' => $email,
+            'remainingSeconds' => $remainingSeconds,
+            'isExpired' => $isExpired,
+        ]);
+    }
+
+    /**
+     * Reset the user's password with strict 60 seconds validation.
+     */
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
+        ]);
+
+        // Enforce strict 60 seconds expiration
+        $record = DB::table('password_reset_tokens')->where('email', $request->email)->first();
+        if (!$record || !Hash::check($request->token, $record->token) || Carbon::parse($record->created_at)->addSeconds(60)->isPast()) {
+            return back()->withErrors([
+                'email' => 'This password reset link has expired (60-second limit). Please request a new link.'
+            ])->onlyInput('email');
+        }
+
+        $status = PasswordBroker::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->setRememberToken(Str::random(60));
+
+                $user->save();
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status === PasswordBroker::PASSWORD_RESET) {
+            return redirect()->route('login')->with('success', 'Your password has been successfully reset! You can now log in with your new password.');
+        }
+
+        return back()->withErrors(['email' => __($status)])->onlyInput('email');
     }
 
     protected function redirectBasedOnRole($user)

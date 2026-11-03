@@ -46,12 +46,10 @@
                     <!-- Logo -->
                     <div class="flex items-center space-x-8">
                         <a href="{{ url('/') }}" class="flex items-center space-x-2.5 hover:opacity-90 transition-opacity">
-                            <div class="w-9 h-9 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white shadow-xs">
-                                <svg class="w-5.5 h-5.5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 2h6M9 6h6m-7 4v10a2 2 0 002 2h6a2 2 0 002-2V10M8 10c0-2 2-3 4-3s4 1 4 3" />
-                                </svg>
+                            <div class="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center p-1 border border-sky-100 shadow-xs">
+                                <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox" class="w-full h-full object-contain">
                             </div>
-                            <span class="text-xl font-bold tracking-tight text-slate-900 font-serif">DairyBox</span>
+                            <span class="text-xl font-bold tracking-tight text-slate-900">Dairy<span class="text-[#0ea5e9]">Box</span></span>
                         </a>
 
                         <!-- Desktop Navigation Links -->
@@ -124,8 +122,8 @@
                                         <!-- Body (Scrollable list) -->
                                         <div class="overflow-y-auto divide-y divide-slate-100 max-h-[350px]">
                                             @forelse($allNotifications as $notif)
-                                            <div class="p-3.5 flex items-start justify-between gap-3 transition-colors hover:bg-slate-50/50 {{ !$notif->is_read ? 'bg-sky-50/10' : '' }}">
-                                                <div class="flex space-x-2.5">
+                                            <div class="group relative p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/40 {{ !$notif->is_read ? 'bg-sky-50/15' : '' }}">
+                                                <a href="{{ route('notifications.readAndRedirect', $notif->id) }}" class="flex space-x-2.5 flex-1 min-w-0 pr-2 block">
                                                     <!-- Read indicator dot -->
                                                     <div class="mt-1 flex-shrink-0">
                                                         @if(!$notif->is_read)
@@ -134,17 +132,25 @@
                                                             <span class="block w-2 h-2 rounded-full bg-slate-200"></span>
                                                         @endif
                                                     </div>
-                                                    <div>
-                                                        <h4 class="text-xs font-bold {{ !$notif->is_read ? 'text-slate-900' : 'text-slate-700' }}">{{ $notif->title }}</h4>
-                                                        <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{{ $notif->message }}</p>
-                                                        <span class="block text-[8px] text-slate-400 mt-1 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="flex items-center justify-between">
+                                                            <h4 class="text-xs font-bold {{ !$notif->is_read ? 'text-slate-900 group-hover:text-sky-600' : 'text-slate-700 group-hover:text-sky-600' }} transition-colors">
+                                                                {{ $notif->title }}
+                                                            </h4>
+                                                            <i class="bi bi-arrow-right text-[10px] text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all ml-1 flex-shrink-0"></i>
+                                                        </div>
+                                                        <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed break-words">{{ $notif->message }}</p>
+                                                        <div class="flex items-center space-x-2 mt-1">
+                                                            <span class="block text-[8px] text-slate-400 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
+                                                            <span class="text-[8px] font-semibold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">View details &rarr;</span>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                </a>
 
                                                 @if(!$notif->is_read)
-                                                <form action="{{ route('customer.notifications.read', $notif->id) }}" method="POST" class="flex-shrink-0">
+                                                <form action="{{ route('customer.notifications.read', $notif->id) }}" method="POST" class="flex-shrink-0 z-10" onclick="event.stopPropagation();">
                                                     @csrf
-                                                    <button type="submit" class="p-1 px-1.5 border border-slate-200 rounded-lg text-[8px] font-bold text-slate-600 hover:text-slate-900 bg-white transition-all shadow-sm cursor-pointer">
+                                                    <button type="submit" class="p-1 px-1.5 border border-slate-200 rounded-lg text-[8px] font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 transition-all shadow-2xs cursor-pointer" title="Mark as read without redirecting">
                                                         Mark read
                                                     </button>
                                                 </form>
@@ -162,13 +168,11 @@
                                 </div>
 
                                 <!-- Shopping Cart -->
-                                <a href="{{ route('customer.cart.index') }}" class="relative p-2 text-slate-500 hover:text-[#0ea5e9] hover:bg-sky-50/50 rounded-xl transition-all" title="Shopping Cart">
+                                <a href="{{ route('customer.cart.index') }}" id="navCartButton" class="nav-cart-btn relative p-2 text-slate-500 hover:text-[#0ea5e9] hover:bg-sky-50/50 rounded-xl transition-all" title="Shopping Cart">
                                     <i class="bi bi-cart3 text-xl"></i>
-                                    @if($cartItemCount > 0)
-                                        <span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#0ea5e9] text-[9px] font-bold text-white ring-2 ring-white">
-                                            {{ $cartItemCount }}
-                                        </span>
-                                    @endif
+                                    <span class="cart-nav-badge absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#0ea5e9] text-[9px] font-bold text-white ring-2 ring-white {{ $cartItemCount > 0 ? '' : 'hidden' }}">
+                                        {{ $cartItemCount }}
+                                    </span>
                                 </a>
 
                                 <!-- Divider -->
@@ -412,10 +416,10 @@
                                     
                                     @auth
                                         @if(auth()->user()->role === 'customer' && !$outOfStock)
-                                            <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline">
+                                            <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}">
                                                 @csrf
                                                 <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="w-8 h-8 rounded-full bg-[#0ea5e9] hover:bg-sky-600 text-white flex items-center justify-center transition-colors shadow-md shadow-sky-100 cursor-pointer" title="Add to cart">
+                                                <button type="submit" class="add-to-cart-btn w-8 h-8 rounded-full bg-[#0ea5e9] hover:bg-sky-600 text-white flex items-center justify-center transition-colors shadow-md shadow-sky-100 cursor-pointer animate-none hover:scale-105 active:scale-95" title="Add to cart">
                                                     <i class="bi bi-plus text-lg font-bold"></i>
                                                 </button>
                                             </form>
@@ -476,12 +480,10 @@
         <footer class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-slate-100/60 mt-12 flex flex-col sm:flex-row items-center justify-between gap-4">
             <!-- Footer Logo -->
             <div class="flex items-center space-x-2.5">
-                <div class="w-7 h-7 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 2h6M9 6h6m-7 4v10a2 2 0 002 2h6a2 2 0 002-2V10M8 10c0-2 2-3 4-3s4 1 4 3" />
-                    </svg>
+                <div class="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center p-0.5 border border-sky-100">
+                    <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox" class="w-full h-full object-contain">
                 </div>
-                <span class="text-base font-bold tracking-tight text-slate-800 font-serif">DairyBox</span>
+                <span class="text-base font-bold tracking-tight text-slate-800">Dairy<span class="text-[#0ea5e9]">Box</span></span>
             </div>
             <!-- Footer Text -->
             <p class="text-xs text-slate-500 font-medium">&copy; {{ date('Y') }} DairyBox. Farm-fresh dairy, delivered.</p>

@@ -39,7 +39,8 @@ class InventoryController extends Controller
             'product_id' => 'required|exists:products,id',
             'adjustment_type' => 'required|in:in,out',
             'quantity' => 'required|integer|min:1',
-            'expiration_date' => 'required_if:adjustment_type,in|nullable|date|after:today',
+            'manufacturing_date' => 'nullable|date|before_or_equal:today',
+            'expiration_date' => 'required_if:adjustment_type,in|nullable|date|after_or_equal:manufacturing_date',
             'remarks' => 'required|string|max:255',
         ]);
 
@@ -50,14 +51,16 @@ class InventoryController extends Controller
 
         try {
             if ($request->adjustment_type === 'in') {
-                InventoryService::addStock($productId, $qty, $request->expiration_date, $remarks);
+                InventoryService::addStock($productId, $qty, $request->expiration_date, $remarks, $request->manufacturing_date);
                 
                 AuditLog::create([
                     'user_id' => auth()->id(),
                     'action' => 'STOCK_ADJUSTMENT_IN',
-                    'details' => "Stock added: {$product->product_name} (+{$qty} units, Expiry: {$request->expiration_date}, Remarks: {$remarks})",
+                    'details' => "Stock added: {$product->product_name} (+{$qty} units, Mfg: {$request->manufacturing_date}, Expiry: {$request->expiration_date}, Remarks: {$remarks})",
                     'ip_address' => $request->ip(),
                 ]);
+
+                \App\Services\ExpiryNotificationService::checkProduct($product->fresh());
 
                 return redirect()->route('admin.inventory.index')->with('success', "Stock added successfully for {$product->product_name}.");
             } else {

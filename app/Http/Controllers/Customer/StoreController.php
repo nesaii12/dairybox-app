@@ -51,13 +51,21 @@ class StoreController extends Controller
 
         $products = $query->paginate(9)->withQueryString();
 
+        $cartQuantities = [];
+        if (auth()->check()) {
+            $cart = \App\Models\Cart::where('customer_id', auth()->id())->first();
+            if ($cart) {
+                $cartQuantities = $cart->cartItems->pluck('quantity', 'product_id')->toArray();
+            }
+        }
+
         if ($request->ajax()) {
             return response()->json([
-                'html' => view('customer.partials.product_grid', compact('products'))->render()
+                'html' => view('customer.partials.product_grid', compact('products', 'cartQuantities'))->render()
             ]);
         }
 
-        return view('customer.catalog', compact('products', 'categories'));
+        return view('customer.catalog', compact('products', 'categories', 'cartQuantities'));
     }
 
     public function show(Product $product)
@@ -66,10 +74,17 @@ class StoreController extends Controller
             abort(404, 'Product not found.');
         }
 
+        $cartItemQuantity = 0;
+        if (auth()->check()) {
+            $cart = \App\Models\Cart::where('customer_id', auth()->id())->first();
+            $cartItem = $cart?->cartItems()->where('product_id', $product->id)->first();
+            $cartItemQuantity = $cartItem ? $cartItem->quantity : 0;
+        }
+
         // Load reviews/ratings with customer names
         $reviews = $product->ratings()->with('customer')->latest()->get();
         $avgRating = $product->ratings()->avg('rating') ?: 0;
 
-        return view('customer.product', compact('product', 'reviews', 'avgRating'));
+        return view('customer.product', compact('product', 'reviews', 'avgRating', 'cartItemQuantity'));
     }
 }
