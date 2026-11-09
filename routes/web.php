@@ -15,7 +15,9 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:3,1');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+    Route::post('/register/phone-otp/send', [AuthController::class, 'sendPhoneOtp'])->name('register.phone.sendOtp')->middleware('throttle:5,1');
+    Route::post('/register/phone-otp/verify', [AuthController::class, 'verifyPhoneOtp'])->name('register.phone.verifyOtp')->middleware('throttle:10,1');
 
     // Google OAuth Routes
     Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
@@ -61,6 +63,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');
     Route::post('/customers/{customer}/restrict', [\App\Http\Controllers\Admin\CustomerController::class, 'restrict'])->name('customers.restrict');
     Route::post('/customers/{customer}/unrestrict', [\App\Http\Controllers\Admin\CustomerController::class, 'unrestrict'])->name('customers.unrestrict');
+    Route::delete('/customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroy'])->name('customers.destroy');
     
     // Delivery Monitoring & Incident Handling
     Route::get('/deliveries', [\App\Http\Controllers\Admin\DeliveryController::class, 'index'])->name('deliveries.index');
@@ -80,6 +83,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Forecasting
     Route::get('/forecast', [\App\Http\Controllers\Admin\ForecastController::class, 'index'])->name('forecast.index');
     Route::post('/forecast/generate', [\App\Http\Controllers\Admin\ForecastController::class, 'generate'])->name('forecast.generate');
+    Route::post('/forecast/generate-all', [\App\Http\Controllers\Admin\ForecastController::class, 'generateAll'])->name('forecast.generateAll');
 
     // Notifications
     Route::post('/notifications/read-all', [\App\Http\Controllers\Admin\NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
@@ -152,4 +156,8 @@ Route::middleware(['auth', 'role:rider'])->prefix('rider')->name('rider.')->grou
     Route::post('/deliveries/{delivery}/mark-arrived', [\App\Http\Controllers\Rider\RiderController::class, 'markArrived'])->name('deliveries.markArrived');
     Route::post('/deliveries/{delivery}/update-status', [\App\Http\Controllers\Rider\RiderController::class, 'updateStatus'])->name('deliveries.updateStatus');
     Route::get('/history', [\App\Http\Controllers\Rider\RiderController::class, 'history'])->name('history');
+
+    // Notifications
+    Route::post('/notifications/read-all', [\App\Http\Controllers\Customer\NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
+    Route::post('/notifications/{notification}/read', [\App\Http\Controllers\Customer\NotificationController::class, 'markAsRead'])->name('notifications.read');
 });

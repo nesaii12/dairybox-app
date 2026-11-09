@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Services\GoogleAuthService;
 use App\Services\OtpService;
+use App\Services\SmsOtpService;
 
 class AuthController extends Controller
 {
@@ -76,14 +77,102 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
-    public function register(Request $request, OtpService $otpService)
+    public function sendPhoneOtp(Request $request, SmsOtpService $smsOtpService)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'string', 'confirmed', Password::defaults()],
-            'phone' => 'required|string|max:20',
+        $rawPhone = (string) $request->input('phone', '');
+        $normalizedPhone = $smsOtpService->normalizePhone($rawPhone);
+
+        if (!$smsOtpService->isValidPhilippineMobile($normalizedPhone)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter a valid 11-digit Philippine mobile number (e.g., 09171234567).',
+            ], 422);
+        }
+
+        if (User::where('phone', $normalizedPhone)->orWhere('phone', $rawPhone)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This phone number is already registered. Please use a different phone number.',
+            ], 422);
+        }
+
+        $cooldown = $smsOtpService->getRemainingCooldownSeconds($normalizedPhone);
+        if ($cooldown > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Please wait {$cooldown} seconds before requesting another SMS code.",
+                'cooldown' => $cooldown,
+            ], 429);
+        }
+
+        try {
+            $result = $smsOtpService->generateAndSend($normalizedPhone);
+
+            return response()->json([
+                'success' => true,
+                'phone' => $normalizedPhone,
+                'cooldown' => $result['cooldown'],
+                'sent_via' => $result['sent_via'],
+                'message' => "A 6-digit SMS verification code has been sent to {$normalizedPhone}.",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage() ?: 'Failed to send SMS verification code. Please try again.',
+            ], 500);
+        }
+    }
+
+    public function verifyPhoneOtp(Request $request, SmsOtpService $smsOtpService)
+    {
+        $request->validate([
+            'phone' => 'required|string',
+            'code'  => 'required|string|size:6',
         ]);
+
+        $normalizedPhone = $smsOtpService->normalizePhone($request->phone);
+
+        if ($smsOtpService->verify($normalizedPhone, $request->code, $request->session()->getId())) {
+            return response()->json([
+                'success' => true,
+                'phone' => $normalizedPhone,
+                'message' => 'Phone number verified successfully.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid or expired SMS verification code. Please check the code and try again.',
+        ], 422);
+    }
+
+    public function register(Request $request, OtpService $otpService, SmsOtpService $smsOtpService)
+    {
+        $normalizedPhone = $smsOtpService->normalizePhone((string) $request->input('phone', ''));
+        $request->merge(['phone' => $normalizedPhone]);
+
+        $validator = Validator::make($request->all(), [
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|max:255|unique:users',
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
+            'phone'    => ['required', 'string', 'regex:/^09\d{9}$/', 'unique:users,phone'],
+        ], [
+            'phone.regex'  => 'Please enter a valid 11-digit Philippine mobile number starting with 09.',
+            'phone.unique' => 'This phone number is already registered. Please use a different phone number.',
+        ]);
+
+        $sessionId = $request->session()->getId();
+        $isPhoneVerified = $smsOtpService->isVerifiedForSession($normalizedPhone, $sessionId);
+
+        if (!$isPhoneVerified && $request->filled('phone_otp')) {
+            $isPhoneVerified = $smsOtpService->verify($normalizedPhone, (string) $request->input('phone_otp'), $sessionId);
+        }
+
+        $validator->after(function ($validator) use ($isPhoneVerified) {
+            if (!$isPhoneVerified) {
+                $validator->errors()->add('phone', 'Please verify your phone number via SMS code before creating your account.');
+            }
+        });
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
@@ -93,10 +182,12 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'phone' => $request->phone,
+            'phone' => $normalizedPhone,
             'role' => 'customer',
             'status' => 'active',
         ]);
+
+        $smsOtpService->clearVerifiedForSession($normalizedPhone, $sessionId);
 
         // Generate and send 6-digit OTP code to the newly created user's email
         $otpService->generateAndSend($user);

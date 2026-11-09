@@ -47,4 +47,12 @@ return [
         'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
     ],
 
+    'sms' => [
+        'provider' => env('SMS_PROVIDER', 'semaphore'), // 'semaphore' or 'philsms'
+        'semaphore_api_key' => env('SEMAPHORE_API_KEY'),
+        'semaphore_sender_name' => env('SEMAPHORE_SENDER_NAME', 'DairyBox'),
+        'philsms_api_token' => env('PHILSMS_API_TOKEN'),
+        'philsms_sender_id' => env('PHILSMS_SENDER_ID', 'PhilSMS'),
+    ],
+
 ];
