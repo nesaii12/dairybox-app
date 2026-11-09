@@ -48,14 +48,14 @@
                     {{ $product->category->category_name }}
                 </span>
                 
-                @if($product->stock > 0)
+                @if($product->stock > 0 && (!$product->expiration_date || \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->gte(now()->startOfDay())))
                     <span class="inline-flex items-center text-xs font-bold text-emerald-600">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
                         {{ $product->stock }} Units Available
                     </span>
                 @else
                     <span class="inline-flex items-center text-xs font-bold text-rose-600">
-                        Sold Out
+                        Out of Stock
                     </span>
                 @endif
             </div>
@@ -115,12 +115,26 @@
         <!-- Purchase Action Form -->
         <div class="mt-8 pt-6 border-t border-slate-100">
             @php
-                $cartQty = $cartItemQuantity ?? 0;
-                $availableToAdd = max(0, $product->stock - $cartQty);
-                $allStockInCart = ($cartQty >= $product->stock) && ($product->stock > 0);
+                $cartQty        = $cartItemQuantity ?? 0;
+                $isExpired      = $product->expiration_date &&
+                                  \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
+                $effectiveStock = $isExpired ? 0 : $product->stock;
+                $availableToAdd = max(0, $effectiveStock - $cartQty);
+                $allStockInCart = ($cartQty >= $effectiveStock) && ($effectiveStock > 0);
             @endphp
 
-            @if($product->stock > 0)
+            @if($isExpired)
+                <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1 mb-3">
+                    <div class="flex items-center gap-1.5 font-bold text-rose-900">
+                        <i class="bi bi-x-circle-fill text-rose-600"></i>
+                        <span>Product Unavailable</span>
+                    </div>
+                    <p class="text-[11px] leading-relaxed">This product has passed its expiration date and is no longer available for purchase.</p>
+                </div>
+                <button disabled class="w-full py-3 px-4 rounded-xl text-sm font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed text-center">
+                    Out of Stock
+                </button>
+            @elseif($effectiveStock > 0)
                 @auth
                     @if(auth()->user()->isRestricted())
                         <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">

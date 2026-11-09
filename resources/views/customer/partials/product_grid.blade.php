@@ -1,10 +1,12 @@
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
     @forelse($products as $product)
         @php
-            $outOfStock = $product->stock <= 0;
+            $isExpired  = $product->expiration_date &&
+                          \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
+            $outOfStock = $isExpired || $product->stock <= 0;
             $isLowStock = $product->isLowStock() && !$outOfStock;
-            $inCart = isset($cartQuantities) ? ($cartQuantities[$product->id] ?? 0) : 0;
-            $maxInCart = ($inCart >= $product->stock) && !$outOfStock;
+            $inCart     = isset($cartQuantities) ? ($cartQuantities[$product->id] ?? 0) : 0;
+            $maxInCart  = ($inCart >= $product->stock) && !$outOfStock;
         @endphp
         <div id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name) }}" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300 record-highlight-target">
             <!-- Image Wrapper -->
@@ -27,7 +29,9 @@
                 <!-- Stock indicator badges -->
                 @if($outOfStock)
                     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center">
-                        <span class="bg-rose-600 text-white text-[10px] px-3 py-1.5 rounded-full font-bold shadow-md uppercase tracking-wider">Sold Out</span>
+                        <span class="bg-rose-600 text-white text-[10px] px-3 py-1.5 rounded-full font-bold shadow-md uppercase tracking-wider">
+                            {{ $isExpired ? 'Out of Stock' : 'Sold Out' }}
+                        </span>
                     </div>
                 @elseif($isLowStock)
                     <span class="absolute top-4 left-4 bg-amber-100/90 backdrop-blur border border-amber-200/50 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs">Only {{ $product->stock }} left</span>
@@ -71,7 +75,9 @@
                 <div class="flex items-center justify-between pt-2 border-t border-slate-50">
                     <div>
                         <span class="text-sm font-bold text-sky-600">₱{{ number_format($product->price, 2) }}</span>
-                        @if(!$outOfStock)
+                        @if($isExpired)
+                            <span class="block text-[10px] text-rose-500 font-semibold">Out of Stock</span>
+                        @elseif(!$outOfStock)
                             <span class="block text-[10px] text-slate-400 font-medium">{{ $product->stock }} in stock</span>
                         @endif
                     </div>

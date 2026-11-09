@@ -67,6 +67,20 @@ class CartController extends Controller
 
         $qty = (int) $request->quantity;
 
+        // Check if product is expired
+        if ($product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
+            $msg = "{$product->product_name} is no longer available as it has expired.";
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                    'available_left' => 0,
+                    'stock' => 0,
+                ], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
         // Check if product is completely out of stock
         if ($product->stock <= 0) {
             $msg = "{$product->product_name} is currently out of stock.";
@@ -206,7 +220,16 @@ class CartController extends Controller
         
         // Double check stock availability before checkout screen
         foreach ($items as $item) {
-            $freshStock = $item->product ? $item->product->fresh()->stock : 0;
+            $freshProduct = $item->product ? $item->product->fresh() : null;
+            $freshStock   = $freshProduct ? $freshProduct->stock : 0;
+
+            // Block expired products
+            if ($freshProduct && $freshProduct->expiration_date &&
+                \Carbon\Carbon::parse($freshProduct->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
+                return redirect()->route('customer.cart.index')
+                    ->with('error', "{$freshProduct->product_name} has expired and cannot be ordered. Please remove it from your cart.");
+            }
+
             if ($freshStock < $item->quantity) {
                 if ($freshStock > 0) {
                     $item->update([
@@ -282,6 +305,11 @@ class CartController extends Controller
                 if (!$product || $product->stock < $item->quantity) {
                     $available = $product ? $product->stock : 0;
                     throw new \Exception("Insufficient stock for product '{$item->product->product_name}'. Available: {$available}, Requested: {$item->quantity}");
+                }
+
+                // Block expired products at order placement
+                if ($product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
+                    throw new \Exception("'{$product->product_name}' has expired and cannot be ordered. Please remove it from your cart.");
                 }
 
                 // Create Order Item
