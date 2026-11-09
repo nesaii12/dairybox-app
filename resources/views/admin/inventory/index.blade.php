@@ -1,14 +1,14 @@
 @extends('layouts.admin')
 
-@section('title', 'FIFO Inventory Adjustments')
-@section('page_title', 'FIFO Inventory Adjustments')
+@section('title', 'Inventory Management')
+@section('page_title', 'Inventory Management')
 
 @section('content')
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
     <!-- Left Column: Adjustment Form Card -->
     <div class="lg:col-span-1">
         <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 lg:sticky lg:top-24">
-            <h3 class="text-lg font-bold text-slate-950 mb-1">Stock Adjustment</h3>
+            <h3 class="text-lg font-bold text-slate-950 mb-1">Stock Management</h3>
             <p class="text-xs text-slate-500 mb-6">Manually adjust warehouse inventory levels. Stock additions will create new FIFO batches.</p>
             
             <form action="{{ route('admin.inventory.adjust') }}" method="POST" class="space-y-4">
