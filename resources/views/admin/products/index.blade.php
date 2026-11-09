@@ -139,9 +139,15 @@
                     </td>
                     <!-- Status -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold {{ $product->status == 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-100' }}">
-                            {{ ucfirst($product->status) }}
-                        </span>
+                        @if($product->stock == 0)
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200">
+                                <i class="bi bi-dash-circle text-[10px]"></i> Inactive
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold {{ $product->status == 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-100' }}">
+                                {{ ucfirst($product->status) }}
+                            </span>
+                        @endif
                     </td>
                     <!-- Actions -->
                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
