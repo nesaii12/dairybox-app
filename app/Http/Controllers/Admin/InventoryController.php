@@ -19,10 +19,65 @@ class InventoryController extends Controller
         $perPage = $request->input('per_page', session('per_page_inventory', 10));
         session(['per_page_inventory' => $perPage]);
 
-        // Get products with their batches for listing
-        $products = Product::with(['category', 'inventories' => function($query) {
-            $query->orderBy('created_at', 'desc');
-        }])->latest()->paginate($perPage)->withQueryString();
+        $filter = $request->input('filter', 'all');
+
+        $today        = now()->toDateString();
+        $sevenDaysOut = now()->addDays(7)->toDateString();
+        $sevenDaysAgo = now()->subDays(7)->startOfDay();
+
+        // Build product query filtered by inventory batch criteria
+        $productQuery = Product::with(['category', 'inventories' => function ($query) {
+            $query->orderBy('created_at', 'asc');
+        }]);
+
+        if ($filter === 'near_expiry') {
+            // Products with at least one active batch expiring within 7 days
+            $productQuery->whereHas('inventories', function ($q) use ($today, $sevenDaysOut) {
+                $q->where('remaining_stock', '>', 0)
+                  ->whereNotNull('expiration_date')
+                  ->whereDate('expiration_date', '>=', $today)
+                  ->whereDate('expiration_date', '<=', $sevenDaysOut);
+            });
+
+        } elseif ($filter === 'new_stock') {
+            // Only products with active batches stocked in within the last 7 days
+            $productQuery->whereHas('inventories', function ($q) use ($sevenDaysAgo) {
+                $q->where('remaining_stock', '>', 0)
+                  ->where('created_at', '>=', $sevenDaysAgo);
+            });
+
+        } else {
+            // "All" filter — sort by priority:
+            // 1. Expired  2. Near Expiry  3. New Stock  4. Everything else
+            $productQuery->orderByRaw("
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM inventories
+                        WHERE inventories.product_id = products.id
+                          AND inventories.remaining_stock > 0
+                          AND inventories.expiration_date IS NOT NULL
+                          AND inventories.expiration_date < ?
+                    ) THEN 1
+                    WHEN EXISTS (
+                        SELECT 1 FROM inventories
+                        WHERE inventories.product_id = products.id
+                          AND inventories.remaining_stock > 0
+                          AND inventories.expiration_date IS NOT NULL
+                          AND inventories.expiration_date >= ?
+                          AND inventories.expiration_date <= ?
+                    ) THEN 2
+                    WHEN EXISTS (
+                        SELECT 1 FROM inventories
+                        WHERE inventories.product_id = products.id
+                          AND inventories.remaining_stock > 0
+                          AND inventories.created_at >= ?
+                    ) THEN 3
+                    ELSE 4
+                END ASC
+            ", [$today, $today, $sevenDaysOut, $sevenDaysAgo]);
+        }
+
+        $products = $productQuery->paginate($perPage)->withQueryString();
 
         // Get recent inventory transaction history
         $recentTransactions = Inventory::with('product')
@@ -30,7 +85,7 @@ class InventoryController extends Controller
             ->take(10)
             ->get();
 
-        return view('admin.inventory.index', compact('products', 'productsForForm', 'recentTransactions'));
+        return view('admin.inventory.index', compact('products', 'productsForForm', 'recentTransactions', 'filter'));
     }
 
     public function adjust(Request $request)
