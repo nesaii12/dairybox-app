@@ -368,13 +368,28 @@ class ForecastService
 
         // 3. Seasonal Demand Index per Calendar Month (1..12)
         // Compares each calendar month's average demand across recorded years against overall monthly average
-        $overallMonthlyAvgQty = $monthlyRecords->count() > 0
-            ? (float) $monthlyRecords->avg('total_qty')
-            : 0.0;
+        $nowYr = (int) Carbon::now()->year;
+        $nowMo = (int) Carbon::now()->month;
+        $nowYm = Carbon::now()->format('Y-m');
+        $isPartialCurrentMonth = Carbon::now()->day < 25 && $monthlyRecords->count() > 1;
+
+        $completedMonthlyRecords = $isPartialCurrentMonth
+            ? $monthlyRecords->filter(fn($r) => $r->ym !== $nowYm)
+            : $monthlyRecords;
+
+        $overallMonthlyAvgQty = $completedMonthlyRecords->count() > 0
+            ? (float) $completedMonthlyRecords->avg('total_qty')
+            : (float) ($monthlyRecords->avg('total_qty') ?? 0.0);
 
         $seasonalMonths = [];
         for ($m = 1; $m <= 12; $m++) {
             $rowsForMonth = $yearlyMonthlyRecords->where('mo', $m);
+            if ($isPartialCurrentMonth && $m === $nowMo && $rowsForMonth->count() > 1) {
+                $completedRowsForMonth = $rowsForMonth->filter(fn($r) => (int) $r->yr !== $nowYr);
+                if ($completedRowsForMonth->isNotEmpty()) {
+                    $rowsForMonth = $completedRowsForMonth;
+                }
+            }
             $avgQty = $rowsForMonth->isNotEmpty() ? (float) $rowsForMonth->avg('total_qty') : 0.0;
             $avgRev = $rowsForMonth->isNotEmpty() ? (float) $rowsForMonth->avg('total_revenue') : 0.0;
             $totalQty = (int) $rowsForMonth->sum('total_qty');
