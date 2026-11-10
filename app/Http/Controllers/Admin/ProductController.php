@@ -19,7 +19,29 @@ class ProductController extends Controller
         $perPage = $request->input('per_page', session('per_page_products', 10));
         session(['per_page_products' => $perPage]);
 
-        $products = Product::with('category')->latest()->paginate($perPage)->withQueryString();
+        $today = now()->toDateString();
+        $sevenDaysOut = now()->addDays(7)->toDateString();
+
+        // Sort order:
+        // 1. Near Expiry (in stock, expiring within 7 days)
+        // 2. Not Expired (in stock, expiring after 7 days or no expiry set)
+        // 3. Expired (in stock, expiration date has passed)
+        // 4. Out of Stock (stock <= 0)
+        $products = Product::with('category')
+            ->orderByRaw("
+                CASE
+                    WHEN stock > 0 AND expiration_date IS NOT NULL AND DATE(expiration_date) >= ? AND DATE(expiration_date) <= ? THEN 1
+                    WHEN stock > 0 AND (expiration_date IS NULL OR DATE(expiration_date) > ?) THEN 2
+                    WHEN stock > 0 AND expiration_date IS NOT NULL AND DATE(expiration_date) < ? THEN 3
+                    ELSE 4
+                END ASC
+            ", [$today, $sevenDaysOut, $sevenDaysOut, $today])
+            ->orderByRaw("CASE WHEN expiration_date IS NULL THEN 1 ELSE 0 END ASC")
+            ->orderBy('expiration_date', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
+
         $categories = Category::all();
         $flavorPresets = Product::getFlavorPresets();
         return view('admin.products.index', compact('products', 'categories', 'flavorPresets'));

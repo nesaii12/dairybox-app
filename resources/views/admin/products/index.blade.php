@@ -49,16 +49,20 @@
             <tbody class="divide-y divide-slate-100 bg-white">
                 @forelse($products as $product)
                 @php
-                    $isLowStock = $product->stock < 10;
+                    $isOutOfStock = $product->stock <= 0;
+                    $isLowStock = !$isOutOfStock && $product->stock < 10;
                     $isExpired = false;
                     $isNearExpiration = false;
-                    if ($product->expiration_date && $product->stock > 0) {
+                    $isNotExpired = false;
+                    if ($product->expiration_date) {
                         $expiryDate = \Carbon\Carbon::parse($product->expiration_date)->startOfDay();
                         $today = now()->startOfDay();
                         if ($expiryDate->lt($today)) {
                             $isExpired = true;
-                        } elseif ($expiryDate->lte($today->copy()->addDays(7))) {
+                        } elseif (!$isOutOfStock && $expiryDate->lte($today->copy()->addDays(7))) {
                             $isNearExpiration = true;
+                        } elseif (!$isOutOfStock) {
+                            $isNotExpired = true;
                         }
                     }
                 @endphp
@@ -108,8 +112,12 @@
                     <!-- Current Stock -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex flex-col space-y-1">
-                            <span class="text-sm font-bold {{ $isLowStock ? 'text-rose-600' : 'text-slate-900' }}">{{ $product->stock }} units</span>
-                            @if($isLowStock)
+                            <span class="text-sm font-bold {{ $isOutOfStock ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : 'text-slate-900') }}">{{ $product->stock }} units</span>
+                            @if($isOutOfStock)
+                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    <i class="bi bi-x-octagon mr-1"></i> Out of Stock
+                                </span>
+                            @elseif($isLowStock)
                                 <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
                                     <i class="bi bi-exclamation-triangle mr-1"></i> Low Stock
                                 </span>
@@ -149,6 +157,10 @@
                             @elseif($isNearExpiration)
                                 <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
                                     <i class="bi bi-clock mr-1"></i> Near Expiry
+                                </span>
+                            @elseif($isNotExpired)
+                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    <i class="bi bi-check-circle mr-1"></i> Not Expired
                                 </span>
                             @endif
                         </div>

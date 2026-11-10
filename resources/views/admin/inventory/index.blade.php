@@ -211,8 +211,8 @@
                         // Show ONLY the new batch for this product
                         $displayBatch = $newBatch;
                     } else {
-                        // "All" — show the most urgent batch: expired > near expiry > new > first
-                        $displayBatch = $expiredBatch ?? $nearExpiryBatch ?? $newBatch ?? $firstBatch;
+                        // "All" — show the most relevant batch: near expiry > new > first > expired
+                        $displayBatch = $nearExpiryBatch ?? $newBatch ?? $firstBatch ?? $expiredBatch;
                     }
                 @endphp
                 <tr id="product-{{ $product->id }}"
@@ -253,10 +253,15 @@
 
                     <!-- Manufacture Date -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        @if($displayBatch && $displayBatch->manufacturing_date)
+                        @php
+                            $mfgDateRaw = $displayBatch?->manufacturing_date
+                                ?? $activeBatches->whereNotNull('manufacturing_date')->first()?->manufacturing_date
+                                ?? $product->manufacturing_date;
+                            $isNew = $newBatch && $displayBatch && $displayBatch->id === $newBatch->id;
+                        @endphp
+                        @if($displayBatch && $mfgDateRaw)
                             @php
-                                $mfgDate = \Carbon\Carbon::parse($displayBatch->manufacturing_date);
-                                $isNew   = $newBatch && $displayBatch->id === $newBatch->id;
+                                $mfgDate = \Carbon\Carbon::parse($mfgDateRaw);
                             @endphp
                             <span class="text-sm font-semibold {{ $isNew ? 'text-emerald-700' : 'text-slate-700' }}">
                                 {{ $mfgDate->format('M d, Y') }}
@@ -268,7 +273,6 @@
                             @endif
                             <span class="block text-[10px] text-slate-400">Batch #{{ $displayBatch->id }}</span>
                         @elseif($displayBatch)
-                            @php $isNew = $newBatch && $displayBatch->id === $newBatch->id; @endphp
                             <span class="text-xs text-slate-400 italic">—</span>
                             @if($isNew)
                                 <span class="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700">

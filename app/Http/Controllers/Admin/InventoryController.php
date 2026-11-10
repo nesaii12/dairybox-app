@@ -48,33 +48,37 @@ class InventoryController extends Controller
 
         } else {
             // "All" filter — sort by priority:
-            // 1. Expired  2. Near Expiry  3. New Stock  4. Everything else
+            // 1. Near Expiry  2. Not Expired  3. Expired  4. Out of Stock
             $productQuery->orderByRaw("
                 CASE
-                    WHEN EXISTS (
-                        SELECT 1 FROM inventories
-                        WHERE inventories.product_id = products.id
-                          AND inventories.remaining_stock > 0
-                          AND inventories.expiration_date IS NOT NULL
-                          AND inventories.expiration_date < ?
+                    WHEN products.stock > 0 AND (
+                        (products.expiration_date IS NOT NULL AND DATE(products.expiration_date) >= ? AND DATE(products.expiration_date) <= ?)
+                        OR EXISTS (
+                            SELECT 1 FROM inventories
+                            WHERE inventories.product_id = products.id
+                              AND inventories.remaining_stock > 0
+                              AND inventories.expiration_date IS NOT NULL
+                              AND DATE(inventories.expiration_date) >= ?
+                              AND DATE(inventories.expiration_date) <= ?
+                        )
                     ) THEN 1
-                    WHEN EXISTS (
-                        SELECT 1 FROM inventories
-                        WHERE inventories.product_id = products.id
-                          AND inventories.remaining_stock > 0
-                          AND inventories.expiration_date IS NOT NULL
-                          AND inventories.expiration_date >= ?
-                          AND inventories.expiration_date <= ?
+                    WHEN products.stock > 0 AND (
+                        (products.expiration_date IS NULL OR DATE(products.expiration_date) > ?)
+                        AND NOT EXISTS (
+                            SELECT 1 FROM inventories
+                            WHERE inventories.product_id = products.id
+                              AND inventories.remaining_stock > 0
+                              AND inventories.expiration_date IS NOT NULL
+                              AND DATE(inventories.expiration_date) < ?
+                        )
                     ) THEN 2
-                    WHEN EXISTS (
-                        SELECT 1 FROM inventories
-                        WHERE inventories.product_id = products.id
-                          AND inventories.remaining_stock > 0
-                          AND inventories.created_at >= ?
-                    ) THEN 3
+                    WHEN products.stock > 0 THEN 3
                     ELSE 4
                 END ASC
-            ", [$today, $today, $sevenDaysOut, $sevenDaysAgo]);
+            ", [$today, $sevenDaysOut, $today, $sevenDaysOut, $sevenDaysOut, $today])
+            ->orderByRaw("CASE WHEN products.expiration_date IS NULL THEN 1 ELSE 0 END ASC")
+            ->orderBy('products.expiration_date', 'asc')
+            ->orderBy('products.created_at', 'desc');
         }
 
         $products = $productQuery->paginate($perPage)->withQueryString();
