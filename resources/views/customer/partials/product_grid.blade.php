@@ -60,9 +60,24 @@
                         <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
                             <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
                         </h3>
-                        @if($product->flavor)
-                            <p class="text-[11px] text-sky-600 font-bold mt-0.5">{{ $product->flavor }}</p>
-                        @endif
+                        <div class="flex items-center justify-between gap-2 mt-0.5">
+                            @if($product->flavor)
+                                <p class="text-[11px] text-sky-600 font-bold truncate">{{ $product->flavor }}</p>
+                            @else
+                                <span></span>
+                            @endif
+                            @php
+                                $ratingCount = (int) ($product->ratings_count ?? $product->ratings()->count());
+                                $ratingAvg = (float) ($product->ratings_avg_rating ?? ($ratingCount > 0 ? $product->ratings()->avg('rating') : 0));
+                            @endphp
+                            @if($ratingCount > 0)
+                                <a href="{{ route('customer.product', $product->id) }}#reviews-section" class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-100 shrink-0" title="{{ number_format($ratingAvg, 1) }} out of 5 ({{ $ratingCount }} {{ Str::plural('review', $ratingCount) }})">
+                                    <i class="bi bi-star-fill text-amber-400 text-[9px]"></i>
+                                    <span>{{ number_format($ratingAvg, 1) }}</span>
+                                    <span class="text-slate-400 font-medium">({{ $ratingCount }})</span>
+                                </a>
+                            @endif
+                        </div>
                     </div>
 
                     <!-- Milk Type & Size Customization Options -->

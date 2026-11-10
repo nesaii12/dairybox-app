@@ -40,7 +40,9 @@ class StoreController extends Controller
             ];
         }
         
-        $query = Product::where('status', 'active');
+        $query = Product::where('status', 'active')
+            ->withCount('ratings')
+            ->withAvg('ratings', 'rating');
 
         // Apply filters
         if ($request->filled('search')) {
@@ -152,6 +154,21 @@ class StoreController extends Controller
         $reviews = $product->ratings()->with('customer')->latest()->get();
         $avgRating = $product->ratings()->avg('rating') ?: 0;
 
-        return view('customer.product', compact('product', 'reviews', 'avgRating', 'cartItemQuantity', 'siblingVariants'));
+        $hasPurchased = false;
+        $userRating = null;
+        if (auth()->check()) {
+            $hasPurchased = \App\Models\Order::where('customer_id', auth()->id())
+                ->where('order_status', '!=', 'Cancelled')
+                ->whereHas('orderItems', function ($q) use ($product) {
+                    $q->where('product_id', $product->id);
+                })
+                ->exists();
+
+            $userRating = \App\Models\Rating::where('customer_id', auth()->id())
+                ->where('product_id', $product->id)
+                ->first();
+        }
+
+        return view('customer.product', compact('product', 'reviews', 'avgRating', 'cartItemQuantity', 'siblingVariants', 'hasPurchased', 'userRating'));
     }
 }

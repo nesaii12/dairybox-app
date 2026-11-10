@@ -300,47 +300,171 @@
 </div>
 
 <!-- Reviews Section -->
-<div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
-    <div class="border-b border-slate-100 pb-5 mb-6">
-        <h3 class="text-sm font-bold text-slate-950 uppercase tracking-wider">Ratings & Customer Reviews</h3>
-        <p class="text-xs text-slate-500 mt-0.5">Real customer feedback submitted after confirmed orders.</p>
+@php
+    $satisfactionLabels = [
+        5 => ['label' => 'Very Satisfied', 'class' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+        4 => ['label' => 'Satisfied', 'class' => 'bg-sky-50 text-sky-700 border-sky-200'],
+        3 => ['label' => 'Neutral', 'class' => 'bg-amber-50 text-amber-700 border-amber-200'],
+        2 => ['label' => 'Dissatisfied', 'class' => 'bg-orange-50 text-orange-700 border-orange-200'],
+        1 => ['label' => 'Very Dissatisfied', 'class' => 'bg-rose-50 text-rose-700 border-rose-200'],
+    ];
+    $totalReviewsCount = $reviews->count();
+@endphp
+<div id="reviews-section" class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
+    <div class="border-b border-slate-100 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+            <h3 class="text-sm font-bold text-slate-950 uppercase tracking-wider">Ratings & Customer Satisfaction Feedback</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Customer ratings and satisfaction reviews from verified product purchases.</p>
+        </div>
+        @if($totalReviewsCount > 0)
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-100 text-xs font-bold text-amber-800 w-max">
+                <i class="bi bi-star-fill text-amber-400"></i>
+                <span>{{ number_format($avgRating, 1) }} / 5.0 ({{ $totalReviewsCount }} {{ Str::plural('review', $totalReviewsCount) }})</span>
+            </span>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Reviews Breakdown Summary -->
-        <div class="lg:col-span-1 bg-slate-50 border border-slate-100 p-6 rounded-2xl flex flex-col items-center justify-center text-center">
-            <h4 class="text-5xl font-black text-slate-950 font-serif">{{ number_format($avgRating, 1) }}</h4>
-            <div class="flex text-amber-400 my-2">
-                @for($i = 1; $i <= 5; $i++)
-                    @if($i <= round($avgRating))
-                        <i class="bi bi-star-fill text-base"></i>
-                    @else
-                        <i class="bi bi-star text-base text-slate-300"></i>
-                    @endif
-                @endfor
+        <div class="lg:col-span-1 space-y-5">
+            <div class="bg-slate-50 border border-slate-100 p-6 rounded-2xl flex flex-col items-center justify-center text-center">
+                <h4 class="text-5xl font-black text-slate-950 font-serif">{{ number_format($avgRating, 1) }}</h4>
+                <div class="flex text-amber-400 my-2 space-x-0.5">
+                    @for($i = 1; $i <= 5; $i++)
+                        @if($i <= round($avgRating))
+                            <i class="bi bi-star-fill text-base"></i>
+                        @else
+                            <i class="bi bi-star text-base text-slate-300"></i>
+                        @endif
+                    @endfor
+                </div>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Average based on {{ $totalReviewsCount }} {{ Str::plural('rating', $totalReviewsCount) }}</p>
+
+                <!-- Satisfaction Star Breakdown -->
+                <div class="w-full mt-5 pt-4 border-t border-slate-200/70 space-y-2 text-left">
+                    @for($star = 5; $star >= 1; $star--)
+                        @php
+                            $starCount = $reviews->where('rating', $star)->count();
+                            $starPct = $totalReviewsCount > 0 ? round(($starCount / $totalReviewsCount) * 100) : 0;
+                        @endphp
+                        <div class="flex items-center gap-2 text-[11px]">
+                            <span class="w-12 font-bold text-slate-600 flex items-center gap-0.5 shrink-0">
+                                {{ $star }} <i class="bi bi-star-fill text-amber-400 text-[9px]"></i>
+                            </span>
+                            <div class="flex-1 h-2 bg-slate-200/80 rounded-full overflow-hidden">
+                                <div class="h-full bg-amber-400 rounded-full transition-all duration-300" style="width: {{ $starPct }}%"></div>
+                            </div>
+                            <span class="w-7 text-right text-[10px] font-semibold text-slate-400 shrink-0">{{ $starCount }}</span>
+                        </div>
+                    @endfor
+                </div>
             </div>
-            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Average based on {{ $reviews->count() }} ratings</p>
-            <div class="mt-4 p-3 bg-white border border-slate-200/50 rounded-xl text-[10px] text-slate-500 font-medium leading-relaxed">
-                Verified purchases only. You can leave reviews on completed orders in your orders tracker.
-            </div>
+
+            <!-- Customer Rating & Feedback Form (for verified buyers) -->
+            @auth
+                @if(!empty($hasPurchased))
+                    <div class="bg-sky-50/50 border border-sky-100 p-5 rounded-2xl">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="bi bi-chat-heart-fill text-sky-600"></i>
+                                <span>{{ !empty($userRating) ? 'Update Your Rating & Feedback' : 'Rate Your Satisfaction' }}</span>
+                            </h4>
+                            @if(!empty($userRating))
+                                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Reviewed</span>
+                            @endif
+                        </div>
+                        <p class="text-[11px] text-slate-500 mb-3">How satisfied are you with <span class="font-semibold text-slate-700">{{ $product->product_name }}</span>?</p>
+
+                        <form action="{{ route('customer.ratings.store', $product->id) }}" method="POST" class="space-y-3.5">
+                            @csrf
+                            @php
+                                $initialRating = old('rating', $userRating->rating ?? 5);
+                                $initialLabel = $satisfactionLabels[$initialRating]['label'] ?? 'Very Satisfied';
+                            @endphp
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <div class="flex items-center space-x-1.5 text-xl" id="productRateStars">
+                                        @for($s = 1; $s <= 5; $s++)
+                                            <label class="cursor-pointer transition-transform hover:scale-110">
+                                                <input type="radio" name="rating" value="{{ $s }}" {{ (int) $initialRating === $s ? 'checked' : '' }} required class="sr-only" onchange="setProductSatisfactionRating({{ $s }})">
+                                                <i class="bi {{ $s <= $initialRating ? 'bi-star-fill text-amber-400' : 'bi-star text-slate-300' }}" data-star-index="{{ $s }}" onclick="setProductSatisfactionRating({{ $s }})"></i>
+                                            </label>
+                                        @endfor
+                                    </div>
+                                    <span id="productSatisfactionBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-200">
+                                        {{ $initialLabel }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Quick Feedback Tags -->
+                            <div>
+                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Quick Feedback Tags</span>
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach(['Fresh & creamy', 'Great flavor', 'High quality dairy', 'Good packaging', 'Worth the price'] as $tag)
+                                        <button type="button" onclick="appendProductFeedbackTag('{{ $tag }}')" class="px-2 py-1 rounded-lg bg-white hover:bg-sky-50 text-slate-600 hover:text-sky-700 border border-slate-200/80 text-[10px] font-semibold transition cursor-pointer">
+                                            + {{ $tag }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="product_review_input" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Your Feedback</label>
+                                <textarea name="review" id="product_review_input" rows="3" maxlength="500"
+                                    placeholder="Share your experience with the taste, freshness, and quality..."
+                                    class="block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/15 focus:border-sky-500 text-xs transition-all resize-none">{{ old('review', $userRating->review ?? '') }}</textarea>
+                            </div>
+
+                            <button type="submit" class="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-sky-100 cursor-pointer flex items-center justify-center gap-1.5">
+                                <i class="bi bi-send-check-fill"></i>
+                                <span>{{ !empty($userRating) ? 'Update Rating & Feedback' : 'Submit Rating & Feedback' }}</span>
+                            </button>
+                        </form>
+                    </div>
+                @else
+                    <div class="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl text-xs text-slate-500 leading-relaxed flex items-start gap-2.5">
+                        <i class="bi bi-bag-check text-sky-600 text-base mt-0.5"></i>
+                        <div>
+                            <span class="font-bold text-slate-800 block mb-0.5">Verified Buyers Only</span>
+                            Purchase this product to rate your satisfaction and share feedback. You can also review purchased items anytime from <a href="{{ route('customer.orders.index') }}" class="text-sky-600 font-bold hover:underline">My Orders</a>.
+                        </div>
+                    </div>
+                @endif
+            @else
+                <div class="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl text-xs text-slate-500 leading-relaxed flex items-start gap-2.5">
+                    <i class="bi bi-person-check text-sky-600 text-base mt-0.5"></i>
+                    <div>
+                        <a href="{{ route('login') }}" class="text-sky-600 font-bold hover:underline">Sign in</a> to rate and leave feedback on products you have purchased.
+                    </div>
+                </div>
+            @endauth
         </div>
 
         <!-- Individual reviews list -->
         <div class="lg:col-span-2">
-            <div class="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+            <div class="space-y-4 max-h-[520px] overflow-y-auto pr-1">
                 @forelse($reviews as $rev)
+                @php
+                    $satInfo = $satisfactionLabels[$rev->rating] ?? $satisfactionLabels[5];
+                @endphp
                 <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80 shadow-2xs">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-start justify-between gap-2">
                         <div class="flex items-center space-x-2.5">
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-sky-400 text-white flex items-center justify-center font-bold text-xs shadow-2xs shadow-sky-100/50">
-                                {{ strtoupper(substr($rev->customer->name, 0, 1)) }}
+                                {{ strtoupper(substr($rev->customer->name ?? 'C', 0, 1)) }}
                             </div>
                             <div>
-                                <span class="block text-xs font-bold text-slate-900">{{ $rev->customer->name }}</span>
-                                <span class="block text-[9px] text-slate-400 mt-0.5">{{ $rev->created_at->format('M d, Y') }}</span>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-xs font-bold text-slate-900">{{ $rev->customer->name ?? 'Customer' }}</span>
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border {{ $satInfo['class'] }}">
+                                        {{ $satInfo['label'] }}
+                                    </span>
+                                </div>
+                                <span class="block text-[9px] text-slate-400 mt-0.5">{{ $rev->created_at->format('M d, Y h:i A') }} &bull; Verified Purchase</span>
                             </div>
                         </div>
-                        <div class="flex text-amber-400 text-xs">
+                        <div class="flex items-center gap-1 text-amber-400 text-xs shrink-0">
                             @for($i = 1; $i <= 5; $i++)
                                 @if($i <= $rev->rating)
                                     <i class="bi bi-star-fill"></i>
@@ -351,15 +475,16 @@
                         </div>
                     </div>
                     @if($rev->review)
-                        <p class="text-xs text-slate-600 mt-3 leading-relaxed bg-white border border-slate-100 p-2.5 rounded-xl shadow-2xs">
+                        <p class="text-xs text-slate-600 mt-3 leading-relaxed bg-white border border-slate-100 p-3 rounded-xl shadow-2xs">
                             "{{ $rev->review }}"
                         </p>
                     @endif
                 </div>
                 @empty
-                <div class="py-12 text-center">
-                    <i class="bi bi-chat-square-dots text-3xl text-slate-200 block mb-2"></i>
-                    <p class="text-xs text-slate-400 italic">No reviews recorded yet for this product.</p>
+                <div class="py-16 text-center bg-slate-50/40 rounded-2xl border border-dashed border-slate-200">
+                    <i class="bi bi-chat-square-dots text-3xl text-slate-300 block mb-2"></i>
+                    <p class="text-xs font-semibold text-slate-600">No customer reviews yet</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Be the first verified buyer to rate and review this product.</p>
                 </div>
                 @endforelse
             </div>
@@ -499,6 +624,51 @@
                 customClass: { popup: 'rounded-2xl border border-slate-100 shadow-xl' }
             });
         }
+    }
+
+    const satisfactionLevels = {
+        1: 'Very Dissatisfied',
+        2: 'Dissatisfied',
+        3: 'Neutral',
+        4: 'Satisfied',
+        5: 'Very Satisfied'
+    };
+
+    function setProductSatisfactionRating(rating) {
+        const container = document.getElementById('productRateStars');
+        const badge = document.getElementById('productSatisfactionBadge');
+        if (!container) return;
+
+        container.querySelectorAll('input[name="rating"]').forEach(input => {
+            input.checked = parseInt(input.value, 10) === rating;
+        });
+
+        container.querySelectorAll('i[data-star-index]').forEach(icon => {
+            const idx = parseInt(icon.getAttribute('data-star-index'), 10);
+            if (idx <= rating) {
+                icon.classList.remove('bi-star', 'text-slate-300');
+                icon.classList.add('bi-star-fill', 'text-amber-400');
+            } else {
+                icon.classList.remove('bi-star-fill', 'text-amber-400');
+                icon.classList.add('bi-star', 'text-slate-300');
+            }
+        });
+
+        if (badge && satisfactionLevels[rating]) {
+            badge.textContent = satisfactionLevels[rating];
+        }
+    }
+
+    function appendProductFeedbackTag(tagText) {
+        const textarea = document.getElementById('product_review_input');
+        if (!textarea) return;
+        const current = textarea.value.trim();
+        if (!current) {
+            textarea.value = tagText + '. ';
+        } else if (!current.toLowerCase().includes(tagText.toLowerCase())) {
+            textarea.value = current.replace(/\.*\s*$/, '. ') + tagText + '. ';
+        }
+        textarea.focus();
     }
 </script>
 @endsection

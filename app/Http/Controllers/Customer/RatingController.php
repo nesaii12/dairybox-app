@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Rating;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -16,22 +17,37 @@ class RatingController extends Controller
             'review' => 'nullable|string|max:500',
         ]);
 
-        // Verify if user already rated this product to prevent duplicate reviews
-        $exists = Rating::where('customer_id', auth()->id())
-            ->where('product_id', $product->id)
+        // Verify that the customer has purchased this product in a non-cancelled order
+        $hasPurchased = Order::where('customer_id', auth()->id())
+            ->where('order_status', '!=', 'Cancelled')
+            ->whereHas('orderItems', function ($q) use ($product) {
+                $q->where('product_id', $product->id);
+            })
             ->exists();
 
-        if ($exists) {
-            return redirect()->back()->with('error', 'You have already submitted a review for this product.');
+        if (!$hasPurchased) {
+            return redirect()->back()->with('error', 'You can only rate and review products you have purchased.');
         }
 
-        Rating::create([
-            'customer_id' => auth()->id(),
-            'product_id' => $product->id,
-            'rating' => $request->rating,
-            'review' => $request->review,
-        ]);
+        $existing = Rating::where('customer_id', auth()->id())
+            ->where('product_id', $product->id)
+            ->first();
 
-        return redirect()->back()->with('success', 'Thank you! Your product review has been submitted.');
+        Rating::updateOrCreate(
+            [
+                'customer_id' => auth()->id(),
+                'product_id' => $product->id,
+            ],
+            [
+                'rating' => (int) $request->rating,
+                'review' => $request->filled('review') ? trim($request->review) : null,
+            ]
+        );
+
+        $message = $existing
+            ? 'Your product rating and feedback have been updated.'
+            : 'Thank you! Your product rating and feedback have been submitted.';
+
+        return redirect()->back()->with('success', $message);
     }
 }

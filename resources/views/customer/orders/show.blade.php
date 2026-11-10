@@ -125,7 +125,11 @@
                 </div>
                 <div class="flex items-center justify-between">
                     <span>Delivery Fee</span>
-                    <span class="font-semibold text-slate-900">₱{{ number_format($order->delivery_fee, 2) }}</span>
+                    @if($order->order_type === 'Delivery' && (float) $order->delivery_fee == 0)
+                        <span class="font-bold text-emerald-600">Free Delivery</span>
+                    @else
+                        <span class="font-semibold text-slate-900">₱{{ number_format($order->delivery_fee, 2) }}</span>
+                    @endif
                 </div>
                 <div class="flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
                     <span class="font-bold text-slate-900">Total Charged</span>
@@ -134,71 +138,135 @@
             </div>
         </div>
 
-        <!-- Rating & Review Trigger (if order is delivered) -->
-        @if($order->order_status === 'Delivered')
-            <div class="bg-sky-50/50 border border-sky-100 p-5 rounded-2xl">
+        <!-- Rating & Review Trigger (for completed/fulfilled orders) -->
+        @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup']))
+            @php
+                $satisfactionLabels = [
+                    5 => ['label' => 'Very Satisfied', 'class' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                    4 => ['label' => 'Satisfied', 'class' => 'bg-sky-50 text-sky-700 border-sky-200'],
+                    3 => ['label' => 'Neutral', 'class' => 'bg-amber-50 text-amber-700 border-amber-200'],
+                    2 => ['label' => 'Dissatisfied', 'class' => 'bg-orange-50 text-orange-700 border-orange-200'],
+                    1 => ['label' => 'Very Dissatisfied', 'class' => 'bg-rose-50 text-rose-700 border-rose-200'],
+                ];
+            @endphp
+            <div id="review-products" class="bg-sky-50/50 border border-sky-100 p-5 rounded-2xl">
                 <h3 class="text-sm font-bold text-sky-950 flex items-center space-x-2">
-                    <i class="bi bi-star-fill text-sky-500 animate-pulse"></i>
-                    <span>Review Purchased Products</span>
+                    <i class="bi bi-star-fill text-amber-400"></i>
+                    <span>Rate & Give Feedback on Purchased Products</span>
                 </h3>
-                <p class="text-[11px] text-slate-500 mt-1">Submit feedback for individual items in this order to share with other shoppers.</p>
+                <p class="text-[11px] text-slate-500 mt-1">Rate your satisfaction (1 to 5 stars) and share feedback on the products from this order.</p>
                 
                 <div class="space-y-4 mt-4">
                     @foreach($order->orderItems as $item)
-                        <!-- Check if user already reviewed this product -->
                         @php
-                            $hasReviewed = \App\Models\Rating::where('customer_id', auth()->id())
+                            $existingRating = \App\Models\Rating::where('customer_id', auth()->id())
                                 ->where('product_id', $item->product_id)
-                                ->exists();
+                                ->first();
+                            $currentScore = $existingRating->rating ?? 5;
+                            $satBadge = $satisfactionLabels[$currentScore] ?? $satisfactionLabels[5];
                         @endphp
 
-                        @if(!$hasReviewed)
-                            <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-xs font-bold text-slate-800">{{ $item->product->product_name }}</span>
-                                    <span class="text-[9px] text-slate-400 font-medium">Not reviewed yet</span>
-                                </div>
-                                
-                                <form action="{{ route('customer.ratings.store', $item->product_id) }}" method="POST" class="space-y-3">
-                                    @csrf
-                                    <!-- Star Selector -->
-                                    <div class="flex items-center space-x-1 text-slate-300 text-lg">
-                                        <label class="cursor-pointer hover:text-amber-400">
-                                            <input type="radio" name="rating" value="1" required class="sr-only">
-                                            <i class="bi bi-star" onclick="highlightStars(this, 1)"></i>
-                                        </label>
-                                        <label class="cursor-pointer hover:text-amber-400">
-                                            <input type="radio" name="rating" value="2" required class="sr-only">
-                                            <i class="bi bi-star" onclick="highlightStars(this, 2)"></i>
-                                        </label>
-                                        <label class="cursor-pointer hover:text-amber-400">
-                                            <input type="radio" name="rating" value="3" required class="sr-only">
-                                            <i class="bi bi-star" onclick="highlightStars(this, 3)"></i>
-                                        </label>
-                                        <label class="cursor-pointer hover:text-amber-400">
-                                            <input type="radio" name="rating" value="4" required class="sr-only">
-                                            <i class="bi bi-star" onclick="highlightStars(this, 4)"></i>
-                                        </label>
-                                        <label class="cursor-pointer hover:text-amber-400">
-                                            <input type="radio" name="rating" value="5" required class="sr-only">
-                                            <i class="bi bi-star" onclick="highlightStars(this, 5)"></i>
-                                        </label>
+                        <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="h-10 w-10 rounded-lg overflow-hidden bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0">
+                                        @if($item->product->image)
+                                            <img src="{{ asset('storage/' . $item->product->image) }}" alt="{{ $item->product->product_name }}" class="h-full w-full object-cover">
+                                        @else
+                                            <i class="bi bi-image text-slate-300"></i>
+                                        @endif
                                     </div>
-                                    
-                                    <input type="text" name="review" placeholder="Write feedback comment (optional)..."
-                                        class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 text-xs transition-all placeholder-slate-450 focus:bg-white">
-                                    
-                                    <button type="submit" class="py-1.5 px-3.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-[10px] font-bold transition-all shadow-md shadow-sky-100 cursor-pointer">
-                                        Submit Review
+                                    <div>
+                                        <a href="{{ route('customer.product', $item->product_id) }}#reviews-section" class="text-xs font-bold text-slate-900 hover:text-sky-600 transition-colors">
+                                            {{ $item->product->product_name }}
+                                        </a>
+                                        <span class="block text-[10px] text-slate-400">
+                                            {{ $item->product->milk_type }} Milk &bull; Size: {{ $item->product->size }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                @if($existingRating)
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[10px] flex items-center">
+                                            <i class="bi bi-check-circle-fill mr-1 text-emerald-600"></i> Reviewed
+                                        </span>
+                                        <button type="button" onclick="toggleEditOrderReview({{ $item->id }})" class="text-[11px] font-bold text-sky-600 hover:text-sky-800 cursor-pointer">
+                                            Edit
+                                        </button>
+                                    </div>
+                                @else
+                                    <span class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full font-bold">
+                                        Awaiting Feedback
+                                    </span>
+                                @endif
+                            </div>
+
+                            @if($existingRating)
+                                <div id="review-summary-{{ $item->id }}" class="bg-slate-50/80 border border-slate-100 rounded-xl p-3 space-y-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-1.5">
+                                            <div class="flex text-amber-400 text-xs">
+                                                @for($i = 1; $i <= 5; $i++)
+                                                    <i class="bi {{ $i <= $existingRating->rating ? 'bi-star-fill' : 'bi-star text-slate-300' }}"></i>
+                                                @endfor
+                                            </div>
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border {{ $satBadge['class'] }}">
+                                                {{ $satBadge['label'] }}
+                                            </span>
+                                        </div>
+                                        <span class="text-[10px] text-slate-400">{{ $existingRating->updated_at->format('M d, Y') }}</span>
+                                    </div>
+                                    @if($existingRating->review)
+                                        <p class="text-xs text-slate-600 italic">"{{ $existingRating->review }}"</p>
+                                    @else
+                                        <p class="text-[11px] text-slate-400 italic">No written comment provided.</p>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <form id="review-form-{{ $item->id }}" action="{{ route('customer.ratings.store', $item->product_id) }}" method="POST" class="space-y-3 {{ $existingRating ? 'hidden mt-3 pt-3 border-t border-slate-100' : '' }}">
+                                @csrf
+                                <!-- Star & Satisfaction Selector -->
+                                <div class="flex items-center justify-between flex-wrap gap-2">
+                                    <div class="flex items-center space-x-1.5 text-lg star-group" data-item-id="{{ $item->id }}">
+                                        @for($s = 1; $s <= 5; $s++)
+                                            <label class="cursor-pointer transition-transform hover:scale-110">
+                                                <input type="radio" name="rating" value="{{ $s }}" {{ (int) $currentScore === $s ? 'checked' : '' }} required class="sr-only">
+                                                <i class="bi {{ $s <= $currentScore ? 'bi-star-fill text-amber-400' : 'bi-star text-slate-300' }}" onclick="highlightStars(this, {{ $s }}, {{ $item->id }})"></i>
+                                            </label>
+                                        @endfor
+                                    </div>
+                                    <span id="satisfaction-label-{{ $item->id }}" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-200">
+                                        {{ $satBadge['label'] }}
+                                    </span>
+                                </div>
+
+                                <!-- Quick Satisfaction Feedback Chips -->
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach(['Fresh & creamy', 'Great flavor', 'High quality dairy', 'Good packaging', 'Worth the price'] as $tag)
+                                        <button type="button" onclick="appendOrderFeedbackTag({{ $item->id }}, '{{ $tag }}')" class="px-2 py-0.5 rounded-lg bg-slate-50 hover:bg-sky-50 text-slate-600 hover:text-sky-700 border border-slate-200/80 text-[10px] font-semibold transition cursor-pointer">
+                                            + {{ $tag }}
+                                        </button>
+                                    @endforeach
+                                </div>
+
+                                <textarea name="review" id="order-review-input-{{ $item->id }}" rows="2" maxlength="500" placeholder="Share your satisfaction feedback on taste, freshness, and quality..."
+                                    class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 text-xs transition-all placeholder-slate-400 focus:bg-white resize-none">{{ $existingRating->review ?? '' }}</textarea>
+
+                                <div class="flex items-center gap-2">
+                                    <button type="submit" class="py-2 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-sky-100 cursor-pointer flex items-center gap-1.5">
+                                        <i class="bi bi-send-check-fill"></i>
+                                        <span>{{ $existingRating ? 'Update Feedback' : 'Submit Rating & Feedback' }}</span>
                                     </button>
-                                </form>
-                            </div>
-                        @else
-                            <div class="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center justify-between text-xs text-slate-500">
-                                <span class="font-medium">{{ $item->product->product_name }}</span>
-                                <span class="font-bold text-emerald-600 flex items-center"><i class="bi bi-check2 mr-1"></i> Reviewed</span>
-                            </div>
-                        @endif
+                                    @if($existingRating)
+                                        <button type="button" onclick="toggleEditOrderReview({{ $item->id }})" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition cursor-pointer">
+                                            Cancel
+                                        </button>
+                                    @endif
+                                </div>
+                            </form>
+                        </div>
                     @endforeach
                 </div>
             </div>
@@ -396,20 +464,58 @@
         document.getElementById('customerCancellationModal').classList.add('hidden');
     }
 
-    function highlightStars(starElement, count) {
-        // Find all star elements inside the parent wrapper
-        const wrapper = starElement.closest('.flex');
+    const orderSatisfactionMap = {
+        1: 'Very Dissatisfied',
+        2: 'Dissatisfied',
+        3: 'Neutral',
+        4: 'Satisfied',
+        5: 'Very Satisfied'
+    };
+
+    function highlightStars(starElement, count, itemId) {
+        const wrapper = starElement.closest('.star-group') || starElement.closest('.flex');
         const stars = wrapper.querySelectorAll('i');
+        const radios = wrapper.querySelectorAll('input[type="radio"]');
+
+        radios.forEach((radio, idx) => {
+            radio.checked = (idx + 1) === count;
+        });
 
         stars.forEach((star, index) => {
             if (index < count) {
-                star.classList.replace('bi-star', 'bi-star-fill');
-                star.classList.add('text-amber-400');
+                star.classList.remove('bi-star', 'text-slate-300');
+                star.classList.add('bi-star-fill', 'text-amber-400');
             } else {
-                star.classList.replace('bi-star-fill', 'bi-star');
-                star.classList.remove('text-amber-400');
+                star.classList.remove('bi-star-fill', 'text-amber-400');
+                star.classList.add('bi-star', 'text-slate-300');
             }
         });
+
+        if (itemId) {
+            const labelEl = document.getElementById('satisfaction-label-' + itemId);
+            if (labelEl && orderSatisfactionMap[count]) {
+                labelEl.textContent = orderSatisfactionMap[count];
+            }
+        }
+    }
+
+    function appendOrderFeedbackTag(itemId, tagText) {
+        const input = document.getElementById('order-review-input-' + itemId);
+        if (!input) return;
+        const current = input.value.trim();
+        if (!current) {
+            input.value = tagText + '. ';
+        } else if (!current.toLowerCase().includes(tagText.toLowerCase())) {
+            input.value = current.replace(/\.*\s*$/, '. ') + tagText + '. ';
+        }
+        input.focus();
+    }
+
+    function toggleEditOrderReview(itemId) {
+        const form = document.getElementById('review-form-' + itemId);
+        if (form) {
+            form.classList.toggle('hidden');
+        }
     }
 </script>
 @endsection
