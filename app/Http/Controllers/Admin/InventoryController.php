@@ -75,38 +75,23 @@ class InventoryController extends Controller
                 ->orderBy('products.created_at', 'desc');
 
         } else {
-            // "All" filter — sort by priority:
-            // 1. Near Expiry  2. Not Expired  3. Expired  4. Out of Stock
-            $productQuery->orderByRaw("
-                CASE
-                    WHEN products.stock > 0 AND (
-                        (products.expiration_date IS NOT NULL AND DATE(products.expiration_date) >= ? AND DATE(products.expiration_date) <= ?)
-                        OR EXISTS (
-                            SELECT 1 FROM inventories
-                            WHERE inventories.product_id = products.id
-                              AND inventories.remaining_stock > 0
-                              AND inventories.expiration_date IS NOT NULL
-                              AND DATE(inventories.expiration_date) >= ?
-                              AND DATE(inventories.expiration_date) <= ?
-                        )
-                    ) THEN 1
-                    WHEN products.stock > 0 AND (
-                        (products.expiration_date IS NULL OR DATE(products.expiration_date) > ?)
-                        AND NOT EXISTS (
-                            SELECT 1 FROM inventories
-                            WHERE inventories.product_id = products.id
-                              AND inventories.remaining_stock > 0
-                              AND inventories.expiration_date IS NOT NULL
-                              AND DATE(inventories.expiration_date) < ?
-                        )
-                    ) THEN 2
-                    WHEN products.stock > 0 THEN 3
-                    ELSE 4
-                END ASC
-            ", [$today, $sevenDaysOut, $today, $sevenDaysOut, $sevenDaysOut, $today])
-            ->orderByRaw("CASE WHEN products.expiration_date IS NULL THEN 1 ELSE 0 END ASC")
-            ->orderBy('products.expiration_date', 'asc')
-            ->orderBy('products.created_at', 'desc');
+            // "All" filter — arrange by date manufactured (FIFO chronological order, active stock first)
+            $mfgDateExpr = "COALESCE((
+                SELECT inventories.manufacturing_date
+                FROM inventories
+                WHERE inventories.product_id = products.id
+                  AND inventories.remaining_stock > 0
+                  AND inventories.manufacturing_date IS NOT NULL
+                ORDER BY inventories.created_at ASC
+                LIMIT 1
+            ), products.manufacturing_date)";
+
+            $productQuery
+                ->orderByRaw("CASE WHEN products.stock > 0 THEN 0 ELSE 1 END ASC")
+                ->orderByRaw("CASE WHEN {$mfgDateExpr} IS NULL THEN 1 ELSE 0 END ASC")
+                ->orderByRaw("{$mfgDateExpr} ASC")
+                ->orderBy('products.expiration_date', 'asc')
+                ->orderBy('products.id', 'asc');
         }
 
         $products = $productQuery->paginate($perPage)->withQueryString();

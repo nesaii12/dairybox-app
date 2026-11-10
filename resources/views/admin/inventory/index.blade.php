@@ -98,8 +98,8 @@
                         // Show ONLY the new batch for this product
                         $displayBatch = $newBatch;
                     } else {
-                        // "All" — show the most relevant batch: near expiry > new > first > expired
-                        $displayBatch = $nearExpiryBatch ?? $newBatch ?? $firstBatch ?? $expiredBatch;
+                        // "All" — FIFO batch order matching date manufactured
+                        $displayBatch = $firstBatch ?? $nearExpiryBatch ?? $newBatch ?? $expiredBatch;
                     }
                 @endphp
                 <tr id="product-{{ $product->id }}"
@@ -149,7 +149,7 @@
                                 ?? $product->manufacturing_date;
                             $isNew = $newBatch && $displayBatch && $displayBatch->id === $newBatch->id;
                         @endphp
-                        @if($displayBatch && $mfgDateRaw)
+                        @if($mfgDateRaw)
                             @php
                                 $mfgDate = \Carbon\Carbon::parse($mfgDateRaw);
                             @endphp
@@ -161,7 +161,9 @@
                                     <i class="bi bi-box-seam"></i> New
                                 </span>
                             @endif
-                            <span class="block text-[10px] text-slate-400">Batch #{{ $displayBatch->id }}</span>
+                            @if($displayBatch)
+                                <span class="block text-[10px] text-slate-400">Batch #{{ $displayBatch->id }}</span>
+                            @endif
                         @elseif($displayBatch)
                             <span class="text-xs text-slate-400 italic">—</span>
                             @if($isNew)
