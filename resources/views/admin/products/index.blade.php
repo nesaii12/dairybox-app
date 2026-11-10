@@ -397,35 +397,6 @@
             return;
         }
         flavorInput.value = val;
-        const selectedOpt = select.options[select.selectedIndex];
-        const imgPath = selectedOpt.getAttribute('data-image');
-        if (imgPath) {
-            selectEditPreset(productId, imgPath, val);
-        }
-    }
-
-    function selectEditPreset(productId, imagePath, flavorName) {
-        const presetInput = document.getElementById('edit_preset_image_' + productId);
-        const fileInput = document.getElementById('image_' + productId);
-        const previewImg = document.getElementById('edit_preview_' + productId);
-        const previewPlaceholder = document.getElementById('edit_preview_placeholder_' + productId);
-        const previewTitle = document.getElementById('edit_preview_title_' + productId);
-        const previewSub = document.getElementById('edit_preview_sub_' + productId);
-
-        if (presetInput) presetInput.value = imagePath;
-        if (fileInput) fileInput.value = '';
-        if (previewImg) {
-            previewImg.src = '{{ asset("storage") }}/' + imagePath;
-            previewImg.classList.remove('hidden');
-        }
-        if (previewPlaceholder) previewPlaceholder.classList.add('hidden');
-        if (previewTitle) previewTitle.textContent = 'Selected Preset: ' + flavorName;
-        if (previewSub) previewSub.textContent = 'Path: storage/' + imagePath;
-
-        const flavorInput = document.getElementById('flavor_' + productId);
-        if (flavorInput && (!flavorInput.value || flavorInput.value.trim() === '')) {
-            flavorInput.value = flavorName;
-        }
     }
 
     function previewEditCustomImage(productId, input) {

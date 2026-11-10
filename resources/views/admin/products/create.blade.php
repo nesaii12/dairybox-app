@@ -191,53 +191,15 @@
                 </div>
             </div>
 
-            <!-- Product Image / Flavor Photo Section -->
+            <!-- Product Image / Custom Upload Section -->
             <div class="space-y-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-900 uppercase tracking-wider">Product Photo</label>
-                        <p class="text-[11px] text-slate-500">Pick from curated flavor presets or upload a custom high-resolution photo.</p>
-                    </div>
-
-                    <!-- Mode Toggle Buttons -->
-                    <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 text-xs font-bold">
-                        <button type="button" id="tabPresetBtn" onclick="switchImageTab('presets')"
-                            class="px-3 py-1.5 rounded-lg text-slate-900 bg-white shadow-2xs transition-all cursor-pointer">
-                            <i class="bi bi-images mr-1 text-sky-600"></i> Preset Photos
-                        </button>
-                        <button type="button" id="tabUploadBtn" onclick="switchImageTab('upload')"
-                            class="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition-all cursor-pointer">
-                            <i class="bi bi-cloud-arrow-up mr-1"></i> Upload Custom
-                        </button>
-                    </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-900 uppercase tracking-wider">Product Photo</label>
+                    <p class="text-[11px] text-slate-500">Upload a custom high-resolution photo for this product.</p>
                 </div>
 
-                <!-- Hidden input to store selected preset image path -->
-                <input type="hidden" name="preset_image" id="preset_image" value="{{ old('preset_image') }}">
-
-                <!-- Tab 1: Preset Flavor Photos Gallery -->
-                <div id="presetGalleryContainer" class="block">
-                    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                        @foreach($flavorPresets as $fp)
-                            <div onclick="selectPresetPhoto('{{ $fp['image'] }}', '{{ $fp['name'] }}')"
-                                 id="preset-card-{{ Str::slug($fp['name']) }}"
-                                 data-preset-img="{{ $fp['image'] }}"
-                                 class="preset-card group relative rounded-xl border-2 border-slate-200 hover:border-sky-400 bg-white p-2 cursor-pointer transition-all duration-200 hover:shadow-md text-center">
-                                <div class="aspect-square rounded-lg overflow-hidden bg-slate-100 mb-2 relative">
-                                    <img src="{{ asset('storage/' . $fp['image']) }}" alt="{{ $fp['name'] }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                                    <div class="check-badge absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-sky-600 text-white flex items-center justify-center text-[10px] shadow-sm hidden">
-                                        <i class="bi bi-check-lg"></i>
-                                    </div>
-                                </div>
-                                <span class="block text-[11px] font-bold text-slate-800 truncate">{{ $fp['name'] }}</span>
-                                <span class="block text-[9px] text-slate-400">{{ $fp['category'] }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-
-                <!-- Tab 2: Custom File Upload Dropzone -->
-                <div id="uploadDropzoneContainer" class="hidden">
+                <!-- Custom File Upload Dropzone -->
+                <div id="uploadDropzoneContainer">
                     <div id="dropzone"
                         class="relative border-2 border-dashed border-slate-300 hover:border-sky-400 rounded-2xl p-6 sm:p-8 text-center bg-slate-50/50 hover:bg-sky-50/20 transition-all cursor-pointer">
                         <input type="file" name="image" id="imageInput" accept="image/jpeg,image/png,image/webp,image/jpg" onchange="handleCustomFileUpload(this)"
@@ -255,16 +217,16 @@
                 </div>
 
                 <!-- Active Photo Live Preview Banner -->
-                <div id="previewContainer" class="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between {{ old('preset_image') ? '' : 'hidden' }}">
+                <div id="previewContainer" class="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between hidden">
                     <div class="flex items-center space-x-3.5">
                         <div class="h-14 w-14 rounded-xl overflow-hidden bg-white border border-slate-200 shadow-2xs flex-shrink-0">
-                            <img id="previewImage" src="{{ old('preset_image') ? asset('storage/' . old('preset_image')) : '' }}" alt="Selected Product Photo" class="h-full w-full object-cover">
+                            <img id="previewImage" src="" alt="Selected Product Photo" class="h-full w-full object-cover">
                         </div>
                         <div>
                             <span class="inline-flex items-center text-[10px] font-bold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-md mb-1">
                                 <i class="bi bi-image mr-1"></i> Active Selected Photo
                             </span>
-                            <h5 id="previewTitle" class="text-xs font-bold text-slate-900">Flavor Preset Selected</h5>
+                            <h5 id="previewTitle" class="text-xs font-bold text-slate-900">Custom Photo Selected</h5>
                             <p id="previewSubtitle" class="text-[10px] text-slate-500">This photo will be registered for the product.</p>
                         </div>
                     </div>
@@ -276,9 +238,6 @@
                 </div>
 
                 @error('image')
-                    <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
-                @enderror
-                @error('preset_image')
                     <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                 @enderror
             </div>
@@ -297,78 +256,6 @@
 </div>
 
 <script>
-    // Tab switching logic
-    function switchImageTab(tab) {
-        const presetContainer = document.getElementById('presetGalleryContainer');
-        const uploadContainer = document.getElementById('uploadDropzoneContainer');
-        const tabPresetBtn = document.getElementById('tabPresetBtn');
-        const tabUploadBtn = document.getElementById('tabUploadBtn');
-
-        if (tab === 'presets') {
-            presetContainer.classList.remove('hidden');
-            uploadContainer.classList.add('hidden');
-            tabPresetBtn.className = 'px-3 py-1.5 rounded-lg text-slate-900 bg-white shadow-2xs transition-all cursor-pointer';
-            tabUploadBtn.className = 'px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition-all cursor-pointer';
-        } else {
-            presetContainer.classList.add('hidden');
-            uploadContainer.classList.remove('hidden');
-            tabUploadBtn.className = 'px-3 py-1.5 rounded-lg text-slate-900 bg-white shadow-2xs transition-all cursor-pointer';
-            tabPresetBtn.className = 'px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition-all cursor-pointer';
-        }
-    }
-
-    // Preset photo selection
-    function selectPresetPhoto(imagePath, flavorName) {
-        document.getElementById('preset_image').value = imagePath;
-        
-        // Clear any file input so user doesn't upload a conflict
-        const fileInput = document.getElementById('imageInput');
-        if (fileInput) fileInput.value = '';
-
-        // Update card visual states
-        document.querySelectorAll('.preset-card').forEach(card => {
-            card.classList.remove('border-sky-600', 'bg-sky-50/40', 'ring-2', 'ring-sky-500/20');
-            card.classList.add('border-slate-200');
-            const badge = card.querySelector('.check-badge');
-            if (badge) badge.classList.add('hidden');
-        });
-
-        // Find and highlight active card
-        document.querySelectorAll('.preset-card').forEach(card => {
-            if (card.getAttribute('data-preset-img') === imagePath) {
-                card.classList.remove('border-slate-200');
-                card.classList.add('border-sky-600', 'bg-sky-50/40', 'ring-2', 'ring-sky-500/20');
-                const badge = card.querySelector('.check-badge');
-                if (badge) badge.classList.remove('hidden');
-            }
-        });
-
-        // If flavor field is currently empty or user is selecting a preset, set flavor name
-        const flavorInput = document.getElementById('flavor');
-        if (flavorName && (!flavorInput.value || flavorInput.value.trim() === '')) {
-            flavorInput.value = flavorName;
-            const presetSelect = document.getElementById('flavor_preset_select');
-            if (presetSelect) presetSelect.value = flavorName;
-        }
-
-        // Also if product_name is empty, suggest a name based on flavor
-        const productNameInput = document.getElementById('product_name');
-        if (!productNameInput.value && flavorName) {
-            productNameInput.value = flavorName + ' Dairy Milk';
-        }
-
-        // Update Live Preview box
-        const previewContainer = document.getElementById('previewContainer');
-        const previewImage = document.getElementById('previewImage');
-        const previewTitle = document.getElementById('previewTitle');
-        const previewSubtitle = document.getElementById('previewSubtitle');
-
-        previewImage.src = '{{ asset("storage") }}/' + imagePath;
-        previewTitle.textContent = 'Preset: ' + (flavorName || 'Flavor Photo');
-        previewSubtitle.textContent = 'Path: storage/' + imagePath;
-        previewContainer.classList.remove('hidden');
-    }
-
     // Dropdown change handler
     function handlePresetDropdownChange(select) {
         const val = select.value;
@@ -382,26 +269,12 @@
         }
 
         flavorInput.value = val;
-        const selectedOption = select.options[select.selectedIndex];
-        const imgPath = selectedOption.getAttribute('data-image');
-        if (imgPath) {
-            selectPresetPhoto(imgPath, val);
-        }
     }
 
     // Custom file upload handler
     function handleCustomFileUpload(input) {
         if (input.files && input.files[0]) {
             const file = input.files[0];
-            
-            // Clear preset selection
-            document.getElementById('preset_image').value = '';
-            document.querySelectorAll('.preset-card').forEach(card => {
-                card.classList.remove('border-sky-600', 'bg-sky-50/40', 'ring-2', 'ring-sky-500/20');
-                card.classList.add('border-slate-200');
-                const badge = card.querySelector('.check-badge');
-                if (badge) badge.classList.add('hidden');
-            });
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -421,26 +294,9 @@
 
     // Clear selected photo
     function clearSelectedPhoto() {
-        document.getElementById('preset_image').value = '';
         const fileInput = document.getElementById('imageInput');
         if (fileInput) fileInput.value = '';
-
-        document.querySelectorAll('.preset-card').forEach(card => {
-            card.classList.remove('border-sky-600', 'bg-sky-50/40', 'ring-2', 'ring-sky-500/20');
-            card.classList.add('border-slate-200');
-            const badge = card.querySelector('.check-badge');
-            if (badge) badge.classList.add('hidden');
-        });
-
         document.getElementById('previewContainer').classList.add('hidden');
     }
-
-    // Initialize state on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        const existingPreset = document.getElementById('preset_image').value;
-        if (existingPreset) {
-            selectPresetPhoto(existingPreset);
-        }
-    });
 </script>
 @endsection
