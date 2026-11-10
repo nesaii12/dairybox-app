@@ -75,7 +75,7 @@ class InventoryController extends Controller
                 ->orderBy('products.created_at', 'desc');
 
         } else {
-            // "All" filter — arrange by date manufactured (FIFO chronological order, active stock first)
+            // "All" filter — place 0 stock products in the first rows, then arrange by date manufactured
             $mfgDateExpr = "COALESCE((
                 SELECT inventories.manufacturing_date
                 FROM inventories
@@ -87,7 +87,7 @@ class InventoryController extends Controller
             ), products.manufacturing_date)";
 
             $productQuery
-                ->orderByRaw("CASE WHEN products.stock > 0 THEN 0 ELSE 1 END ASC")
+                ->orderByRaw("CASE WHEN products.stock <= 0 THEN 0 ELSE 1 END ASC")
                 ->orderByRaw("CASE WHEN {$mfgDateExpr} IS NULL THEN 1 ELSE 0 END ASC")
                 ->orderByRaw("{$mfgDateExpr} ASC")
                 ->orderBy('products.expiration_date', 'asc')
