@@ -125,7 +125,7 @@
                 <td>{{ $sale->order->customer->name }}</td>
                 <td>{{ $sale->order->order_type }}</td>
                 <td>{{ \Carbon\Carbon::parse($sale->sales_date)->format('M d, Y') }}</td>
-                <td style="text-align: right; font-weight: bold;">₱{{ number_format($sale->total_amount, 2) }}</td>
+                <td style="text-align: right; font-weight: bold;">{{ number_format($sale->total_amount, 2) }}</td>
             </tr>
             @empty
             <tr>
@@ -139,7 +139,7 @@
         <table>
             <tr>
                 <td style="font-weight: bold;">Grand Total Sales:</td>
-                <td class="total-val">₱{{ number_format($totalSales, 2) }}</td>
+                <td class="total-val">{{ number_format($totalSales, 2) }}</td>
             </tr>
         </table>
     </div>
