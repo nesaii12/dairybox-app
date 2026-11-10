@@ -40,7 +40,8 @@
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attributes</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Price</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Current Stock</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Dates</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacture Date</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Expiry Info</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                     <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -56,7 +57,7 @@
                         $today = now()->startOfDay();
                         if ($expiryDate->lt($today)) {
                             $isExpired = true;
-                        } elseif ($expiryDate->diffInDays($today) <= 7) {
+                        } elseif ($expiryDate->lte($today->copy()->addDays(7))) {
                             $isNearExpiration = true;
                         }
                     }
@@ -119,17 +120,28 @@
                             @endif
                         </div>
                     </td>
-                    <!-- Dates -->
+                    <!-- Manufacture Date -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex flex-col space-y-0.5">
-                            @if($product->manufacturing_date)
-                                <span class="text-[10px] text-slate-500 font-medium">
-                                    <span class="font-bold text-slate-400">Mfg:</span> {{ \Carbon\Carbon::parse($product->manufacturing_date)->format('M d, Y') }}
-                                </span>
+                        @if($product->manufacturing_date)
+                            <div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700">
+                                <i class="bi bi-calendar2-check text-sky-500 text-xs"></i>
+                                <span>{{ \Carbon\Carbon::parse($product->manufacturing_date)->format('M d, Y') }}</span>
+                            </div>
+                        @else
+                            <span class="text-xs font-medium text-slate-400">N/A</span>
+                        @endif
+                    </td>
+                    <!-- Expiry Info -->
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex flex-col space-y-1">
+                            @if($product->expiration_date)
+                                <div class="flex items-center space-x-1.5 text-xs font-bold {{ $isExpired ? 'text-rose-600' : ($isNearExpiration ? 'text-amber-700' : 'text-slate-800') }}">
+                                    <i class="bi bi-clock-history {{ $isExpired ? 'text-rose-500' : ($isNearExpiration ? 'text-amber-500' : 'text-emerald-500') }} text-xs"></i>
+                                    <span>{{ \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') }}</span>
+                                </div>
+                            @else
+                                <span class="text-xs font-medium text-slate-400">N/A</span>
                             @endif
-                            <span class="text-xs text-slate-700 font-semibold">
-                                <span class="font-bold text-slate-400 text-[10px]">Exp:</span> {{ $product->expiration_date ? \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') : 'N/A' }}
-                            </span>
                             @if($isExpired)
                                 <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
                                     <i class="bi bi-x-circle mr-1"></i> Expired
@@ -361,7 +373,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-12 text-center">
+                    <td colspan="9" class="px-6 py-12 text-center">
                         <div class="flex flex-col items-center justify-center space-y-2">
                             <i class="bi bi-egg-fried text-4xl text-slate-300"></i>
                             <p class="text-sm font-semibold text-slate-800">No Products Registered</p>
