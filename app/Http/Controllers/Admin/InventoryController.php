@@ -23,7 +23,7 @@ class InventoryController extends Controller
 
         $today        = now()->toDateString();
         $sevenDaysOut = now()->addDays(7)->toDateString();
-        $sevenDaysAgo = now()->subDays(7)->startOfDay();
+        $recentCutoff = now()->subDay();
 
         // Build product query filtered by inventory batch criteria
         $productQuery = Product::with(['category', 'inventories' => function ($query) {
@@ -32,19 +32,47 @@ class InventoryController extends Controller
 
         if ($filter === 'near_expiry') {
             // Products with at least one active batch expiring within 7 days
-            $productQuery->whereHas('inventories', function ($q) use ($today, $sevenDaysOut) {
-                $q->where('remaining_stock', '>', 0)
-                  ->whereNotNull('expiration_date')
-                  ->whereDate('expiration_date', '>=', $today)
-                  ->whereDate('expiration_date', '<=', $sevenDaysOut);
-            });
+            $productQuery->where('stock', '>', 0)
+                ->whereHas('inventories', function ($q) use ($today, $sevenDaysOut) {
+                    $q->where('remaining_stock', '>', 0)
+                      ->whereNotNull('expiration_date')
+                      ->whereDate('expiration_date', '>=', $today)
+                      ->whereDate('expiration_date', '<=', $sevenDaysOut);
+                })
+                ->orderBy('expiration_date', 'asc')
+                ->orderBy('created_at', 'desc');
 
         } elseif ($filter === 'new_stock') {
-            // Only products with active batches stocked in within the last 7 days
-            $productQuery->whereHas('inventories', function ($q) use ($sevenDaysAgo) {
-                $q->where('remaining_stock', '>', 0)
-                  ->where('created_at', '>=', $sevenDaysAgo);
-            });
+            // Only products with genuinely recent stock-in batches (last 24 hours)
+            // that are not cancelled-delivery returns and not already near-expiry or expired
+            $productQuery->where('stock', '>', 0)
+                ->whereHas('inventories', function ($q) use ($recentCutoff, $sevenDaysOut) {
+                    $q->where('remaining_stock', '>', 0)
+                      ->where('stock_in', '>', 0)
+                      ->where('created_at', '>=', $recentCutoff)
+                      ->where(function ($rq) {
+                          $rq->whereNull('remarks')
+                             ->orWhere('remarks', 'not like', 'Delivery Cancelled/Failed%');
+                      })
+                      ->where(function ($eq) use ($sevenDaysOut) {
+                          $eq->whereNull('expiration_date')
+                             ->orWhereDate('expiration_date', '>', $sevenDaysOut);
+                      });
+                })
+                ->orderByDesc(
+                    Inventory::select('created_at')
+                        ->whereColumn('inventories.product_id', 'products.id')
+                        ->where('remaining_stock', '>', 0)
+                        ->where('stock_in', '>', 0)
+                        ->where('created_at', '>=', $recentCutoff)
+                        ->where(function ($rq) {
+                            $rq->whereNull('remarks')
+                               ->orWhere('remarks', 'not like', 'Delivery Cancelled/Failed%');
+                        })
+                        ->latest('created_at')
+                        ->limit(1)
+                )
+                ->orderBy('products.created_at', 'desc');
 
         } else {
             // "All" filter — sort by priority:
