@@ -55,29 +55,35 @@
                 $cardSizeOptions = ['Small', 'Medium', 'Large'];
             @endphp
             <div class="p-5 flex-1 flex flex-col justify-between space-y-3.5">
+                @php
+                    $ratingCount = (int) ($product->ratings_count ?? $product->ratings()->count());
+                    $ratingAvg = (float) ($product->ratings_avg_rating ?? ($ratingCount > 0 ? $product->ratings()->avg('rating') : 0));
+                @endphp
                 <div class="space-y-2">
                     <div>
+                        <!-- Product Rating Reference -->
+                        <a href="{{ route('customer.product', $product->id) }}#reviews-section" class="inline-flex items-center gap-1.5 text-[11px] mb-1 w-max group/rating" title="{{ $ratingCount > 0 ? number_format($ratingAvg, 1) . ' out of 5 (' . $ratingCount . ' ' . Str::plural('review', $ratingCount) . ')' : 'No reviews yet' }}">
+                            <span class="flex items-center text-amber-400 space-x-0.5 text-[10px]">
+                                @for($i = 1; $i <= 5; $i++)
+                                    @if($i <= round($ratingAvg))
+                                        <i class="bi bi-star-fill"></i>
+                                    @else
+                                        <i class="bi bi-star text-slate-300"></i>
+                                    @endif
+                                @endfor
+                            </span>
+                            <span class="font-bold {{ $ratingCount > 0 ? 'text-slate-700' : 'text-slate-400' }}">{{ number_format($ratingAvg, 1) }}</span>
+                            <span class="text-[10px] text-slate-400 font-medium group-hover/rating:text-sky-600 transition-colors">
+                                ({{ $ratingCount > 0 ? $ratingCount . ' ' . Str::plural('review', $ratingCount) : 'No reviews yet' }})
+                            </span>
+                        </a>
+
                         <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
                             <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
                         </h3>
-                        <div class="flex items-center justify-between gap-2 mt-0.5">
-                            @if($product->flavor)
-                                <p class="text-[11px] text-sky-600 font-bold truncate">{{ $product->flavor }}</p>
-                            @else
-                                <span></span>
-                            @endif
-                            @php
-                                $ratingCount = (int) ($product->ratings_count ?? $product->ratings()->count());
-                                $ratingAvg = (float) ($product->ratings_avg_rating ?? ($ratingCount > 0 ? $product->ratings()->avg('rating') : 0));
-                            @endphp
-                            @if($ratingCount > 0)
-                                <a href="{{ route('customer.product', $product->id) }}#reviews-section" class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-100 shrink-0" title="{{ number_format($ratingAvg, 1) }} out of 5 ({{ $ratingCount }} {{ Str::plural('review', $ratingCount) }})">
-                                    <i class="bi bi-star-fill text-amber-400 text-[9px]"></i>
-                                    <span>{{ number_format($ratingAvg, 1) }}</span>
-                                    <span class="text-slate-400 font-medium">({{ $ratingCount }})</span>
-                                </a>
-                            @endif
-                        </div>
+                        @if($product->flavor)
+                            <p class="text-[11px] text-sky-600 font-bold mt-0.5 truncate">{{ $product->flavor }}</p>
+                        @endif
                     </div>
 
                     <!-- Milk Type & Size Customization Options -->

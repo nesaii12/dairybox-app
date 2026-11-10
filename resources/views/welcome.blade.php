@@ -390,11 +390,34 @@
                                 $cardSizeOptions = ['Small', 'Medium', 'Large'];
                             @endphp
                             <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                                @php
+                                    $ratingCount = (int) ($product->ratings_count ?? $product->ratings()->count());
+                                    $ratingAvg = (float) ($product->ratings_avg_rating ?? ($ratingCount > 0 ? $product->ratings()->avg('rating') : 0));
+                                @endphp
                                 <div class="space-y-2">
-                                    <div class="flex items-center justify-between">
-                                        <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
-                                            <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
-                                        </h3>
+                                    <div>
+                                        <!-- Product Rating Reference -->
+                                        <a href="{{ route('customer.product', $product->id) }}#reviews-section" class="inline-flex items-center gap-1.5 text-[11px] mb-1 w-max group/rating" title="{{ $ratingCount > 0 ? number_format($ratingAvg, 1) . ' out of 5 (' . $ratingCount . ' ' . Str::plural('review', $ratingCount) . ')' : 'No reviews yet' }}">
+                                            <span class="flex items-center text-amber-400 space-x-0.5 text-[10px]">
+                                                @for($i = 1; $i <= 5; $i++)
+                                                    @if($i <= round($ratingAvg))
+                                                        <i class="bi bi-star-fill"></i>
+                                                    @else
+                                                        <i class="bi bi-star text-slate-300"></i>
+                                                    @endif
+                                                @endfor
+                                            </span>
+                                            <span class="font-bold {{ $ratingCount > 0 ? 'text-slate-700' : 'text-slate-400' }}">{{ number_format($ratingAvg, 1) }}</span>
+                                            <span class="text-[10px] text-slate-400 font-medium group-hover/rating:text-sky-600 transition-colors">
+                                                ({{ $ratingCount > 0 ? $ratingCount . ' ' . Str::plural('review', $ratingCount) : 'No reviews yet' }})
+                                            </span>
+                                        </a>
+
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
+                                                <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
+                                            </h3>
+                                        </div>
                                     </div>
                                     <!-- Milk Type & Size Customization Options -->
                                     <div class="space-y-1.5 pt-0.5">

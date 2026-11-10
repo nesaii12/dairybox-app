@@ -5,8 +5,21 @@ use Illuminate\Support\Facades\Route;
 
 // Public Landing Route
 Route::get('/', function () {
-    $products = \App\Models\Product::with('category')->active()->take(4)->get();
-    return view('welcome', compact('products'));
+    $products = \App\Models\Product::with('category')->withCount('ratings')->withAvg('ratings', 'rating')->active()->take(4)->get();
+    $allActiveProducts = \App\Models\Product::active()->get();
+    $productVariantsMap = [];
+    foreach ($allActiveProducts as $p) {
+        $key = strtolower(trim($p->product_name));
+        $expired = $p->expiration_date && \Carbon\Carbon::parse($p->expiration_date)->startOfDay()->lt(now()->startOfDay());
+        $productVariantsMap[$key][] = [
+            'id' => $p->id,
+            'milk_type' => $p->milk_type,
+            'size' => $p->size,
+            'available' => !$expired && $p->stock > 0,
+            'url' => route('customer.product', $p->id),
+        ];
+    }
+    return view('welcome', compact('products', 'productVariantsMap'));
 })->name('home');
 
 // Guest Routes
@@ -109,6 +122,8 @@ Route::middleware(['auth', 'role:customer', 'otp.verified'])->prefix('customer')
     Route::post('/cart/add/{product}', [\App\Http\Controllers\Customer\CartController::class, 'add'])->name('cart.add');
     Route::post('/cart/update/{item}', [\App\Http\Controllers\Customer\CartController::class, 'update'])->name('cart.update');
     Route::post('/cart/remove/{item}', [\App\Http\Controllers\Customer\CartController::class, 'remove'])->name('cart.remove');
+    Route::post('/cart/batch/new', [\App\Http\Controllers\Customer\CartController::class, 'startNewBatch'])->name('cart.newBatch');
+    Route::post('/cart/batch/{cart}/remove', [\App\Http\Controllers\Customer\CartController::class, 'removeBatch'])->name('cart.removeBatch');
     
     // Checkout (requires check.restriction to ensure restricted users can't place orders)
     Route::middleware('check.restriction')->group(function () {
