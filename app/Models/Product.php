@@ -129,4 +129,99 @@ class Product extends Model
     {
         return $query->where('status', 'active');
     }
+
+    /**
+     * Path to the JSON store for multi-select milk types and sizes.
+     */
+    protected static function optionsFilePath(): string
+    {
+        return storage_path('app/product_options.json');
+    }
+
+    public static function getAllOptionsStore(): array
+    {
+        $path = static::optionsFilePath();
+        if (!file_exists($path)) {
+            return [];
+        }
+        $data = json_decode(file_get_contents($path), true);
+        return is_array($data) ? $data : [];
+    }
+
+    public static function saveProductOptions(int $productId, array $milkTypes, array $sizes): void
+    {
+        $store = static::getAllOptionsStore();
+        $store['products'][(string) $productId] = [
+            'milk_types' => array_values(array_unique(array_intersect($milkTypes, ['Carabao', 'Cow']))),
+            'sizes' => array_values(array_unique(array_intersect($sizes, ['Small', 'Medium', 'Large']))),
+        ];
+        file_put_contents(static::optionsFilePath(), json_encode($store, JSON_PRETTY_PRINT));
+    }
+
+    public static function deleteProductOptions(int $productId): void
+    {
+        $store = static::getAllOptionsStore();
+        unset($store['products'][(string) $productId]);
+        file_put_contents(static::optionsFilePath(), json_encode($store, JSON_PRETTY_PRINT));
+    }
+
+    public function getAvailableMilkTypesAttribute(): array
+    {
+        $store = static::getAllOptionsStore();
+        $saved = $store['products'][(string) $this->id]['milk_types'] ?? null;
+        if (!empty($saved) && is_array($saved)) {
+            return $saved;
+        }
+        return $this->milk_type ? [$this->milk_type] : ['Cow'];
+    }
+
+    public function getAvailableSizesAttribute(): array
+    {
+        $store = static::getAllOptionsStore();
+        $saved = $store['products'][(string) $this->id]['sizes'] ?? null;
+        if (!empty($saved) && is_array($saved)) {
+            return $saved;
+        }
+        return $this->size ? [$this->size] : ['Medium'];
+    }
+
+    public static function saveCartItemCustomization(int $cartItemId, string $milkType, string $size): void
+    {
+        $store = static::getAllOptionsStore();
+        $store['cart_items'][(string) $cartItemId] = [
+            'milk_type' => $milkType,
+            'size' => $size,
+        ];
+        file_put_contents(static::optionsFilePath(), json_encode($store, JSON_PRETTY_PRINT));
+    }
+
+    public static function getCartItemCustomization(int $cartItemId, ?self $product = null): array
+    {
+        $store = static::getAllOptionsStore();
+        $saved = $store['cart_items'][(string) $cartItemId] ?? null;
+        return [
+            'milk_type' => $saved['milk_type'] ?? ($product?->milk_type ?? 'Cow'),
+            'size' => $saved['size'] ?? ($product?->size ?? 'Medium'),
+        ];
+    }
+
+    public static function saveOrderItemCustomization(int $orderItemId, string $milkType, string $size): void
+    {
+        $store = static::getAllOptionsStore();
+        $store['order_items'][(string) $orderItemId] = [
+            'milk_type' => $milkType,
+            'size' => $size,
+        ];
+        file_put_contents(static::optionsFilePath(), json_encode($store, JSON_PRETTY_PRINT));
+    }
+
+    public static function getOrderItemCustomization(int $orderItemId, ?self $product = null): array
+    {
+        $store = static::getAllOptionsStore();
+        $saved = $store['order_items'][(string) $orderItemId] ?? null;
+        return [
+            'milk_type' => $saved['milk_type'] ?? ($product?->milk_type ?? 'Cow'),
+            'size' => $saved['size'] ?? ($product?->size ?? 'Medium'),
+        ];
+    }
 }

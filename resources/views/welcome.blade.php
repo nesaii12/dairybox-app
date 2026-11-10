@@ -2,7 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>DairyBox — Fresh dairy, delivered with care.</title>
@@ -30,7 +30,10 @@
             }
             body {
                 font-family: var(--font-sans);
-                background: linear-gradient(135deg, #fdfdfa 0%, #f7fafd 50%, #f0f9ff 100%);
+                background: radial-gradient(at 10% 10%, rgba(254, 240, 138, 0.22) 0px, transparent 45%), 
+                            radial-gradient(at 90% 25%, rgba(253, 230, 138, 0.18) 0px, transparent 50%), 
+                            radial-gradient(at 50% 90%, rgba(254, 243, 199, 0.25) 0px, transparent 60%), 
+                            linear-gradient(135deg, #fffdf5 0%, #fefcf3 50%, #faf6ea 100%);
             }
             .font-serif {
                 font-family: var(--font-serif);
@@ -40,13 +43,13 @@
     <body class="h-full antialiased text-slate-800 flex flex-col justify-between overflow-x-hidden">
 
         <!-- Header Navigation -->
-        <nav class="bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100/80">
+        <nav class="bg-[#fffdf8]/90 backdrop-blur-md sticky top-0 z-40 border-b border-amber-200/50 shadow-2xs">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
                     <!-- Logo -->
                     <div class="flex items-center space-x-8">
                         <a href="{{ url('/') }}" class="flex items-center space-x-2.5 hover:opacity-90 transition-opacity">
-                            <div class="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center p-1 border border-sky-100 shadow-xs">
+                            <div class="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center p-1 border border-amber-100 shadow-xs">
                                 <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox" class="w-full h-full object-contain">
                             </div>
                             <span class="text-xl font-bold tracking-tight text-slate-900">Dairy<span class="text-[#0ea5e9]">Box</span></span>
@@ -54,15 +57,15 @@
 
                         <!-- Desktop Navigation Links -->
                         <div class="hidden md:flex space-x-1.5">
-                            <a href="{{ url('/') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->is('/') ? 'font-bold bg-slate-100 text-slate-900' : 'font-semibold text-slate-600 hover:text-slate-900' }}">
+                            <a href="{{ url('/') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->is('/') ? 'font-bold bg-amber-100/70 text-amber-950 border border-amber-200/60 shadow-2xs' : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-amber-50/50' }}">
                                 Home
                             </a>
-                            <a href="{{ route('customer.catalog') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'font-bold bg-slate-100 text-slate-900' : 'font-semibold text-slate-600 hover:text-slate-900' }}">
+                            <a href="{{ route('customer.catalog') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'font-bold bg-amber-100/70 text-amber-950 border border-amber-200/60 shadow-2xs' : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-amber-50/50' }}">
                                 Shop
                             </a>
                             @auth
                                 @if(auth()->user()->role === 'customer')
-                                    <a href="{{ route('customer.orders.index') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.orders.*') ? 'font-bold bg-slate-100 text-slate-900' : 'font-semibold text-slate-600 hover:text-slate-900' }}">
+                                    <a href="{{ route('customer.orders.index') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.orders.*') ? 'font-bold bg-amber-100/70 text-amber-950 border border-amber-200/60 shadow-2xs' : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-amber-50/50' }}">
                                         My Orders
                                     </a>
                                 @endif
@@ -75,8 +78,8 @@
                         $notifCount = 0;
                         $allNotifications = collect();
                         if (auth()->check()) {
-                            $cart = \App\Models\Cart::where('customer_id', auth()->id())->first();
-                            $cartItemCount = $cart ? $cart->cartItems()->sum('quantity') : 0;
+                            $cartIds = \App\Models\Cart::where('customer_id', auth()->id())->pluck('id');
+                            $cartItemCount = $cartIds->isNotEmpty() ? (int) \App\Models\CartItem::whereIn('cart_id', $cartIds)->sum('quantity') : 0;
                             $notifCount = \App\Models\AppNotification::where('user_id', auth()->id())->where('is_read', false)->count();
                             $allNotifications = \App\Models\AppNotification::where('user_id', auth()->id())
                                 ->orderBy('created_at', 'desc')
@@ -101,7 +104,7 @@
                                     </button>
 
                                     <!-- Notifications Dropdown -->
-                                    <div id="notificationsModal" class="absolute right-0 mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
+                                    <div id="notificationsModal" class="absolute right-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
                                         <!-- Header -->
                                         <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                                             <div>
@@ -219,39 +222,19 @@
                         @endauth
                     </div>
                 </div>
-
-                <!-- Mobile Navigation Links (Bottom Navbar style on mobile for better touch access) -->
-                <div class="md:hidden flex items-center justify-around py-2 border-t border-slate-100 bg-white">
-                    <a href="{{ url('/') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->is('/') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                        <i class="bi bi-house text-lg"></i>
-                        <span>Home</span>
-                    </a>
-                    <a href="{{ route('customer.catalog') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                        <i class="bi bi-shop text-lg"></i>
-                        <span>Shop</span>
-                    </a>
-                    @auth
-                        @if(auth()->user()->role === 'customer')
-                            <a href="{{ route('customer.orders.index') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->routeIs('customer.orders.*') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                                <i class="bi bi-clock-history text-lg"></i>
-                                <span>Orders</span>
-                            </a>
-                        @endif
-                    @endauth
-                </div>
             </div>
         </nav>
 
         <!-- Main Workspace content -->
-        <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-20">
+        <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 md:pb-12 space-y-14 sm:space-y-20">
 
             <!-- Hero Section -->
             <section class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <!-- Hero Left Column -->
                 <div class="lg:col-span-6 space-y-6">
                     <!-- Tagline badge -->
-                    <div class="inline-flex items-center space-x-1.5 py-1 px-3.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] font-bold text-amber-700 uppercase tracking-wide">
-                        <i class="bi bi-sprout-fill"></i>
+                    <div class="inline-flex items-center space-x-1.5 py-1 px-3.5 rounded-full bg-amber-100/80 border border-amber-200/90 text-[11px] font-bold text-amber-900 uppercase tracking-wide shadow-2xs">
+                        <i class="bi bi-sprout-fill text-amber-600"></i>
                         <span>Farm to doorstep in hours</span>
                     </div>
 
@@ -293,14 +276,14 @@
 
                 <!-- Hero Right Column (Features card block) -->
                 <div class="lg:col-span-6 flex justify-center lg:justify-end">
-                    <div class="w-full max-w-lg bg-white rounded-[32px] border border-slate-100 shadow-xl p-8 grid grid-cols-2 gap-6 relative">
-                        <!-- Background glow element -->
-                        <div class="absolute -inset-1 bg-gradient-to-r from-sky-400/10 to-amber-400/10 rounded-[34px] -z-10 blur-xl"></div>
+                    <div class="w-full max-w-lg bg-white/95 rounded-3xl sm:rounded-[32px] border border-amber-100/90 shadow-xl shadow-amber-950/5 p-4 sm:p-8 grid grid-cols-2 gap-3 sm:gap-6 relative">
+                        <!-- Background glow element with warm light yellow ambiance -->
+                        <div class="absolute -inset-1 bg-gradient-to-r from-amber-300/20 via-yellow-200/20 to-sky-300/10 rounded-[34px] -z-10 blur-xl"></div>
                         
                         <!-- Feature 1 -->
-                        <div class="bg-[#faf8f2] border border-[#f0eee4] rounded-2xl p-5 space-y-4 hover:shadow-sm transition-all duration-300">
-                            <div class="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
-                                <svg class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <div class="bg-[#fefce8] border border-amber-100 rounded-2xl p-5 space-y-4 hover:shadow-sm hover:border-amber-200 transition-all duration-300">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 2h6M9 6h6m-7 4v10a2 2 0 002 2h6a2 2 0 002-2V10M8 10c0-2 2-3 4-3s4 1 4 3" />
                                 </svg>
                             </div>
@@ -311,9 +294,9 @@
                         </div>
 
                         <!-- Feature 2 -->
-                        <div class="bg-[#faf8f2] border border-[#f0eee4] rounded-2xl p-5 space-y-4 hover:shadow-sm transition-all duration-300">
-                            <div class="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
-                                <svg class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <div class="bg-[#fefce8] border border-amber-100 rounded-2xl p-5 space-y-4 hover:shadow-sm hover:border-amber-200 transition-all duration-300">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18M3 12h18m-3-6L6 18M6 6l12 12" />
                                 </svg>
                             </div>
@@ -324,9 +307,9 @@
                         </div>
 
                         <!-- Feature 3 -->
-                        <div class="bg-[#faf8f2] border border-[#f0eee4] rounded-2xl p-5 space-y-4 hover:shadow-sm transition-all duration-300">
-                            <div class="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
-                                <svg class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <div class="bg-[#fefce8] border border-amber-100 rounded-2xl p-5 space-y-4 hover:shadow-sm hover:border-amber-200 transition-all duration-300">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10M13 8h7a1 1 0 011 1v7H13M13 12h8" />
                                 </svg>
                             </div>
@@ -337,9 +320,9 @@
                         </div>
 
                         <!-- Feature 4 -->
-                        <div class="bg-[#faf8f2] border border-[#f0eee4] rounded-2xl p-5 space-y-4 hover:shadow-sm transition-all duration-300">
-                            <div class="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
-                                <svg class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <div class="bg-[#fefce8] border border-amber-100 rounded-2xl p-5 space-y-4 hover:shadow-sm hover:border-amber-200 transition-all duration-300">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                 </svg>
                             </div>
@@ -366,7 +349,7 @@
                 </div>
 
                 <!-- Product Catalog Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     @forelse($products as $product)
                         @php
                             $outOfStock = $product->stock <= 0;
@@ -398,17 +381,60 @@
                             </div>
 
                             <!-- Details -->
+                            @php
+                                $allowedCardMilks = !$outOfStock ? $product->available_milk_types : [];
+                                $allowedCardSizes = !$outOfStock ? $product->available_sizes : [];
+                                $defaultCardMilk = in_array($product->milk_type, $allowedCardMilks) ? $product->milk_type : ($allowedCardMilks[0] ?? $product->milk_type);
+                                $defaultCardSize = in_array($product->size, $allowedCardSizes) ? $product->size : ($allowedCardSizes[0] ?? $product->size);
+                                $cardMilkOptions = ['Carabao' => 'Carabao', 'Cow' => "Cow's Milk"];
+                                $cardSizeOptions = ['Small', 'Medium', 'Large'];
+                            @endphp
                             <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-                                <div class="space-y-1">
+                                <div class="space-y-2">
                                     <div class="flex items-center justify-between">
                                         <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
                                             <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
                                         </h3>
                                     </div>
-                                    <!-- Source and size info -->
-                                    <p class="text-[11px] text-slate-500 font-semibold">
-                                        {{ $product->milk_type }} Milk &bull; {{ $product->size }}
-                                    </p>
+                                    <!-- Milk Type & Size Customization Options -->
+                                    <div class="space-y-1.5 pt-0.5">
+                                        <div class="flex items-center gap-1 flex-wrap" data-card-milk-group="{{ $product->id }}">
+                                            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 w-9 shrink-0">Milk:</span>
+                                            @foreach($cardMilkOptions as $mKey => $mLabel)
+                                                @php
+                                                    $milkAvail = in_array($mKey, $allowedCardMilks);
+                                                    $isCurrMilk = ($defaultCardMilk === $mKey) && $milkAvail;
+                                                @endphp
+                                                @if($milkAvail)
+                                                    <button type="button"
+                                                        data-card-option="milk"
+                                                        data-product-id="{{ $product->id }}"
+                                                        data-value="{{ $mKey }}"
+                                                        class="card-milk-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer {{ $isCurrMilk ? 'font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs' : 'font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600' }}">{{ $mLabel }}</button>
+                                                @else
+                                                    <button type="button" disabled aria-disabled="true" title="{{ $mLabel }} unavailable" class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200/70 line-through opacity-55 cursor-not-allowed select-none">{{ $mLabel }}</button>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                        <div class="flex items-center gap-1 flex-wrap" data-card-size-group="{{ $product->id }}">
+                                            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 w-9 shrink-0">Size:</span>
+                                            @foreach($cardSizeOptions as $sOpt)
+                                                @php
+                                                    $sizeAvail = in_array($sOpt, $allowedCardSizes);
+                                                    $isCurrSize = ($defaultCardSize === $sOpt) && $sizeAvail;
+                                                @endphp
+                                                @if($sizeAvail)
+                                                    <button type="button"
+                                                        data-card-option="size"
+                                                        data-product-id="{{ $product->id }}"
+                                                        data-value="{{ $sOpt }}"
+                                                        class="card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer {{ $isCurrSize ? 'font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs' : 'font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600' }}">{{ $sOpt }}</button>
+                                                @else
+                                                    <button type="button" disabled aria-disabled="true" title="{{ $sOpt }} unavailable" class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200/70 line-through opacity-55 cursor-not-allowed select-none">{{ $sOpt }}</button>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="flex items-center justify-between pt-2 border-t border-slate-50">
@@ -416,11 +442,23 @@
                                     
                                     @auth
                                         @if(auth()->user()->role === 'customer' && !$outOfStock)
-                                            <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}">
+                                            <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline-flex items-center gap-1.5 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}">
                                                 @csrf
-                                                <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="add-to-cart-btn w-8 h-8 rounded-full bg-[#0ea5e9] hover:bg-sky-600 text-white flex items-center justify-center transition-colors shadow-md shadow-sky-100 cursor-pointer animate-none hover:scale-105 active:scale-95" title="Add to cart">
-                                                    <i class="bi bi-plus text-lg font-bold"></i>
+                                                <input type="hidden" name="milk_type" class="card-selected-milk" value="{{ $defaultCardMilk }}">
+                                                <input type="hidden" name="size" class="card-selected-size" value="{{ $defaultCardSize }}">
+                                                <div class="catalog-qty-stepper flex items-center border border-slate-200 rounded-xl bg-slate-50/90 overflow-hidden h-8">
+                                                    <button type="button" class="catalog-qty-minus px-2 h-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs" title="Decrease quantity">
+                                                        <i class="bi bi-dash pointer-events-none"></i>
+                                                    </button>
+                                                    <input type="number" name="quantity" value="1" min="1" max="{{ max(1, $product->stock) }}"
+                                                        class="catalog-qty-input w-7 text-center text-xs font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        aria-label="Quantity">
+                                                    <button type="button" class="catalog-qty-plus px-2 h-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs" title="Increase quantity">
+                                                        <i class="bi bi-plus pointer-events-none"></i>
+                                                    </button>
+                                                </div>
+                                                <button type="submit" class="add-to-cart-btn w-8 h-8 rounded-xl bg-[#0ea5e9] hover:bg-sky-600 text-white flex items-center justify-center transition-colors shadow-md shadow-sky-100 cursor-pointer animate-none hover:scale-105 active:scale-95 flex-shrink-0" title="Add to selection batch">
+                                                    <i class="bi bi-cart-plus-fill text-xs"></i>
                                                 </button>
                                             </form>
                                         @endif
@@ -446,9 +484,9 @@
 
             <!-- Subscribe Call to Action Banner -->
             <section>
-                <div class="bg-sky-500/[0.04] border border-sky-500/10 rounded-[32px] p-8 sm:p-12 text-center space-y-6 relative overflow-hidden">
-                    <div class="absolute -right-16 -top-16 w-40 h-40 rounded-full bg-sky-400/5 blur-2xl"></div>
-                    <div class="absolute -left-16 -bottom-16 w-40 h-40 rounded-full bg-amber-400/5 blur-2xl"></div>
+                <div class="bg-gradient-to-br from-amber-500/[0.08] via-yellow-400/[0.05] to-amber-200/[0.04] border border-amber-300/35 rounded-3xl sm:rounded-[32px] p-6 sm:p-12 text-center space-y-6 relative overflow-hidden shadow-xs">
+                    <div class="absolute -right-16 -top-16 w-44 h-44 rounded-full bg-yellow-300/20 blur-3xl"></div>
+                    <div class="absolute -left-16 -bottom-16 w-44 h-44 rounded-full bg-amber-400/20 blur-3xl"></div>
                     
                     <div class="max-w-xl mx-auto space-y-3">
                         <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-serif">Subscribe to a weekly DairyBox</h2>
@@ -477,7 +515,7 @@
         </main>
 
         <!-- Footer -->
-        <footer class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-slate-100/60 mt-12 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <footer class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-8 border-t border-slate-100/60 mt-12 flex flex-col sm:flex-row items-center justify-between gap-4">
             <!-- Footer Logo -->
             <div class="flex items-center space-x-2.5">
                 <div class="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center p-0.5 border border-sky-100">
@@ -488,6 +526,63 @@
             <!-- Footer Text -->
             <p class="text-xs text-slate-500 font-medium">&copy; {{ date('Y') }} DairyBox. Farm-fresh dairy, delivered.</p>
         </footer>
+
+        <!-- Customer Mobile Bottom Navigation Bar -->
+        <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-safe select-none">
+            <div class="flex items-center justify-around px-2 py-1.5">
+                <a href="{{ url('/') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->is('/') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                    <i class="bi {{ request()->is('/') ? 'bi-house-fill' : 'bi-house' }} text-lg leading-none mb-1"></i>
+                    <span class="text-[10px] tracking-tight">Home</span>
+                </a>
+
+                <a href="{{ route('customer.catalog') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                    <i class="bi {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'bi-shop-window' : 'bi-shop' }} text-lg leading-none mb-1"></i>
+                    <span class="text-[10px] tracking-tight">Shop</span>
+                </a>
+
+                @auth
+                    @if(auth()->user()->role === 'customer')
+                        <a href="{{ route('customer.orders.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('customer.orders.*') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                            <i class="bi {{ request()->routeIs('customer.orders.*') ? 'bi-clock-history' : 'bi-clock' }} text-lg leading-none mb-1"></i>
+                            <span class="text-[10px] tracking-tight">Orders</span>
+                        </a>
+                    @endif
+                @endauth
+
+                <!-- Shopping Cart with Live Badge Counter -->
+                <a href="{{ route('customer.cart.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all relative {{ request()->routeIs('customer.cart.*') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                    <i class="bi {{ request()->routeIs('customer.cart.*') ? 'bi-cart-fill' : 'bi-cart3' }} text-lg leading-none mb-1"></i>
+                    <span class="text-[10px] tracking-tight">Cart</span>
+                    <span class="cart-nav-badge absolute top-0.5 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#0ea5e9] text-[9px] font-bold text-white ring-2 ring-white {{ $cartItemCount > 0 ? '' : 'hidden' }}">
+                        {{ $cartItemCount }}
+                    </span>
+                </a>
+
+                @auth
+                    @if(auth()->user()->role === 'customer')
+                        <a href="{{ route('customer.settings.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('customer.settings.*') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                            <i class="bi {{ request()->routeIs('customer.settings.*') ? 'bi-person-fill-gear' : 'bi-person-gear' }} text-lg leading-none mb-1"></i>
+                            <span class="text-[10px] tracking-tight">Account</span>
+                        </a>
+                    @elseif(auth()->user()->role === 'admin')
+                        <a href="{{ route('admin.dashboard') }}" class="flex flex-col items-center py-1 px-3 rounded-xl text-sky-600 font-medium">
+                            <i class="bi bi-grid-fill text-lg leading-none mb-1"></i>
+                            <span class="text-[10px] tracking-tight">Admin</span>
+                        </a>
+                    @elseif(auth()->user()->role === 'rider')
+                        <a href="{{ route('rider.dashboard') }}" class="flex flex-col items-center py-1 px-3 rounded-xl text-emerald-600 font-medium">
+                            <i class="bi bi-bicycle text-lg leading-none mb-1"></i>
+                            <span class="text-[10px] tracking-tight">Rider</span>
+                        </a>
+                    @endif
+                @else
+                    <a href="{{ route('login') }}" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-500 hover:text-sky-600 font-medium">
+                        <i class="bi bi-person text-lg leading-none mb-1"></i>
+                        <span class="text-[10px] tracking-tight">Sign In</span>
+                    </a>
+                @endauth
+            </div>
+        </nav>
 
         @if(auth()->check())
         <!-- Toggle Script -->

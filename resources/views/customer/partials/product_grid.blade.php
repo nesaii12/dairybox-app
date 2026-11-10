@@ -46,17 +46,78 @@
             </div>
 
             <!-- Product Information -->
-            <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div class="space-y-1">
-                    <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
-                        <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
-                    </h3>
-                    <p class="text-[11px] text-slate-500 font-semibold">
+            @php
+                $allowedCardMilks = !$outOfStock ? $product->available_milk_types : [];
+                $allowedCardSizes = !$outOfStock ? $product->available_sizes : [];
+                $defaultCardMilk = in_array($product->milk_type, $allowedCardMilks) ? $product->milk_type : ($allowedCardMilks[0] ?? $product->milk_type);
+                $defaultCardSize = in_array($product->size, $allowedCardSizes) ? $product->size : ($allowedCardSizes[0] ?? $product->size);
+                $cardMilkOptions = ['Carabao' => 'Carabao', 'Cow' => "Cow's Milk"];
+                $cardSizeOptions = ['Small', 'Medium', 'Large'];
+            @endphp
+            <div class="p-5 flex-1 flex flex-col justify-between space-y-3.5">
+                <div class="space-y-2">
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight group-hover:text-sky-600 transition-colors truncate">
+                            <a href="{{ route('customer.product', $product->id) }}">{{ $product->product_name }}</a>
+                        </h3>
                         @if($product->flavor)
-                            <span class="text-sky-600 font-bold">{{ $product->flavor }}</span> &bull;
+                            <p class="text-[11px] text-sky-600 font-bold mt-0.5">{{ $product->flavor }}</p>
                         @endif
-                        {{ $product->milk_type }} Milk &bull; {{ $product->size }}
-                    </p>
+                    </div>
+
+                    <!-- Milk Type & Size Customization Options -->
+                    <div class="space-y-1.5 pt-0.5">
+                        <!-- Milk Type Pills -->
+                        <div class="flex items-center gap-1 flex-wrap" data-card-milk-group="{{ $product->id }}">
+                            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 w-9 shrink-0">Milk:</span>
+                            @foreach($cardMilkOptions as $mKey => $mLabel)
+                                @php
+                                    $milkAvail = in_array($mKey, $allowedCardMilks);
+                                    $isCurrMilk = ($defaultCardMilk === $mKey) && $milkAvail;
+                                @endphp
+                                @if($milkAvail)
+                                    <button type="button"
+                                        data-card-option="milk"
+                                        data-product-id="{{ $product->id }}"
+                                        data-value="{{ $mKey }}"
+                                        class="card-milk-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer {{ $isCurrMilk ? 'font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs' : 'font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600' }}">
+                                        {{ $mLabel }}
+                                    </button>
+                                @else
+                                    <button type="button" disabled aria-disabled="true" title="{{ $mLabel }} unavailable"
+                                        class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200/70 line-through opacity-55 cursor-not-allowed select-none">
+                                        {{ $mLabel }}
+                                    </button>
+                                @endif
+                            @endforeach
+                        </div>
+
+                        <!-- Size Pills -->
+                        <div class="flex items-center gap-1 flex-wrap" data-card-size-group="{{ $product->id }}">
+                            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 w-9 shrink-0">Size:</span>
+                            @foreach($cardSizeOptions as $sOpt)
+                                @php
+                                    $sizeAvail = in_array($sOpt, $allowedCardSizes);
+                                    $isCurrSize = ($defaultCardSize === $sOpt) && $sizeAvail;
+                                @endphp
+                                @if($sizeAvail)
+                                    <button type="button"
+                                        data-card-option="size"
+                                        data-product-id="{{ $product->id }}"
+                                        data-value="{{ $sOpt }}"
+                                        class="card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer {{ $isCurrSize ? 'font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs' : 'font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600' }}">
+                                        {{ $sOpt }}
+                                    </button>
+                                @else
+                                    <button type="button" disabled aria-disabled="true" title="{{ $sOpt }} unavailable"
+                                        class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200/70 line-through opacity-55 cursor-not-allowed select-none">
+                                        {{ $sOpt }}
+                                    </button>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+
                     <div class="space-y-0.5 pt-0.5 text-[10px] text-slate-400 font-medium">
                         @if($product->manufacturing_date)
                             <p class="flex items-center gap-1">
@@ -88,16 +149,27 @@
                                 <button type="button" disabled class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 border border-slate-200 flex items-center justify-center cursor-not-allowed" title="Ordering restricted until {{ auth()->user()->restricted_until->format('M d, Y h:i A') }}">
                                     <i class="bi bi-lock-fill text-xs"></i>
                                 </button>
-                            @elseif($maxInCart)
-                                <button type="button" disabled class="w-8 h-8 rounded-full bg-sky-50 text-sky-600 border border-sky-200 flex items-center justify-center cursor-not-allowed" title="All {{ $product->stock }} available units are already in your cart">
-                                    <i class="bi bi-check2 text-base font-bold"></i>
-                                </button>
                             @else
-                                <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}" data-in-cart="{{ $inCart }}">
+                                @php
+                                    $availQty = max(1, $product->stock);
+                                @endphp
+                                <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline-flex items-center gap-1.5 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}" data-in-cart="{{ $inCart }}">
                                     @csrf
-                                    <input type="hidden" name="quantity" value="1">
-                                    <button type="submit" class="add-to-cart-btn w-8 h-8 rounded-full bg-[#0ea5e9] hover:bg-sky-600 text-white flex items-center justify-center transition-colors shadow-md shadow-sky-100 cursor-pointer animate-none hover:scale-105 active:scale-95" title="Add to cart">
-                                        <i class="bi bi-plus text-lg font-bold"></i>
+                                    <input type="hidden" name="milk_type" class="card-selected-milk" value="{{ $defaultCardMilk }}">
+                                    <input type="hidden" name="size" class="card-selected-size" value="{{ $defaultCardSize }}">
+                                    <div class="catalog-qty-stepper flex items-center border border-slate-200 rounded-xl bg-slate-50/90 overflow-hidden h-8">
+                                        <button type="button" class="catalog-qty-minus px-2 h-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs" title="Decrease quantity">
+                                            <i class="bi bi-dash pointer-events-none"></i>
+                                        </button>
+                                        <input type="number" name="quantity" value="1" min="1" max="{{ $availQty }}"
+                                            class="catalog-qty-input w-7 text-center text-xs font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            aria-label="Quantity">
+                                        <button type="button" class="catalog-qty-plus px-2 h-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs" title="Increase quantity">
+                                            <i class="bi bi-plus pointer-events-none"></i>
+                                        </button>
+                                    </div>
+                                    <button type="submit" class="add-to-cart-btn w-8 h-8 rounded-xl bg-[#0ea5e9] hover:bg-sky-600 text-white flex items-center justify-center transition-colors shadow-md shadow-sky-100 cursor-pointer animate-none hover:scale-105 active:scale-95 flex-shrink-0" title="Add to selection batch">
+                                        <i class="bi bi-cart-plus-fill text-xs"></i>
                                     </button>
                                 </form>
                             @endif

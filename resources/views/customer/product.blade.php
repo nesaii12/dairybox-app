@@ -70,8 +70,108 @@
                 <p class="text-sm text-slate-600 leading-relaxed">{{ $product->description ? $product->description : 'Fresh, premium quality product processed directly from dairy sources.' }}</p>
             </div>
 
+            <!-- Order Customization: Milk Type & Size -->
+            @php
+                $isExpiredProd = $product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
+                $prodHasStock = !$isExpiredProd && $product->stock > 0;
+                $variants = isset($siblingVariants) ? $siblingVariants : collect([$product]);
+                $availableVariants = $variants->filter(function ($v) {
+                    $vExp = $v->expiration_date && \Carbon\Carbon::parse($v->expiration_date)->startOfDay()->lt(now()->startOfDay());
+                    return !$vExp && $v->stock > 0;
+                });
+
+                $allowedMilks = $prodHasStock ? $product->available_milk_types : [];
+                $allowedSizes = $prodHasStock ? $product->available_sizes : [];
+                foreach ($availableVariants as $av) {
+                    $allowedMilks = array_values(array_unique(array_merge($allowedMilks, $av->available_milk_types)));
+                    $allowedSizes = array_values(array_unique(array_merge($allowedSizes, $av->available_sizes)));
+                }
+
+                $defaultMilk = in_array($product->milk_type, $allowedMilks) ? $product->milk_type : ($allowedMilks[0] ?? $product->milk_type);
+                $defaultSize = in_array($product->size, $allowedSizes) ? $product->size : ($allowedSizes[0] ?? $product->size);
+
+                $milkOptions = [
+                    'Carabao' => 'Carabao Milk',
+                    'Cow' => "Cow's Milk",
+                ];
+                $sizeOptions = ['Small', 'Medium', 'Large'];
+            @endphp
+
+            <div class="mt-6 pt-6 border-t border-slate-100 space-y-4">
+                <!-- Milk Type Selector -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Milk Type</span>
+                        <span id="selectedMilkLabel" class="text-[11px] font-semibold text-sky-600">{{ $defaultMilk === 'Cow' ? "Cow's Milk" : 'Carabao Milk' }}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2.5" id="detailMilkGroup">
+                        @foreach($milkOptions as $milkKey => $milkLabel)
+                            @php
+                                $isMilkAvailable = in_array($milkKey, $allowedMilks);
+                                $isCurrentMilk = ($defaultMilk === $milkKey) && $isMilkAvailable;
+                            @endphp
+
+                            @if($isMilkAvailable)
+                                <button type="button"
+                                    data-milk="{{ $milkKey }}"
+                                    data-label="{{ $milkLabel }}"
+                                    onclick="selectDetailMilkType(this)"
+                                    class="detail-milk-btn px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer {{ $isCurrentMilk ? 'border-2 border-sky-600 bg-sky-50/70 text-sky-900 shadow-2xs' : 'border border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50/30 text-slate-700 hover:text-sky-700' }}">
+                                    <span class="flex items-center gap-1.5">
+                                        <i class="bi bi-check-circle-fill text-sky-600 detail-check-icon {{ $isCurrentMilk ? '' : 'hidden' }}"></i>
+                                        <span>{{ $milkLabel }}</span>
+                                    </span>
+                                    <span class="detail-status-tag text-[10px] font-bold {{ $isCurrentMilk ? 'text-sky-600 uppercase' : 'text-emerald-600' }}">{{ $isCurrentMilk ? 'Selected' : 'Available' }}</span>
+                                </button>
+                            @else
+                                <button type="button" disabled aria-disabled="true" title="{{ $milkLabel }} is not available for {{ $product->product_name }}"
+                                    class="px-3.5 py-2.5 rounded-xl border border-slate-200/80 bg-slate-100/80 text-slate-400 text-xs font-semibold flex items-center justify-between cursor-not-allowed opacity-60 select-none">
+                                    <span class="line-through">{{ $milkLabel }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400">Unavailable</span>
+                                </button>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Size Selector -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Size</span>
+                        <span id="selectedSizeLabel" class="text-[11px] font-semibold text-sky-600">{{ $defaultSize }}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2.5" id="detailSizeGroup">
+                        @foreach($sizeOptions as $sizeOption)
+                            @php
+                                $isSizeAvailable = in_array($sizeOption, $allowedSizes);
+                                $isCurrentSize = ($defaultSize === $sizeOption) && $isSizeAvailable;
+                            @endphp
+
+                            @if($isSizeAvailable)
+                                <button type="button"
+                                    data-size="{{ $sizeOption }}"
+                                    onclick="selectDetailSize(this)"
+                                    class="detail-size-btn px-3 py-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer {{ $isCurrentSize ? 'border-2 border-sky-600 bg-sky-50/70 text-sky-900 shadow-2xs' : 'border border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50/30 text-slate-700 hover:text-sky-700' }}">
+                                    <span class="flex items-center gap-1">
+                                        <i class="bi bi-check-circle-fill text-sky-600 text-[11px] detail-check-icon {{ $isCurrentSize ? '' : 'hidden' }}"></i>
+                                        <span>{{ $sizeOption }}</span>
+                                    </span>
+                                    <span class="detail-status-tag text-[9px] font-bold mt-0.5 {{ $isCurrentSize ? 'text-sky-600' : 'text-emerald-600' }}">{{ $isCurrentSize ? 'Selected' : 'Available' }}</span>
+                                </button>
+                            @else
+                                <button type="button" disabled aria-disabled="true" title="Size {{ $sizeOption }} is not available for {{ $product->product_name }}"
+                                    class="px-3 py-2.5 rounded-xl border border-slate-200/80 bg-slate-100/80 text-slate-400 text-xs font-semibold flex flex-col items-center justify-center cursor-not-allowed opacity-60 select-none">
+                                    <span class="line-through">{{ $sizeOption }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Unavailable</span>
+                                </button>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
             <!-- Specs & Freshness Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-5">
                 @if($product->flavor)
                 <div class="p-3.5 bg-sky-50/60 border border-sky-100 rounded-2xl">
                     <span class="block text-[9px] font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1">
@@ -80,14 +180,6 @@
                     <span class="text-xs font-bold text-sky-950">{{ $product->flavor }}</span>
                 </div>
                 @endif
-                <div class="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                    <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Milk Source</span>
-                    <span class="text-xs font-bold text-slate-800">{{ $product->milk_type }} Milk</span>
-                </div>
-                <div class="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                    <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Container Size</span>
-                    <span class="text-xs font-bold text-slate-800">{{ $product->size }}</span>
-                </div>
                 @if($product->manufacturing_date)
                 <div class="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
@@ -119,8 +211,8 @@
                 $isExpired      = $product->expiration_date &&
                                   \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
                 $effectiveStock = $isExpired ? 0 : $product->stock;
-                $availableToAdd = max(0, $effectiveStock - $cartQty);
-                $allStockInCart = ($cartQty >= $effectiveStock) && ($effectiveStock > 0);
+                $availableToAdd = $effectiveStock;
+                $allStockInCart = false;
             @endphp
 
             @if($isExpired)
@@ -167,12 +259,12 @@
                     @else
                         <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="space-y-4 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}" data-in-cart="{{ $cartQty }}">
                             @csrf
+                            <input type="hidden" name="milk_type" id="detail_milk_type_input" value="{{ $defaultMilk }}">
+                            <input type="hidden" name="size" id="detail_size_input" value="{{ $defaultSize }}">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <label for="quantity" class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Order Quantity</label>
-                                    @if($cartQty > 0)
-                                        <span class="text-[10px] text-sky-600 font-semibold">{{ $cartQty }} already in cart ({{ $availableToAdd }} more available)</span>
-                                    @endif
+                                    <span id="product-in-cart-info" class="text-[10px] text-sky-600 font-semibold {{ $cartQty > 0 ? '' : 'hidden' }}">{{ $cartQty }} already in cart ({{ $availableToAdd }} more available)</span>
                                 </div>
                                 <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 w-32 justify-between">
                                     <button type="button" onclick="decrementQty()" class="px-3 py-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
@@ -278,10 +370,85 @@
 
 @section('scripts')
 <script>
-    const maxStock = {{ $availableToAdd ?? $product->stock }};
+    function selectDetailMilkType(btn) {
+        const milk = btn.getAttribute('data-milk');
+        const label = btn.getAttribute('data-label');
+        const input = document.getElementById('detail_milk_type_input');
+        const labelEl = document.getElementById('selectedMilkLabel');
+        if (input) input.value = milk;
+        if (labelEl) labelEl.textContent = label;
+
+        document.querySelectorAll('.detail-milk-btn').forEach(b => {
+            b.className = 'detail-milk-btn px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50/30 text-slate-700 hover:text-sky-700';
+            const icon = b.querySelector('.detail-check-icon');
+            if (icon) icon.classList.add('hidden');
+            const tag = b.querySelector('.detail-status-tag');
+            if (tag) {
+                tag.className = 'detail-status-tag text-[10px] font-bold text-emerald-600';
+                tag.textContent = 'Available';
+            }
+        });
+
+        btn.className = 'detail-milk-btn px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border-2 border-sky-600 bg-sky-50/70 text-sky-900 shadow-2xs';
+        const activeIcon = btn.querySelector('.detail-check-icon');
+        if (activeIcon) activeIcon.classList.remove('hidden');
+        const activeTag = btn.querySelector('.detail-status-tag');
+        if (activeTag) {
+            activeTag.className = 'detail-status-tag text-[10px] font-bold text-sky-600 uppercase';
+            activeTag.textContent = 'Selected';
+        }
+    }
+
+    function selectDetailSize(btn) {
+        const size = btn.getAttribute('data-size');
+        const input = document.getElementById('detail_size_input');
+        const labelEl = document.getElementById('selectedSizeLabel');
+        if (input) input.value = size;
+        if (labelEl) labelEl.textContent = size;
+
+        document.querySelectorAll('.detail-size-btn').forEach(b => {
+            b.className = 'detail-size-btn px-3 py-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer border border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50/30 text-slate-700 hover:text-sky-700';
+            const icon = b.querySelector('.detail-check-icon');
+            if (icon) icon.classList.add('hidden');
+            const tag = b.querySelector('.detail-status-tag');
+            if (tag) {
+                tag.className = 'detail-status-tag text-[9px] font-bold mt-0.5 text-emerald-600';
+                tag.textContent = 'Available';
+            }
+        });
+
+        btn.className = 'detail-size-btn px-3 py-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer border-2 border-sky-600 bg-sky-50/70 text-sky-900 shadow-2xs';
+        const activeIcon = btn.querySelector('.detail-check-icon');
+        if (activeIcon) activeIcon.classList.remove('hidden');
+        const activeTag = btn.querySelector('.detail-status-tag');
+        if (activeTag) {
+            activeTag.className = 'detail-status-tag text-[9px] font-bold mt-0.5 text-sky-600';
+            activeTag.textContent = 'Selected';
+        }
+    }
+
+    let maxStock = {{ $availableToAdd ?? $product->stock }};
     const totalStock = {{ $product->stock }};
-    const inCart = {{ $cartQty ?? 0 }};
+    let inCart = {{ $cartQty ?? 0 }};
     const qtyInput = document.getElementById('quantity');
+
+    window.updateProductDetailStockState = function(availableLeft, currentInCart) {
+        maxStock = availableLeft;
+        inCart = currentInCart;
+        if (qtyInput) {
+            qtyInput.max = Math.max(1, availableLeft);
+            qtyInput.value = 1;
+        }
+        const infoEl = document.getElementById('product-in-cart-info');
+        if (infoEl) {
+            if (currentInCart > 0) {
+                infoEl.textContent = `${currentInCart} already in cart (${availableLeft} more available)`;
+                infoEl.classList.remove('hidden');
+            } else {
+                infoEl.classList.add('hidden');
+            }
+        }
+    };
 
     function incrementQty() {
         if (!qtyInput) return;

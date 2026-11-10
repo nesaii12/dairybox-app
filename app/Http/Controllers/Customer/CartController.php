@@ -21,29 +21,64 @@ class CartController extends Controller
 {
     public function index()
     {
-        $cart = Cart::firstOrCreate(['customer_id' => auth()->id()]);
-        $items = $cart->cartItems()->with('product')->get();
+        // Viewing the cart seals the current active selection batch so subsequent shop additions start a new batch
+        session()->forget('active_cart_batch_id');
+
+        // Clean up any empty batch containers for this customer
+        Cart::where('customer_id', auth()->id())->doesntHave('cartItems')->delete();
+
+        $chronologicalIds = Cart::where('customer_id', auth()->id())
+            ->has('cartItems')
+            ->orderBy('id', 'asc')
+            ->pluck('id')
+            ->values();
+
+        $batches = Cart::where('customer_id', auth()->id())
+            ->has('cartItems')
+            ->with(['cartItems' => function ($q) {
+                $q->orderBy('id', 'desc')->with('product');
+            }])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get();
 
         $adjustedItems = [];
-        foreach ($items as $item) {
-            $freshStock = $item->product ? $item->product->fresh()->stock : 0;
-            if ($freshStock > 0 && $item->quantity > $freshStock) {
-                $item->update([
-                    'quantity' => $freshStock,
-                    'subtotal' => $item->product->price * $freshStock,
-                ]);
-                $adjustedItems[] = "{$item->product->product_name} quantity was adjusted to the maximum available stock ({$freshStock}).";
+
+        foreach ($batches as $batch) {
+            foreach ($batch->cartItems as $item) {
+                $freshStock = $item->product ? $item->product->fresh()->stock : 0;
+
+                if ($freshStock > 0 && $item->quantity > $freshStock) {
+                    $item->update([
+                        'quantity' => $freshStock,
+                        'subtotal' => $item->product->price * $freshStock,
+                    ]);
+                    $adjustedItems[] = "{$item->product->product_name} quantity was adjusted to the maximum available stock ({$freshStock}).";
+                }
             }
         }
 
         if (!empty($adjustedItems)) {
-            session()->flash('warning', implode(' ', $adjustedItems));
-            $items = $cart->cartItems()->with('product')->get();
+            session()->flash('warning', implode(' ', array_unique($adjustedItems)));
+            $batches = Cart::where('customer_id', auth()->id())
+                ->has('cartItems')
+                ->with(['cartItems' => function ($q) {
+                    $q->orderBy('id', 'desc')->with('product');
+                }])
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get();
         }
 
+        foreach ($batches as $batch) {
+            $idx = $chronologicalIds->search($batch->id);
+            $batch->cart_number = ($idx !== false) ? ($idx + 1) : 1;
+        }
+
+        $items = $batches->pluck('cartItems')->flatten(1);
         $total = $items->sum('subtotal');
 
-        return view('customer.cart', compact('items', 'total'));
+        return view('customer.cart', compact('batches', 'items', 'total'));
     }
 
     public function add(Request $request, Product $product)
@@ -95,70 +130,113 @@ class CartController extends Controller
             return redirect()->back()->with('error', $msg);
         }
 
-        $cart = Cart::firstOrCreate(['customer_id' => auth()->id()]);
-        
-        $item = CartItem::where('cart_id', $cart->id)
-            ->where('product_id', $product->id)
-            ->first();
-
-        $currentInCart = $item ? $item->quantity : 0;
-        $newTotalQty = $currentInCart + $qty;
-
-        if ($newTotalQty > $product->stock) {
-            $availableToAdd = max(0, $product->stock - $currentInCart);
-            $msg = $availableToAdd > 0
-                ? "Cannot add {$qty} more. You already have {$currentInCart} in your cart, and only {$availableToAdd} more unit" . ($availableToAdd > 1 ? 's are' : ' is') . " available (Stock: {$product->stock})."
-                : "Cannot add more. You already have all available {$product->stock} unit" . ($product->stock > 1 ? 's' : '') . " in your cart.";
+        if ($qty > $product->stock) {
+            $msg = "Cannot add {$qty} unit(s). Maximum available warehouse stock for {$product->product_name} is {$product->stock} unit" . ($product->stock > 1 ? 's' : '') . ".";
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => $msg,
-                    'available_to_add' => $availableToAdd,
-                    'current_in_cart' => $currentInCart,
+                    'available_to_add' => $product->stock,
                     'stock' => $product->stock,
-                    'available_left' => $availableToAdd,
+                    'available_left' => $product->stock,
                 ], 422);
             }
             return redirect()->back()->with('error', $msg);
         }
 
-        if ($item) {
-            $item->update([
-                'quantity' => $newTotalQty,
-                'subtotal' => $product->price * $newTotalQty,
-            ]);
-        } else {
-            CartItem::create([
-                'cart_id' => $cart->id,
-                'product_id' => $product->id,
-                'quantity' => $qty,
-                'subtotal' => $product->price * $qty,
-            ]);
+        // Resolve Selection Batch (Batch Isolation: never auto-merge with previous items of the same product)
+        $forceNewBatch = $request->boolean('new_batch');
+        $activeBatchId = session('active_cart_batch_id');
+        $targetBatch = null;
+
+        if (!$forceNewBatch && $activeBatchId) {
+            $candidateBatch = Cart::where('id', $activeBatchId)
+                ->where('customer_id', auth()->id())
+                ->first();
+
+            if ($candidateBatch) {
+                $alreadyInBatch = CartItem::where('cart_id', $candidateBatch->id)
+                    ->where('product_id', $product->id)
+                    ->exists();
+
+                if (!$alreadyInBatch) {
+                    $targetBatch = $candidateBatch;
+                }
+            }
         }
 
-        $totalItemsCount = CartItem::where('cart_id', $cart->id)->sum('quantity');
-        $availableLeft = max(0, $product->stock - $newTotalQty);
+        if (!$targetBatch) {
+            $targetBatch = Cart::where('customer_id', auth()->id())
+                ->doesntHave('cartItems')
+                ->first();
+
+            if ($targetBatch) {
+                $targetBatch->touch();
+            } else {
+                $targetBatch = Cart::create(['customer_id' => auth()->id()]);
+            }
+
+            session(['active_cart_batch_id' => $targetBatch->id]);
+        } else {
+            $targetBatch->touch();
+        }
+
+        $selectedMilk = $request->input('milk_type', $product->milk_type);
+        $selectedSize = $request->input('size', $product->size);
+        if (!in_array($selectedMilk, $product->available_milk_types, true)) {
+            $selectedMilk = $product->available_milk_types[0] ?? $product->milk_type;
+        }
+        if (!in_array($selectedSize, $product->available_sizes, true)) {
+            $selectedSize = $product->available_sizes[0] ?? $product->size;
+        }
+
+        $cartItem = CartItem::create([
+            'cart_id' => $targetBatch->id,
+            'product_id' => $product->id,
+            'quantity' => $qty,
+            'subtotal' => $product->price * $qty,
+        ]);
+
+        Product::saveCartItemCustomization($cartItem->id, $selectedMilk, $selectedSize);
+
+        $nonEmptyBatchIds = Cart::where('customer_id', auth()->id())
+            ->has('cartItems')
+            ->orderBy('id', 'asc')
+            ->pluck('id');
+
+        $batchIndex = $nonEmptyBatchIds->search($targetBatch->id);
+        $batchNumber = ($batchIndex !== false) ? ($batchIndex + 1) : $nonEmptyBatchIds->count();
+
+        $totalItemsCount = (int) CartItem::whereIn('cart_id', $nonEmptyBatchIds)->sum('quantity');
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => "{$product->product_name} has been added to your cart.",
+                'message' => "{$qty}x {$product->product_name} added to Cart #{$batchNumber}.",
                 'cart_count' => $totalItemsCount,
+                'batch_id' => $targetBatch->id,
+                'batch_number' => $batchNumber,
+                'added_quantity' => $qty,
+                'current_in_cart' => $totalItemsCount,
                 'product_name' => $product->product_name,
                 'product_image' => $product->image ? asset('storage/' . $product->image) : null,
                 'product_price' => number_format($product->price, 2),
                 'product_id' => $product->id,
                 'stock' => $product->stock,
-                'available_left' => $availableLeft,
+                'available_left' => $product->stock,
             ]);
         }
 
-        return redirect()->back()->with('success', "{$product->product_name} has been added to your cart.");
+        return redirect()->back()->with('success', "{$qty}x {$product->product_name} added to Cart #{$batchNumber}.");
     }
 
     public function update(Request $request, CartItem $item)
     {
+        if (!$item->cart || $item->cart->customer_id !== auth()->id()) {
+            abort(403);
+        }
+
         $request->validate([
             'quantity' => 'required|integer|min:1',
         ]);
@@ -168,12 +246,13 @@ class CartController extends Controller
 
         if ($qty > $product->stock) {
             $msg = "Cannot set quantity to {$qty}. Maximum available stock is {$product->stock} units.";
+
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => $msg,
                     'max_stock' => $product->stock,
-                    'quantity' => min($item->quantity, $product->stock),
+                    'quantity' => min($item->quantity, max(1, $product->stock)),
                 ], 422);
             }
             return redirect()->back()->with('error', $msg);
@@ -185,15 +264,23 @@ class CartController extends Controller
         ]);
 
         if ($request->ajax() || $request->wantsJson()) {
-            $cart = $item->cart;
-            $items = $cart->cartItems()->with('product')->get();
-            $total = $items->sum('subtotal');
-            $cartCount = $items->sum('quantity');
+            $batchCart = $item->cart;
+            $batchItems = $batchCart->cartItems()->get();
+            $batchSubtotal = $batchItems->sum('subtotal');
+            $batchUnitCount = (int) $batchItems->sum('quantity');
+
+            $customerCartIds = Cart::where('customer_id', auth()->id())->pluck('id');
+            $allItems = CartItem::whereIn('cart_id', $customerCartIds)->get();
+            $total = $allItems->sum('subtotal');
+            $cartCount = (int) $allItems->sum('quantity');
 
             return response()->json([
                 'success' => true,
                 'quantity' => $item->quantity,
                 'subtotal' => '₱' . number_format($item->subtotal, 2),
+                'batch_id' => $batchCart->id,
+                'batch_subtotal' => '₱' . number_format($batchSubtotal, 2),
+                'batch_unit_count' => $batchUnitCount,
                 'total' => '₱' . number_format($total, 2),
                 'cart_count' => $cartCount,
                 'max_stock' => $product->stock,
@@ -205,20 +292,82 @@ class CartController extends Controller
 
     public function remove(CartItem $item)
     {
+        if (!$item->cart || $item->cart->customer_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $batchCart = $item->cart;
         $item->delete();
+
+        if ($batchCart->cartItems()->count() === 0) {
+            if (session('active_cart_batch_id') == $batchCart->id) {
+                session()->forget('active_cart_batch_id');
+            }
+            $batchCart->delete();
+        }
+
         return redirect()->route('customer.cart.index')->with('success', 'Item removed from cart.');
     }
 
-    public function checkout()
+    public function removeBatch(Cart $cart)
     {
-        $cart = Cart::where('customer_id', auth()->id())->first();
-        if (!$cart || $cart->cartItems()->count() === 0) {
+        if ($cart->customer_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if (session('active_cart_batch_id') == $cart->id) {
+            session()->forget('active_cart_batch_id');
+        }
+
+        $cart->cartItems()->delete();
+        $cart->delete();
+
+        return redirect()->route('customer.cart.index')->with('success', 'Cart removed.');
+    }
+
+    public function startNewBatch(Request $request)
+    {
+        session()->forget('active_cart_batch_id');
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Started a new cart.',
+            ]);
+        }
+
+        return redirect()->route('customer.catalog')->with('success', 'Ready to create a new cart.');
+    }
+
+    public function checkout(Request $request)
+    {
+        $allBatches = Cart::where('customer_id', auth()->id())
+            ->has('cartItems')
+            ->with(['cartItems' => function ($q) {
+                $q->orderBy('id', 'desc')->with('product');
+            }])
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($allBatches->isEmpty()) {
             return redirect()->route('customer.catalog')->with('error', 'Your shopping cart is empty.');
         }
 
-        $items = $cart->cartItems()->with('product')->get();
+        $requestedBatchId = $request->query('batch');
+        $selectedBatch = $requestedBatchId
+            ? $allBatches->firstWhere('id', (int) $requestedBatchId)
+            : $allBatches->last();
+
+        if (!$selectedBatch) {
+            return redirect()->route('customer.cart.index')->with('error', 'The selected cart could not be found.');
+        }
+
+        $batchIndex = $allBatches->search(fn($b) => $b->id === $selectedBatch->id);
+        $batchNumber = ($batchIndex !== false) ? ($batchIndex + 1) : 1;
+
+        $items = $selectedBatch->cartItems;
         
-        // Double check stock availability before checkout screen
+        // Double check stock availability for this batch before checkout screen
         foreach ($items as $item) {
             $freshProduct = $item->product ? $item->product->fresh() : null;
             $freshStock   = $freshProduct ? $freshProduct->stock : 0;
@@ -227,7 +376,7 @@ class CartController extends Controller
             if ($freshProduct && $freshProduct->expiration_date &&
                 \Carbon\Carbon::parse($freshProduct->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
                 return redirect()->route('customer.cart.index')
-                    ->with('error', "{$freshProduct->product_name} has expired and cannot be ordered. Please remove it from your cart.");
+                    ->with('error', "{$freshProduct->product_name} in Cart #{$batchNumber} has expired and cannot be ordered. Please remove it from your cart.");
             }
 
             if ($freshStock < $item->quantity) {
@@ -236,22 +385,24 @@ class CartController extends Controller
                         'quantity' => $freshStock,
                         'subtotal' => $item->product->price * $freshStock,
                     ]);
-                    return redirect()->route('customer.cart.index')->with('warning', "Stock changed for {$item->product->product_name}. Quantity was adjusted to {$freshStock}. Please review before continuing.");
+                    return redirect()->route('customer.cart.index')->with('warning', "Stock changed for {$item->product->product_name} in Cart #{$batchNumber}. Quantity was adjusted to {$freshStock}. Please review before continuing.");
                 } else {
-                    return redirect()->route('customer.cart.index')->with('error', "{$item->product->product_name} is now out of stock. Please remove it from your cart to proceed.");
+                    return redirect()->route('customer.cart.index')->with('error', "{$item->product->product_name} in Cart #{$batchNumber} is now out of stock. Please remove it from your cart to proceed.");
                 }
             }
         }
 
         $subtotal = $items->sum('subtotal');
+        $deliveryFee = Order::calculateDeliveryFee((float) $subtotal, 'Delivery');
         $xenditConfigured = app(XenditService::class)->isConfigured();
         
-        return view('customer.checkout', compact('items', 'subtotal', 'xenditConfigured'));
+        return view('customer.checkout', compact('selectedBatch', 'batchNumber', 'items', 'subtotal', 'deliveryFee', 'xenditConfigured'));
     }
 
     public function placeOrder(Request $request, XenditService $xenditService)
     {
         $request->validate([
+            'batch_id' => 'nullable|integer',
             'order_type' => 'required|in:Delivery,Pickup',
             'delivery_address' => 'required_if:order_type,Delivery|nullable|string|max:255',
             'schedule_date' => 'required|date|after_or_equal:today',
@@ -259,12 +410,18 @@ class CartController extends Controller
             'payment_method' => 'required|in:cod,xendit',
         ]);
 
-        $cart = Cart::where('customer_id', auth()->id())->first();
-        if (!$cart || $cart->cartItems()->count() === 0) {
-            return redirect()->route('customer.catalog')->with('error', 'Your shopping cart is empty.');
+        $batchQuery = Cart::where('customer_id', auth()->id())->has('cartItems');
+        if ($request->filled('batch_id')) {
+            $batchQuery->where('id', (int) $request->batch_id);
         }
 
-        $cartItems = $cart->cartItems()->with('product')->get();
+        $selectedBatch = $batchQuery->orderBy('id', 'asc')->first();
+
+        if (!$selectedBatch) {
+            return redirect()->route('customer.cart.index')->with('error', 'The selected order batch is empty or no longer exists.');
+        }
+
+        $cartItems = $selectedBatch->cartItems()->with('product')->orderBy('id', 'asc')->get();
 
         // Check if user is restricted
         if (auth()->user()->isRestricted()) {
@@ -281,7 +438,7 @@ class CartController extends Controller
             $orderNumber = 'DB-' . $today . '-' . str_pad($ordersTodayCount + 1, 4, '0', STR_PAD_LEFT);
 
             $subtotal = $cartItems->sum('subtotal');
-            $deliveryFee = ($request->order_type === 'Delivery') ? 50.00 : 0.00;
+            $deliveryFee = Order::calculateDeliveryFee((float) $subtotal, $request->order_type);
             $totalAmount = $subtotal + $deliveryFee;
 
             $order = Order::create([
@@ -313,7 +470,7 @@ class CartController extends Controller
                 }
 
                 // Create Order Item
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
@@ -321,12 +478,19 @@ class CartController extends Controller
                     'subtotal' => $item->subtotal,
                 ]);
 
+                $itemCust = Product::getCartItemCustomization($item->id, $item->product);
+                Product::saveOrderItemCustomization($orderItem->id, $itemCust['milk_type'], $itemCust['size']);
+
                 // Deduct stock using FIFO logic!
                 InventoryService::deductStock($item->product_id, $item->quantity, "Order checkout #{$orderNumber}");
             }
 
-            // Empty Cart
-            $cart->cartItems()->delete();
+            // Remove only the checked-out Selection Batch so other batches remain in the cart
+            if (session('active_cart_batch_id') == $selectedBatch->id) {
+                session()->forget('active_cart_batch_id');
+            }
+            $selectedBatch->cartItems()->delete();
+            $selectedBatch->delete();
 
             // Record audit log
             AuditLog::create([

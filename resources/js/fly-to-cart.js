@@ -7,6 +7,93 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initFlyToCart() {
+    // Delegated click handlers for product card Milk Type & Size customization pills
+    document.addEventListener('click', (e) => {
+        const optionBtn = e.target.closest('button[data-card-option]');
+        if (!optionBtn || optionBtn.disabled) return;
+
+        e.preventDefault();
+        const optionType = optionBtn.getAttribute('data-card-option');
+        const value = optionBtn.getAttribute('data-value');
+        const card = optionBtn.closest('.group, [data-record-id]') || optionBtn.parentElement.parentElement;
+        if (!card) return;
+
+        if (optionType === 'milk') {
+            card.querySelectorAll('.card-milk-pill').forEach(btn => {
+                btn.className = 'card-milk-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600';
+            });
+            optionBtn.className = 'card-milk-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs';
+            const milkInput = card.querySelector('.card-selected-milk');
+            if (milkInput) milkInput.value = value;
+        } else if (optionType === 'size') {
+            card.querySelectorAll('.card-size-pill').forEach(btn => {
+                btn.className = 'card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600';
+            });
+            optionBtn.className = 'card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs';
+            const sizeInput = card.querySelector('.card-selected-size');
+            if (sizeInput) sizeInput.value = value;
+        }
+    });
+
+    // Delegated quantity stepper handlers for catalog/landing product cards
+    document.addEventListener('click', (e) => {
+        const minusBtn = e.target.closest('.catalog-qty-minus');
+        const plusBtn = e.target.closest('.catalog-qty-plus');
+
+        if (!minusBtn && !plusBtn) return;
+
+        const form = (minusBtn || plusBtn).closest('form.add-to-cart-form');
+        if (!form) return;
+
+        const input = form.querySelector('.catalog-qty-input');
+        if (!input) return;
+
+        e.preventDefault();
+        const maxAllowed = parseInt(input.max, 10) || parseInt(form.dataset.stock, 10) || 1;
+        let current = parseInt(input.value, 10) || 1;
+
+        if (minusBtn) {
+            if (current > 1) {
+                input.value = current - 1;
+            }
+        } else if (plusBtn) {
+            if (current < maxAllowed) {
+                input.value = current + 1;
+            } else if (window.Swal) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stock Limit',
+                    text: `Only ${maxAllowed} more unit(s) available to add.`,
+                    timer: 2000,
+                    showConfirmButton: false,
+                    customClass: { popup: 'rounded-2xl border border-slate-100 shadow-xl' }
+                });
+            }
+        }
+    });
+
+    document.addEventListener('input', (e) => {
+        const input = e.target.closest('.catalog-qty-input');
+        if (!input) return;
+
+        const maxAllowed = parseInt(input.max, 10) || 1;
+        let val = parseInt(input.value, 10);
+        if (val > maxAllowed) {
+            input.value = maxAllowed;
+        } else if (val < 1 && input.value !== '') {
+            input.value = 1;
+        }
+    });
+
+    document.addEventListener('blur', (e) => {
+        if (!e.target || !e.target.classList || !e.target.classList.contains('catalog-qty-input')) return;
+        const input = e.target;
+        const maxAllowed = parseInt(input.max, 10) || 1;
+        let val = parseInt(input.value, 10);
+        if (isNaN(val) || val < 1) input.value = 1;
+        if (val > maxAllowed) input.value = maxAllowed;
+    }, true);
+
     document.addEventListener('submit', async (e) => {
         const form = e.target.closest('form.add-to-cart-form, form[action*="/customer/cart/add"]');
         if (!form) return;
@@ -59,8 +146,24 @@ function initFlyToCart() {
                     animateFlyToCart(sourceElement, cartBtn);
                 }
 
+                if (data.current_in_cart !== undefined) {
+                    form.dataset.inCart = data.current_in_cart;
+                }
+
+                const catalogInput = form.querySelector('.catalog-qty-input');
+                if (catalogInput && data.available_left !== undefined) {
+                    catalogInput.max = Math.max(1, data.available_left);
+                    catalogInput.value = 1;
+                }
+
+                if (typeof window.updateProductDetailStockState === 'function' && data.available_left !== undefined) {
+                    window.updateProductDetailStockState(data.available_left, data.current_in_cart || 0);
+                }
+
                 // If no more units are available to add, update button to show max reached
                 if (data.available_left === 0 && submitBtn) {
+                    const stepper = form.querySelector('.catalog-qty-stepper');
+                    if (stepper) stepper.classList.add('hidden');
                     submitBtn.disabled = true;
                     submitBtn.classList.remove('bg-[#0ea5e9]', 'hover:bg-sky-600', 'text-white');
                     submitBtn.classList.add('bg-sky-50', 'text-sky-600', 'border', 'border-sky-200', 'cursor-not-allowed');
@@ -76,14 +179,20 @@ function initFlyToCart() {
                     // 2. Update cart badges
                     updateCartBadges(data.cart_count);
 
-                    // 3. Show sleek floating toast notification
-                    showFlyCartToast(data.product_name, data.cart_count, data.product_image);
+                    // 3. Show sleek floating toast notification with Selection Batch info
+                    showFlyCartToast(
+                        data.product_name,
+                        data.cart_count,
+                        data.product_image,
+                        data.batch_number,
+                        data.added_quantity
+                    );
                 }, 600);
             } else {
                 // If restricted or stock limit error
                 if (window.Swal) {
                     Swal.fire({
-                        icon: response.status === 403 ? 'warning' : 'warning',
+                        icon: 'warning',
                         title: response.status === 403 ? 'Ordering Restricted' : 'Stock Limit',
                         text: data.message || 'Cannot add more units than available in stock.',
                         confirmButtonColor: '#0ea5e9',
@@ -100,7 +209,7 @@ function initFlyToCart() {
             // Fallback: If network fails or non-JSON returned, submit normally
             form.submit();
         } finally {
-            if (submitBtn) {
+            if (submitBtn && !submitBtn.disabled) {
                 submitBtn.style.pointerEvents = '';
                 submitBtn.classList.remove('opacity-80', 'scale-95');
                 submitBtn.innerHTML = originalBtnHtml;
@@ -209,7 +318,7 @@ function updateCartBadges(newCount) {
 /**
  * Displays a sleek, non-blocking floating toast in the top right
  */
-function showFlyCartToast(productName, cartCount, productImgUrl) {
+function showFlyCartToast(productName, cartCount, productImgUrl, batchNumber, addedQty) {
     let container = document.getElementById('dairybox-toast-container');
     if (!container) {
         container = document.createElement('div');
@@ -218,6 +327,9 @@ function showFlyCartToast(productName, cartCount, productImgUrl) {
         document.body.appendChild(container);
     }
 
+    const batchLabel = batchNumber ? `Cart #${batchNumber}` : 'Cart';
+    const qtyPrefix = (addedQty && addedQty > 1) ? `${addedQty}x ` : '';
+
     const toast = document.createElement('div');
     toast.className = 'pointer-events-auto flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-sky-100 shadow-xl shadow-sky-500/10 toast-enter max-w-sm transition-all';
     toast.innerHTML = `
@@ -225,8 +337,8 @@ function showFlyCartToast(productName, cartCount, productImgUrl) {
             ${productImgUrl ? `<img src="${productImgUrl}" alt="" class="w-full h-full object-cover">` : `<i class="bi bi-cart-check-fill text-xl text-sky-600"></i>`}
         </div>
         <div class="min-w-0 pr-1">
-            <h4 class="text-xs font-bold text-slate-900 truncate">${productName}</h4>
-            <p class="text-[11px] text-slate-500 font-medium">Added to cart &bull; ${cartCount} ${cartCount === 1 ? 'item' : 'items'} in cart</p>
+            <h4 class="text-xs font-bold text-slate-900 truncate">${qtyPrefix}${productName}</h4>
+            <p class="text-[11px] text-slate-500 font-medium">Added to <span class="font-bold text-sky-600">${batchLabel}</span> &bull; ${cartCount} ${cartCount === 1 ? 'unit' : 'units'} in cart</p>
         </div>
         <a href="/customer/cart" class="text-xs font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100/80 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 flex-shrink-0 cursor-pointer">
             <span>View</span>

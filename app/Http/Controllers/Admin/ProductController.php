@@ -37,20 +37,37 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        if (!$request->has('milk_types') && $request->filled('milk_type')) {
+            $request->merge(['milk_types' => [$request->milk_type]]);
+        }
+        if (!$request->has('sizes') && $request->filled('size')) {
+            $request->merge(['sizes' => [$request->size]]);
+        }
+
         $request->validate([
             'product_name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
             'flavor' => 'nullable|string|max:100',
             'description' => 'nullable|string',
-            'milk_type' => 'required|in:Carabao,Cow',
-            'size' => 'required|in:Small,Medium,Large',
+            'milk_types' => 'required|array|min:1',
+            'milk_types.*' => 'required|in:Carabao,Cow',
+            'sizes' => 'required|array|min:1',
+            'sizes.*' => 'required|in:Small,Medium,Large',
             'price' => 'required|numeric|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'preset_image' => 'nullable|string|max:255',
             'initial_stock' => 'required|integer|min:0',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
             'expiration_date' => 'nullable|date|after_or_equal:manufacturing_date',
+        ], [
+            'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
+            'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
         ]);
+
+        $milkTypes = array_values(array_unique($request->milk_types));
+        $sizes = array_values(array_unique($request->sizes));
+        $primaryMilk = $milkTypes[0];
+        $primarySize = $sizes[0];
 
         $imagePath = null;
         if ($request->hasFile('image')) {
@@ -63,9 +80,9 @@ class ProductController extends Controller
             'category_id' => $request->category_id,
             'product_name' => $request->product_name,
             'description' => $request->description,
-            'milk_type' => $request->milk_type,
+            'milk_type' => $primaryMilk,
             'flavor' => $request->flavor,
-            'size' => $request->size,
+            'size' => $primarySize,
             'price' => $request->price,
             'image' => $imagePath,
             'stock' => 0, // Stock-in using FIFO service below will sync this correctly
@@ -73,6 +90,8 @@ class ProductController extends Controller
             'expiration_date' => $request->expiration_date,
             'status' => 'active',
         ]);
+
+        Product::saveProductOptions($product->id, $milkTypes, $sizes);
 
         // If initial stock is specified, log it in the FIFO inventory batches
         if ($request->initial_stock > 0) {
@@ -88,7 +107,7 @@ class ProductController extends Controller
         AuditLog::create([
             'user_id' => auth()->id(),
             'action' => 'PRODUCT_CREATED',
-            'details' => "Created product: {$product->product_name} (Flavor: {$product->flavor}, Size: {$product->size}, Milk: {$product->milk_type}, Initial Stock: {$request->initial_stock})",
+            'details' => "Created product: {$product->product_name} (Flavor: {$product->flavor}, Sizes: " . implode('/', $sizes) . ", Milk: " . implode('/', $milkTypes) . ", Initial Stock: {$request->initial_stock})",
             'ip_address' => $request->ip(),
         ]);
 
@@ -105,28 +124,45 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        if (!$request->has('milk_types') && $request->filled('milk_type')) {
+            $request->merge(['milk_types' => [$request->milk_type]]);
+        }
+        if (!$request->has('sizes') && $request->filled('size')) {
+            $request->merge(['sizes' => [$request->size]]);
+        }
+
         $request->validate([
             'product_name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
             'flavor' => 'nullable|string|max:100',
             'description' => 'nullable|string',
-            'milk_type' => 'required|in:Carabao,Cow',
-            'size' => 'required|in:Small,Medium,Large',
+            'milk_types' => 'required|array|min:1',
+            'milk_types.*' => 'required|in:Carabao,Cow',
+            'sizes' => 'required|array|min:1',
+            'sizes.*' => 'required|in:Small,Medium,Large',
             'price' => 'required|numeric|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'preset_image' => 'nullable|string|max:255',
             'status' => 'required|in:active,inactive',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
             'expiration_date' => 'nullable|date|after_or_equal:manufacturing_date',
+        ], [
+            'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
+            'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
         ]);
+
+        $milkTypes = array_values(array_unique($request->milk_types));
+        $sizes = array_values(array_unique($request->sizes));
+        $primaryMilk = $milkTypes[0];
+        $primarySize = $sizes[0];
 
         $data = [
             'category_id' => $request->category_id,
             'product_name' => $request->product_name,
             'description' => $request->description,
-            'milk_type' => $request->milk_type,
+            'milk_type' => $primaryMilk,
             'flavor' => $request->flavor,
-            'size' => $request->size,
+            'size' => $primarySize,
             'price' => $request->price,
             'status' => $request->status,
             'manufacturing_date' => $request->manufacturing_date,
@@ -147,11 +183,12 @@ class ProductController extends Controller
         }
 
         $product->update($data);
+        Product::saveProductOptions($product->id, $milkTypes, $sizes);
 
         AuditLog::create([
             'user_id' => auth()->id(),
             'action' => 'PRODUCT_UPDATED',
-            'details' => "Updated product: {$product->product_name} (#{$product->id})",
+            'details' => "Updated product: {$product->product_name} (#{$product->id}, Milk: " . implode('/', $milkTypes) . ", Sizes: " . implode('/', $sizes) . ")",
             'ip_address' => $request->ip(),
         ]);
 
@@ -169,6 +206,7 @@ class ProductController extends Controller
             Storage::disk('public')->delete($product->image);
         }
 
+        Product::deleteProductOptions($product->id);
         $product->delete();
 
         AuditLog::create([

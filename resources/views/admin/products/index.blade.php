@@ -90,10 +90,14 @@
                                     <i class="bi bi-tag-fill mr-1 text-[9px] text-sky-500"></i> {{ $product->flavor }}
                                 </span>
                             @endif
-                            <span class="inline-flex items-center w-max px-2 py-0.5 rounded-md text-[10px] font-bold {{ $product->milk_type == 'Carabao' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800' }}">
-                                {{ $product->milk_type }} Milk
-                            </span>
-                            <span class="text-[10px] text-slate-500 font-medium">Size: {{ $product->size }}</span>
+                            <div class="flex flex-wrap gap-1">
+                                @foreach($product->available_milk_types as $mType)
+                                    <span class="inline-flex items-center w-max px-2 py-0.5 rounded-md text-[10px] font-bold {{ $mType == 'Carabao' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800' }}">
+                                        {{ $mType }} Milk
+                                    </span>
+                                @endforeach
+                            </div>
+                            <span class="text-[10px] text-slate-500 font-medium">Size: {{ implode(', ', $product->available_sizes) }}</span>
                         </div>
                     </td>
                     <!-- Price -->
@@ -220,25 +224,38 @@
                                                      </div>
                                                  </div>
 
-                                                 <!-- Milk Type -->
+                                                 <!-- Milk Type Checklist -->
                                                  <div class="space-y-1 text-left">
-                                                     <label for="milk_type_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Milk Type Source</label>
-                                                     <select name="milk_type" id="milk_type_{{ $product->id }}" required
-                                                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all focus:bg-white">
-                                                         <option value="Carabao" {{ old('milk_type', $product->milk_type) == 'Carabao' ? 'selected' : '' }}>Carabao Milk</option>
-                                                         <option value="Cow" {{ old('milk_type', $product->milk_type) == 'Cow' ? 'selected' : '' }}>Cow Milk</option>
-                                                     </select>
+                                                     <label class="block text-xs font-bold text-slate-700">Available Milk Type Source</label>
+                                                     @php
+                                                         $prodMilks = $product->available_milk_types;
+                                                     @endphp
+                                                     <div class="grid grid-cols-2 gap-2">
+                                                         @foreach(['Carabao' => 'Carabao Milk', 'Cow' => "Cow's Milk"] as $mVal => $mLabel)
+                                                             <label class="flex items-center space-x-2 px-3 py-2 bg-slate-50 hover:bg-sky-50/40 border border-slate-200 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50/60 rounded-xl cursor-pointer transition-all select-none">
+                                                                 <input type="checkbox" name="milk_types[]" value="{{ $mVal }}" {{ in_array($mVal, $prodMilks) ? 'checked' : '' }}
+                                                                     class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                                                                 <span class="text-xs font-bold text-slate-800">{{ $mLabel }}</span>
+                                                             </label>
+                                                         @endforeach
+                                                     </div>
                                                  </div>
 
-                                                 <!-- Size -->
+                                                 <!-- Size Checklist -->
                                                  <div class="space-y-1 text-left">
-                                                     <label for="size_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Product Size</label>
-                                                     <select name="size" id="size_{{ $product->id }}" required
-                                                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all focus:bg-white">
-                                                         <option value="Small" {{ old('size', $product->size) == 'Small' ? 'selected' : '' }}>Small</option>
-                                                         <option value="Medium" {{ old('size', $product->size) == 'Medium' ? 'selected' : '' }}>Medium</option>
-                                                         <option value="Large" {{ old('size', $product->size) == 'Large' ? 'selected' : '' }}>Large</option>
-                                                     </select>
+                                                     <label class="block text-xs font-bold text-slate-700">Available Product Size</label>
+                                                     @php
+                                                         $prodSizes = $product->available_sizes;
+                                                     @endphp
+                                                     <div class="grid grid-cols-3 gap-1.5">
+                                                         @foreach(['Small', 'Medium', 'Large'] as $sVal)
+                                                             <label class="flex items-center space-x-1.5 px-2.5 py-2 bg-slate-50 hover:bg-sky-50/40 border border-slate-200 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50/60 rounded-xl cursor-pointer transition-all select-none">
+                                                                 <input type="checkbox" name="sizes[]" value="{{ $sVal }}" {{ in_array($sVal, $prodSizes) ? 'checked' : '' }}
+                                                                     class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                                                                 <span class="text-xs font-bold text-slate-800">{{ $sVal }}</span>
+                                                             </label>
+                                                         @endforeach
+                                                     </div>
                                                  </div>
 
 <!-- Product Flavor -->

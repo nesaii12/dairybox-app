@@ -44,12 +44,12 @@
                     </div>
                     @endif
                     <div class="p-3 bg-slate-50 rounded-xl">
-                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Milk Type</span>
-                        <span class="text-sm font-bold text-slate-800">{{ $product->milk_type }} Milk</span>
+                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Available Milk Types</span>
+                        <span class="text-sm font-bold text-slate-800">{{ implode(', ', array_map(fn($m) => $m . ' Milk', $product->available_milk_types)) }}</span>
                     </div>
                     <div class="p-3 bg-slate-50 rounded-xl">
-                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Product Size</span>
-                        <span class="text-sm font-bold text-slate-800">{{ $product->size }}</span>
+                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Available Sizes</span>
+                        <span class="text-sm font-bold text-slate-800">{{ implode(', ', $product->available_sizes) }}</span>
                     </div>
                     <div class="p-3 bg-slate-50 rounded-xl">
                         <span class="block text-[10px] font-semibold text-slate-400 uppercase">Current Stock</span>

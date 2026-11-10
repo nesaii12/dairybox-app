@@ -66,29 +66,42 @@
                     @enderror
                 </div>
 
-                <!-- Milk Type -->
+                <!-- Milk Type Checklist -->
                 <div>
-                    <label for="milk_type" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Milk Type Source</label>
-                    <select name="milk_type" id="milk_type" required
-                        class="mt-1.5 block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 text-xs transition-all focus:bg-white cursor-pointer font-semibold">
-                        <option value="Carabao" {{ old('milk_type') == 'Carabao' ? 'selected' : '' }}>Carabao Milk</option>
-                        <option value="Cow" {{ old('milk_type', 'Cow') == 'Cow' ? 'selected' : '' }}>Cow Milk</option>
-                    </select>
-                    @error('milk_type')
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Available Milk Type Source</label>
+                    @php
+                        $oldMilks = (array) old('milk_types', ['Cow']);
+                    @endphp
+                    <div class="mt-1.5 grid grid-cols-2 gap-2.5">
+                        @foreach(['Carabao' => 'Carabao Milk', 'Cow' => "Cow's Milk"] as $mVal => $mLabel)
+                            <label class="flex items-center space-x-2.5 px-3 py-2.5 bg-slate-50 hover:bg-sky-50/40 border border-slate-200 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50/60 rounded-xl cursor-pointer transition-all select-none">
+                                <input type="checkbox" name="milk_types[]" value="{{ $mVal }}" {{ in_array($mVal, $oldMilks) ? 'checked' : '' }}
+                                    class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                                <span class="text-xs font-bold text-slate-800">{{ $mLabel }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('milk_types')
                         <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                     @enderror
                 </div>
 
-                <!-- Size -->
+                <!-- Size Checklist -->
                 <div>
-                    <label for="size" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Product Size</label>
-                    <select name="size" id="size" required
-                        class="mt-1.5 block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 text-xs transition-all focus:bg-white cursor-pointer font-semibold">
-                        <option value="Small" {{ old('size') == 'Small' ? 'selected' : '' }}>Small</option>
-                        <option value="Medium" {{ old('size', 'Medium') == 'Medium' ? 'selected' : '' }}>Medium</option>
-                        <option value="Large" {{ old('size') == 'Large' ? 'selected' : '' }}>Large</option>
-                    </select>
-                    @error('size')
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Available Product Size</label>
+                    @php
+                        $oldSizes = (array) old('sizes', ['Medium']);
+                    @endphp
+                    <div class="mt-1.5 grid grid-cols-3 gap-2">
+                        @foreach(['Small', 'Medium', 'Large'] as $sVal)
+                            <label class="flex items-center space-x-2 px-3 py-2.5 bg-slate-50 hover:bg-sky-50/40 border border-slate-200 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50/60 rounded-xl cursor-pointer transition-all select-none">
+                                <input type="checkbox" name="sizes[]" value="{{ $sVal }}" {{ in_array($sVal, $oldSizes) ? 'checked' : '' }}
+                                    class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                                <span class="text-xs font-bold text-slate-800">{{ $sVal }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('sizes')
                         <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                     @enderror
                 </div>
