@@ -2,7 +2,7 @@
 <html lang="en" class="h-full bg-slate-50">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @auth
     <meta name="user-id" content="{{ auth()->id() }}">
@@ -125,7 +125,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @yield('styles')
 </head>
-<body class="h-full flex flex-col md:flex-row text-slate-800 antialiased bg-slate-100/70">
+<body class="h-full flex flex-col md:flex-row text-slate-800 antialiased bg-[#FAF8F2]">
 
     <!-- Mobile Header -->
     <header class="md:hidden bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md text-white">
@@ -138,7 +138,7 @@
         </div>
         <div class="flex items-center space-x-1">
             @include('admin.partials.notifications', ['isMobile' => true])
-            <button id="mobile-menu-toggle" class="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors focus:outline-none relative">
+            <button id="mobile-menu-toggle" class="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors focus:outline-none relative" aria-label="Open mobile menu">
                 <i class="bi bi-list text-2xl"></i>
                 @if(($pendingOrdersCount ?? 0) > 0)
                     <span class="absolute top-2 right-2 w-2 h-2 bg-amber-400 rounded-full ring-2 ring-slate-900"></span>
@@ -146,6 +146,16 @@
             </button>
         </div>
     </header>
+
+    <!-- Mobile Page Sub-header / Context Bar -->
+    <div class="md:hidden bg-[#fffdf8]/95 backdrop-blur-xs border-b border-amber-200/50 px-4 py-2 flex items-center justify-between sticky top-[53px] z-30 shadow-2xs">
+        <div class="flex items-center space-x-2 min-w-0">
+            <h1 class="text-xs font-black text-slate-900 tracking-tight truncate">@yield('page_title', 'Dashboard')</h1>
+        </div>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[8px] font-bold bg-amber-100/80 text-amber-900 border border-amber-200/90 uppercase tracking-wider shrink-0">
+            Command Center
+        </span>
+    </div>
 
     <!-- Sidebar Wrapper for Mobile Overlay / Desktop Fixed -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800/90 flex flex-col justify-between transform -translate-x-full md:translate-x-0 md:static transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none text-slate-300 select-none">
@@ -161,7 +171,7 @@
                         <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block">Command Center</span>
                     </div>
                 </div>
-                <span class="bg-slate-800 text-sky-400 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md border border-slate-700/80 shadow-2xs">Admin</span>
+                <span class="bg-amber-400/20 text-amber-300 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md border border-amber-400/30 shadow-2xs">Admin</span>
             </div>
 
             <!-- Mobile Sidebar close button -->
@@ -224,6 +234,11 @@
                     <span>Riders</span>
                 </a>
 
+                <a href="{{ route('admin.remittances.index') }}" class="group flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.remittances.*') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                    <i class="bi bi-cash-stack text-base {{ request()->routeIs('admin.remittances.*') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200' }}"></i>
+                    <span>Rider Remittance</span>
+                </a>
+
                 <a href="{{ route('admin.deliveries.index') }}" class="group flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.deliveries.*') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
                     <i class="bi bi-truck text-base {{ request()->routeIs('admin.deliveries.*') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200' }}"></i>
                     <span>Delivery Monitor</span>
@@ -267,11 +282,11 @@
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col overflow-y-auto">
         <!-- Top bar (Desktop only) -->
-        <header class="hidden md:flex bg-white/95 backdrop-blur-xs border-b border-slate-200/90 px-8 py-3.5 items-center justify-between shadow-2xs sticky top-0 z-30">
+        <header class="hidden md:flex bg-[#fffdf8]/95 backdrop-blur-xs border-b border-amber-200/50 px-8 py-3.5 items-center justify-between shadow-2xs sticky top-0 z-30">
             <div>
                 <div class="flex items-center space-x-2.5">
                     <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">@yield('page_title', 'Dashboard')</h1>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">Admin Portal</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100/80 text-amber-900 border border-amber-200/90 uppercase tracking-wider">Admin Portal</span>
                 </div>
                 <p class="text-xs text-slate-500 mt-0.5">DairyBox Backoffice — {{ now()->format('l, F j, Y') }}</p>
             </div>
@@ -339,7 +354,7 @@
         </header>
 
         <!-- Inner Content Window -->
-        <div class="flex-1 p-4 md:p-8 max-w-[1600px] w-full mx-auto">
+        <div class="flex-1 p-3.5 sm:p-6 md:p-8 pb-28 md:pb-8 max-w-[1600px] w-full mx-auto">
             <!-- Alert message flashes using SweetAlert2 -->
             @if(session('success'))
             <script>
@@ -381,28 +396,72 @@
         </div>
     </main>
 
+    <!-- Admin Mobile Bottom Quick-Dock Bar -->
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-300 pb-safe shadow-2xl px-2 py-1.5 flex items-center justify-around select-none">
+        <a href="{{ route('admin.dashboard') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('admin.dashboard') ? 'text-sky-400 font-bold bg-slate-800/80 shadow-xs' : 'text-slate-400 hover:text-slate-200' }}">
+            <i class="bi bi-grid-fill text-base leading-none mb-1"></i>
+            <span class="text-[10px] tracking-tight">Overview</span>
+        </a>
+
+        <a href="{{ route('admin.orders.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all relative {{ request()->routeIs('admin.orders.*') ? 'text-sky-400 font-bold bg-slate-800/80 shadow-xs' : 'text-slate-400 hover:text-slate-200' }}">
+            <i class="bi bi-cart-check-fill text-base leading-none mb-1"></i>
+            <span class="text-[10px] tracking-tight">Orders</span>
+            @if(($pendingOrdersCount ?? 0) > 0)
+                <span class="absolute top-0 right-1 px-1.5 py-0.2 text-[8px] font-black rounded-full bg-amber-400 text-slate-950 ring-2 ring-slate-900">
+                    {{ $pendingOrdersCount }}
+                </span>
+            @endif
+        </a>
+
+        <a href="{{ route('admin.inventory.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('admin.inventory.*') ? 'text-sky-400 font-bold bg-slate-800/80 shadow-xs' : 'text-slate-400 hover:text-slate-200' }}">
+            <i class="bi bi-archive-fill text-base leading-none mb-1"></i>
+            <span class="text-[10px] tracking-tight">Inventory</span>
+        </a>
+
+        <a href="{{ route('admin.customers.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('admin.customers.*') ? 'text-sky-400 font-bold bg-slate-800/80 shadow-xs' : 'text-slate-400 hover:text-slate-200' }}">
+            <i class="bi bi-people-fill text-base leading-none mb-1"></i>
+            <span class="text-[10px] tracking-tight">Customers</span>
+        </a>
+
+        <button type="button" id="mobile-dock-menu-toggle" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer">
+            <i class="bi bi-list-nested text-base leading-none mb-1"></i>
+            <span class="text-[10px] tracking-tight">More</span>
+        </button>
+    </nav>
+
     <!-- Menu Toggle Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const menuToggle = document.getElementById('mobile-menu-toggle');
+            const menuDockToggle = document.getElementById('mobile-dock-menu-toggle');
             const menuClose = document.getElementById('mobile-menu-close');
             const sidebar = document.getElementById('sidebar');
             const backdrop = document.getElementById('sidebar-backdrop');
 
             function toggleSidebar() {
+                const isOpening = sidebar.classList.contains('-translate-x-full');
                 sidebar.classList.toggle('-translate-x-full');
                 backdrop.classList.toggle('hidden');
+                document.body.classList.toggle('overflow-hidden', isOpening);
             }
 
-            if (menuToggle && sidebar && backdrop) {
-                menuToggle.addEventListener('click', toggleSidebar);
+            function closeSidebar() {
+                if (!sidebar.classList.contains('-translate-x-full')) {
+                    sidebar.classList.add('-translate-x-full');
+                    backdrop.classList.add('hidden');
+                    document.body.classList.remove('overflow-hidden');
+                }
             }
-            if (menuClose && sidebar && backdrop) {
-                menuClose.addEventListener('click', toggleSidebar);
-            }
-            if (backdrop && sidebar) {
-                backdrop.addEventListener('click', toggleSidebar);
-            }
+
+            if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+            if (menuDockToggle) menuDockToggle.addEventListener('click', toggleSidebar);
+            if (menuClose) menuClose.addEventListener('click', closeSidebar);
+            if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+            // Close sidebar when pressing ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeSidebar();
+            });
 
             // Notification dropdown interactions
             const desktopBtn = document.getElementById('adminNotifBtn');

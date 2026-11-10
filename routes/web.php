@@ -29,6 +29,8 @@ Route::middleware('guest')->group(function () {
     
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+    Route::post('/register/email-otp/send', [AuthController::class, 'sendEmailOtp'])->name('register.email.sendOtp')->middleware('throttle:5,1');
+    Route::post('/register/email-otp/verify', [AuthController::class, 'verifyEmailOtp'])->name('register.email.verifyOtp')->middleware('throttle:10,1');
     Route::post('/register/phone-otp/send', [AuthController::class, 'sendPhoneOtp'])->name('register.phone.sendOtp')->middleware('throttle:5,1');
     Route::post('/register/phone-otp/verify', [AuthController::class, 'verifyPhoneOtp'])->name('register.phone.verifyOtp')->middleware('throttle:10,1');
 
@@ -85,6 +87,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 
     // Riders
     Route::resource('riders', \App\Http\Controllers\Admin\RiderController::class)->except('edit');
+
+    // Rider Cash Remittances & Daily Cash Ledger
+    Route::get('/remittances', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'index'])->name('remittances.index');
+    Route::get('/remittances/rider/{rider}/orders', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'getRiderOrders'])->name('remittances.riderOrders');
+    Route::post('/remittances', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'store'])->name('remittances.store');
+    Route::get('/remittances/{remittance}', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'show'])->name('remittances.show');
+    Route::post('/remittances/{remittance}/verify', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'verify'])->name('remittances.verify');
+    Route::post('/remittances/{remittance}/reject', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'reject'])->name('remittances.reject');
     
     // Reports
     Route::get('/reports', [\App\Http\Controllers\Admin\ReportController::class, 'index'])->name('reports.index');

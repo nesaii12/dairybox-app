@@ -16,6 +16,7 @@ class Order extends Model
         'order_number',
         'customer_id',
         'rider_id',
+        'remittance_id',
         'order_type',
         'payment_method',
         'payment_status',
@@ -57,6 +58,29 @@ class Order extends Model
     }
 
     /**
+     * Calculate tiered delivery fee based on order subtotal and fulfillment type.
+     * - Subtotal >= ₱1,000: Free Delivery (₱0.00)
+     * - Subtotal >= ₱150 up to ₱999.99: ₱25.00
+     * - Subtotal < ₱150: ₱50.00
+     */
+    public static function calculateDeliveryFee(float $subtotal, string $orderType = 'Delivery'): float
+    {
+        if ($orderType !== 'Delivery') {
+            return 0.00;
+        }
+
+        if ($subtotal >= 1000) {
+            return 0.00;
+        }
+
+        if ($subtotal >= 150) {
+            return 25.00;
+        }
+
+        return 50.00;
+    }
+
+    /**
      * The "booted" method of the model.
      */
     protected static function booted(): void
@@ -92,6 +116,14 @@ class Order extends Model
     public function rider(): BelongsTo
     {
         return $this->belongsTo(User::class, 'rider_id');
+    }
+
+    /**
+     * Get the remittance record associated with this order.
+     */
+    public function remittance(): BelongsTo
+    {
+        return $this->belongsTo(RiderRemittance::class, 'remittance_id');
     }
 
     /**

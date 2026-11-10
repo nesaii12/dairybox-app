@@ -109,7 +109,9 @@ class RiderController extends Controller
             $delivery->update($deliveryData);
 
             // 2. Update order status
-            $orderStatus = ($newStatus === 'Delivered') ? 'Delivered' : 'Cancelled';
+            $orderStatus = ($newStatus === 'Delivered')
+                ? (strtolower($order->payment_method ?? 'cod') === 'cod' ? 'Delivered - Pending Remittance' : 'Delivered')
+                : 'Cancelled';
             $orderData = [
                 'order_status' => $orderStatus,
             ];

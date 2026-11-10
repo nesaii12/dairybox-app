@@ -197,7 +197,11 @@
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-slate-400">Delivery Fee</span>
-                    <span class="font-semibold text-slate-900">₱{{ number_format($order->delivery_fee, 2) }}</span>
+                    @if($order->order_type === 'Delivery' && (float) $order->delivery_fee == 0)
+                        <span class="font-bold text-emerald-600">Free Delivery</span>
+                    @else
+                        <span class="font-semibold text-slate-900">₱{{ number_format($order->delivery_fee, 2) }}</span>
+                    @endif
                 </div>
                 <div class="flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
                     <span class="font-bold text-slate-900">Total Charges</span>
@@ -315,6 +319,8 @@
                         'Ready for Pickup' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
                         'Out for Delivery' => 'bg-purple-50 text-purple-700 border-purple-100',
                         'Delivered' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+                        'Delivered - Pending Remittance' => 'bg-amber-50 text-amber-800 border-amber-200',
+                        'Paid & Remitted' => 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold',
                         'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100',
                     ];
                     $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
@@ -331,8 +337,8 @@
             </div>
 
             <!-- Progression Form -->
-            @if($order->order_status !== 'Delivered' && $order->order_status !== 'Cancelled')
-            <form action="{{ route('admin.orders.updateStatus', $order->id) }}" method="POST" class="space-y-4 pt-4 border-t border-slate-100">
+            @if(!in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled']))
+            <form id="adminStatusUpdateForm" action="{{ route('admin.orders.updateStatus', $order->id) }}" method="POST" onsubmit="return validateAdminStatusUpdate(event)" class="space-y-4 pt-4 border-t border-slate-100">
                 @csrf
                 <div>
                     <label for="order_status" class="block text-xs font-semibold text-slate-700">Update Status To</label>
@@ -360,6 +366,10 @@
                             <option value="Cancelled">Cancel Order</option>
                         @endif
                     </select>
+                    <p id="status_no_rider_error" class="{{ $errors->has('rider_id') ? '' : 'hidden' }} mt-1.5 text-[11px] font-semibold text-rose-600 flex items-start gap-1">
+                        <i class="bi bi-exclamation-circle-fill mt-0.5 flex-shrink-0"></i>
+                        <span>Invalid: Cannot set Out for Delivery while no rider is in charge. Please assign a rider below first.</span>
+                    </p>
                 </div>
 
                 <!-- Admin Cancellation Reason Input Box (Hidden by default unless Cancelled is chosen) -->
@@ -392,16 +402,54 @@
                 </button>
             </form>
             @else
+            @if($order->order_status === 'Delivered - Pending Remittance')
+            <div class="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 mt-4 space-y-2">
+                <div class="flex items-center space-x-2 font-bold">
+                    <i class="bi bi-clock-history text-amber-600 text-sm"></i>
+                    <span>Awaiting Rider Cash Remittance</span>
+                </div>
+                <p class="text-[11px] text-amber-800 leading-relaxed">
+                    This order was delivered and COD payment of <span class="font-bold">₱{{ number_format($order->total_amount, 2) }}</span> is pending remittance from rider <span class="font-bold">{{ $order->rider?->name ?? 'Assigned Rider' }}</span>.
+                </p>
+                @if($order->rider_id)
+                <a href="{{ route('admin.remittances.index', ['rider_id' => $order->rider_id]) }}" class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition">
+                    <i class="bi bi-cash-stack"></i>
+                    <span>Process Remittance for {{ $order->rider->name }}</span>
+                </a>
+                @endif
+            </div>
+            @elseif($order->order_status === 'Paid & Remitted' || $order->remittance_id)
+            <div class="p-3.5 bg-emerald-50/80 border border-emerald-200/80 rounded-xl text-xs text-emerald-900 mt-4 space-y-1">
+                <div class="flex items-center space-x-2 font-bold">
+                    <i class="bi bi-patch-check-fill text-emerald-600 text-sm"></i>
+                    <span>Remitted & Reconciled</span>
+                </div>
+                <p class="text-[11px] text-emerald-800">
+                    COD remittance has been officially confirmed and logged in the cash ledger.
+                    @if($order->remittance)
+                        Ref: <span class="font-bold">{{ $order->remittance->reference_no }}</span>
+                    @endif
+                </p>
+            </div>
+            @else
             <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 italic mt-4 text-center">
                 Order status is final. No further changes can be performed.
             </div>
             @endif
+            @endif
         </div>
 
         <!-- Rider Assignment Panel (For Delivery orders only) -->
-        @if($order->order_type === 'Delivery' && $order->order_status !== 'Delivered' && $order->order_status !== 'Cancelled')
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
-            <h3 class="text-sm font-bold text-slate-950 pb-3 border-b border-slate-100 mb-4">Assign Delivery Rider</h3>
+        @if($order->order_type === 'Delivery' && !in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled']))
+        <div id="assign_rider_card" class="bg-white rounded-2xl border {{ $errors->has('rider_id') ? 'border-rose-400 ring-2 ring-rose-500/15' : 'border-slate-200/80' }} p-6 shadow-sm transition-all">
+            <h3 class="text-sm font-bold text-slate-950 pb-3 border-b border-slate-100 mb-4 flex items-center justify-between">
+                <span>Assign Delivery Rider</span>
+                @if(!$order->rider)
+                    <span id="no_rider_badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $errors->has('rider_id') ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200' }}">
+                        Unassigned
+                    </span>
+                @endif
+            </h3>
             
             @if($order->rider)
                 <div class="p-3 bg-sky-50 border border-sky-100 rounded-xl text-xs text-sky-800 mb-4 shadow-2xs">
@@ -423,9 +471,11 @@
             <form action="{{ route('admin.orders.assignRider', $order->id) }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
-                    <label for="rider_id" class="block text-xs font-semibold text-slate-700">Choose Rider</label>
-                    <select name="rider_id" id="rider_id" required
-                        class="mt-1.5 block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 text-xs transition-all focus:bg-white cursor-pointer font-semibold">
+                    <label for="rider_id" class="block text-xs font-semibold text-slate-700">
+                        Choose Rider <span class="text-rose-500">*</span>
+                    </label>
+                    <select name="rider_id" id="rider_id" required onchange="handleRiderSelectChange(this)"
+                        class="mt-1.5 block w-full px-3 py-2.5 {{ $errors->has('rider_id') ? 'bg-rose-50/50 border-rose-500 text-rose-900 focus:ring-rose-500/20 focus:border-rose-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-sky-500/10 focus:border-sky-500' }} border rounded-xl focus:outline-none focus:ring-2 text-xs transition-all focus:bg-white cursor-pointer font-semibold">
                         <option value="">-- Choose Rider --</option>
                         @foreach($riders as $rider)
                             <option value="{{ $rider->id }}" {{ $order->rider_id == $rider->id ? 'selected' : '' }}>
@@ -433,9 +483,13 @@
                             </option>
                         @endforeach
                     </select>
+                    <p id="rider_required_error" class="{{ $errors->has('rider_id') ? '' : 'hidden' }} mt-1.5 text-[11px] font-semibold text-rose-600 flex items-start gap-1">
+                        <i class="bi bi-exclamation-triangle-fill mt-0.5 flex-shrink-0"></i>
+                        <span id="rider_required_error_text">{{ $errors->first('rider_id') ?: 'Invalid: Please fulfill who is the assigned rider and click "Assign & Dispatch" before setting Out for Delivery.' }}</span>
+                    </p>
                 </div>
 
-                <button type="submit" class="w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-md shadow-indigo-100 cursor-pointer">
+                <button type="submit" id="assignRiderSubmitBtn" class="w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-md shadow-indigo-100 cursor-pointer">
                     <i class="bi bi-person-fill-add"></i>
                     <span>{{ $order->rider ? 'Reassign Rider' : 'Assign & Dispatch' }}</span>
                 </button>
@@ -448,11 +502,115 @@
 
 @section('scripts')
 <script>
+    const hasAssignedRider = @json((bool) $order->rider_id);
+
+    function validateAdminStatusUpdate(event) {
+        const statusSelect = document.getElementById('order_status');
+        if (!statusSelect) return true;
+
+        if (statusSelect.value === 'Out for Delivery' && !hasAssignedRider) {
+            event.preventDefault();
+
+            const statusError = document.getElementById('status_no_rider_error');
+            const riderCard = document.getElementById('assign_rider_card');
+            const riderSelect = document.getElementById('rider_id');
+            const riderError = document.getElementById('rider_required_error');
+            const riderErrorText = document.getElementById('rider_required_error_text');
+            const noRiderBadge = document.getElementById('no_rider_badge');
+
+            statusSelect.classList.remove('border-slate-200', 'bg-slate-50', 'focus:border-sky-500');
+            statusSelect.classList.add('border-rose-500', 'bg-rose-50/40', 'focus:border-rose-500');
+
+            if (statusError) {
+                statusError.classList.remove('hidden');
+            }
+
+            if (riderCard) {
+                riderCard.classList.remove('border-slate-200/80');
+                riderCard.classList.add('border-rose-400', 'ring-2', 'ring-rose-500/15');
+            }
+
+            if (noRiderBadge) {
+                noRiderBadge.classList.remove('bg-amber-50', 'text-amber-700', 'border-amber-200');
+                noRiderBadge.classList.add('bg-rose-100', 'text-rose-700', 'border-rose-200');
+                noRiderBadge.innerText = 'Rider Required';
+            }
+
+            if (riderSelect) {
+                riderSelect.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-900', 'focus:border-sky-500');
+                riderSelect.classList.add('border-rose-500', 'bg-rose-50/50', 'text-rose-900', 'focus:border-rose-500');
+            }
+
+            if (riderError) {
+                if (riderErrorText) {
+                    riderErrorText.innerText = riderSelect && riderSelect.value
+                        ? 'Invalid: Rider is selected but not yet assigned. Click "Assign & Dispatch" below to fulfill the rider assignment.'
+                        : 'Invalid: Please select who is the rider assigned to deliver and click "Assign & Dispatch".';
+                }
+                riderError.classList.remove('hidden');
+            }
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Pipeline Update',
+                    text: 'No rider is in charge of this delivery yet. Please fulfill and assign the delivery rider first before setting the order to Out for Delivery.',
+                    confirmButtonText: 'Assign Rider Now',
+                    confirmButtonColor: '#4f46e5',
+                    customClass: {
+                        popup: 'rounded-2xl border border-slate-100 shadow-xl',
+                        confirmButton: 'rounded-xl text-xs font-bold px-4 py-2.5'
+                    }
+                }).then(() => {
+                    if (riderSelect) {
+                        riderSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        riderSelect.focus();
+                    }
+                });
+            } else if (riderSelect) {
+                riderSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                riderSelect.focus();
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    function handleRiderSelectChange(selectEl) {
+        const riderErrorText = document.getElementById('rider_required_error_text');
+        const riderError = document.getElementById('rider_required_error');
+        if (!hasAssignedRider && riderError && !riderError.classList.contains('hidden')) {
+            if (selectEl.value) {
+                selectEl.classList.remove('border-rose-500', 'bg-rose-50/50', 'text-rose-900');
+                selectEl.classList.add('border-indigo-400', 'bg-indigo-50/30', 'text-slate-900');
+                if (riderErrorText) {
+                    riderErrorText.innerText = 'Now click "Assign & Dispatch" below to confirm this rider and set the order Out for Delivery.';
+                }
+            } else {
+                selectEl.classList.remove('border-indigo-400', 'bg-indigo-50/30');
+                selectEl.classList.add('border-rose-500', 'bg-rose-50/50', 'text-rose-900');
+                if (riderErrorText) {
+                    riderErrorText.innerText = 'Invalid: Please select who is the rider assigned to deliver and click "Assign & Dispatch".';
+                }
+            }
+        }
+    }
+
     function toggleAdminCancellationReason(status) {
         const box = document.getElementById('admin_cancellation_reason_box');
         const textarea = document.getElementById('admin_cancellation_reason');
         const btn = document.getElementById('adminSubmitStatusBtn');
         const btnText = document.getElementById('adminSubmitStatusText');
+        const statusSelect = document.getElementById('order_status');
+        const statusError = document.getElementById('status_no_rider_error');
+
+        if (status !== 'Out for Delivery' && statusSelect) {
+            statusSelect.classList.remove('border-rose-500', 'bg-rose-50/40', 'focus:border-rose-500');
+            statusSelect.classList.add('border-slate-200', 'bg-slate-50', 'focus:border-sky-500');
+            if (statusError) statusError.classList.add('hidden');
+        }
 
         if (!box) return;
 

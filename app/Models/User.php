@@ -130,6 +130,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get all cart selection batches for the customer.
+     */
+    public function carts(): HasMany
+    {
+        return $this->hasMany(Cart::class, 'customer_id')->orderBy('id', 'asc');
+    }
+
+    /**
      * Get the customer's ratings.
      */
     public function ratings(): HasMany
@@ -143,6 +151,22 @@ class User extends Authenticatable
     public function appNotifications(): HasMany
     {
         return $this->hasMany(AppNotification::class);
+    }
+
+    /**
+     * Get remittances for this rider.
+     */
+    public function riderRemittances(): HasMany
+    {
+        return $this->hasMany(RiderRemittance::class, 'rider_id');
+    }
+
+    /**
+     * Get remittances recorded by this admin.
+     */
+    public function recordedRemittances(): HasMany
+    {
+        return $this->hasMany(RiderRemittance::class, 'admin_id');
     }
 
     /**

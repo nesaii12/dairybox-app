@@ -49,7 +49,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order)
     {
         $request->validate([
-            'order_status' => 'required|in:Pending,Confirmed,Preparing,Ready for Pickup,Out for Delivery,Delivered,Cancelled',
+            'order_status' => 'required|in:Pending,Confirmed,Preparing,Ready for Pickup,Out for Delivery,Delivered,Delivered - Pending Remittance,Paid & Remitted,Cancelled',
             'cancellation_reason' => 'nullable|string|max:255',
         ]);
 
@@ -61,6 +61,12 @@ class OrderController extends Controller
             return redirect()->back()->with('success', 'Order status updated (no changes).');
         }
 
+        if ($newStatus === 'Out for Delivery' && !$order->rider_id) {
+            return redirect()->back()
+                ->with('error', 'Invalid action: No delivery rider is in charge. Please assign a delivery rider first before setting the order to Out for Delivery.')
+                ->withErrors(['rider_id' => 'Invalid: Please select and assign the rider in charge of delivering this order first.']);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -69,6 +75,16 @@ class OrderController extends Controller
                 $orderData['cancellation_reason'] = $cancellationReason;
             }
             $order->update($orderData);
+
+            if ($newStatus === 'Out for Delivery' && $order->rider_id) {
+                Delivery::updateOrCreate(
+                    ['order_id' => $order->id],
+                    [
+                        'rider_id' => $order->rider_id,
+                        'delivery_status' => 'Out for Delivery',
+                    ]
+                );
+            }
 
             // If cancelled, return the inventory back using FIFO additions
             if ($newStatus === 'Cancelled') {

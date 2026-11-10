@@ -26,7 +26,7 @@ class ForecastService
                 DB::raw('SUM(order_items.quantity) as total_qty')
             )
             ->where('order_items.product_id', $productId)
-            ->where('orders.order_status', 'Delivered')
+            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
             ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear])
             ->groupBy('month')
             ->orderBy('month', 'asc')
@@ -102,7 +102,7 @@ class ForecastService
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
             ->where('order_items.product_id', $productId)
-            ->where('orders.order_status', 'Delivered')
+            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
             ->whereRaw("MONTH({$dateExpr}) = ?", [$targetMonthNum])
             ->select(DB::raw('SUM(order_items.quantity) as qty'))
             ->groupBy(DB::raw("YEAR({$dateExpr})"))
@@ -119,7 +119,7 @@ class ForecastService
             $storeMonthAvg = DB::table('order_items')
                 ->join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-                ->where('orders.order_status', 'Delivered')
+                ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
                 ->whereRaw("MONTH({$dateExpr}) = ?", [$targetMonthNum])
                 ->select(DB::raw('SUM(order_items.quantity) as qty'))
                 ->groupBy(DB::raw("YEAR({$dateExpr})"))
@@ -129,7 +129,7 @@ class ForecastService
             $storeOverallAvg = DB::table('order_items')
                 ->join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-                ->where('orders.order_status', 'Delivered')
+                ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
                 ->select(DB::raw('SUM(order_items.quantity) as qty'))
                 ->groupBy(DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m')"))
                 ->pluck('qty')
@@ -162,7 +162,7 @@ class ForecastService
         $recordedMonths = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-            ->where('orders.order_status', 'Delivered')
+            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
             ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear])
             ->select(
                 DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m') as ym"),
@@ -199,7 +199,7 @@ class ForecastService
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
             ->join('products', 'order_items.product_id', '=', 'products.id')
-            ->where('orders.order_status', 'Delivered')
+            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
             ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') = ?", [$referenceYm])
             ->select(
                 'products.id as product_id',
@@ -304,7 +304,7 @@ class ForecastService
         $baseQuery = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-            ->where('orders.order_status', 'Delivered');
+            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted']);
 
         if ($productId) {
             $baseQuery->where('order_items.product_id', $productId);

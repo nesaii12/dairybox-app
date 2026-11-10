@@ -26,6 +26,8 @@
                     <option value="Ready for Pickup" {{ request('status') === 'Ready for Pickup' ? 'selected' : '' }}>Ready for Pickup</option>
                     <option value="Out for Delivery" {{ request('status') === 'Out for Delivery' ? 'selected' : '' }}>Out for Delivery</option>
                     <option value="Delivered" {{ request('status') === 'Delivered' ? 'selected' : '' }}>Delivered</option>
+                    <option value="Delivered - Pending Remittance" {{ request('status') === 'Delivered - Pending Remittance' ? 'selected' : '' }}>Delivered - Pending Remittance</option>
+                    <option value="Paid & Remitted" {{ request('status') === 'Paid & Remitted' ? 'selected' : '' }}>Paid & Remitted</option>
                     <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
                 </select>
             </div>
@@ -136,6 +138,8 @@
                                 'Ready for Pickup' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
                                 'Out for Delivery' => 'bg-purple-50 text-purple-700 border-purple-100',
                                 'Delivered' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+                                'Delivered - Pending Remittance' => 'bg-amber-50 text-amber-800 border-amber-200',
+                                'Paid & Remitted' => 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold',
                                 'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100',
                             ];
                             $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
