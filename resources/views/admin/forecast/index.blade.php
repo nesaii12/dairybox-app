@@ -224,12 +224,46 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
     <!-- Products Forecast & Inventory Planning Table (Columns 1-3) -->
-    <div class="lg:col-span-3">
+    <div class="lg:col-span-3 space-y-4">
+        @if(!empty($lastMonthStats['top_product']) && !empty($topForecastProduct))
+        <div class="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i class="bi bi-stars text-base"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+                            Next Month Top Seller Projection
+                        </span>
+                        @if($lastMonthStats['reference_label'])
+                            <span class="text-[11px] text-slate-500 font-medium">
+                                Based on {{ $lastMonthStats['reference_label'] }} sales momentum & seasonal trend
+                            </span>
+                        @endif
+                    </div>
+                    <p class="text-xs sm:text-sm text-slate-800 font-semibold mt-1">
+                        <strong class="text-indigo-950 font-black">{{ $topForecastProduct['name'] }} ({{ $topForecastProduct['size'] }})</strong>
+                        is projected to lead sales in <strong>{{ $targetMonthLabel }}</strong> with
+                        <strong class="text-indigo-700">{{ number_format($topForecastProduct['predicted_sales'], 1) }} units</strong>
+                        (₱{{ number_format($topForecastProduct['expected_revenue'], 2) }}),
+                        driven by its strong performance in {{ $lastMonthStats['reference_label'] ?? 'the previous month' }}
+                        @if($lastMonthStats['top_product']['product_id'] === $topForecastProduct['id'])
+                            where it ranked <strong>#1 in sales ({{ number_format($lastMonthStats['top_product']['qty']) }} units / ₱{{ number_format($lastMonthStats['top_product']['revenue'], 2) }})</strong>.
+                        @else
+                             alongside historical seasonal demand.
+                        @endif
+                    </p>
+                </div>
+            </div>
+        </div>
+        @endif
+
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-50/20">
                 <div>
                     <h3 class="text-sm font-bold text-slate-950">Product Demand Forecast & Inventory Planning</h3>
-                    <p class="text-xs text-slate-500">Anticipate future demand for <strong>{{ $targetMonthLabel }}</strong> and identify products requiring additional stock.</p>
+                    <p class="text-xs text-slate-500">Anticipate future demand for <strong>{{ $targetMonthLabel }}</strong> based on {{ $lastMonthStats['reference_label'] ?? 'last month' }} sales momentum and seasonal patterns.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">
                     <!-- Rows per page selection -->
@@ -262,6 +296,7 @@
                             <th class="py-4 px-6">Product</th>
                             <th class="py-4 px-6">Category</th>
                             <th class="py-4 px-6">Current Stock</th>
+                            <th class="py-4 px-6">{{ $lastMonthStats['reference_label'] ?? 'Last Month' }} Sales</th>
                             <th class="py-4 px-6">Forecast ({{ $targetMonth }})</th>
                             <th class="py-4 px-6">Expected Revenue</th>
                             <th class="py-4 px-6">Additional Stock Needed</th>
@@ -281,6 +316,9 @@
                             $stockoutRisk = $predictedSales !== null
                                 ? \App\Services\ForecastService::stockoutRisk($predictedSales, $product->stock)
                                 : 'unknown';
+                            $lastMonthItem = $lastMonthStats['products'][$product->id] ?? null;
+                            $isTopLastMonth = $lastMonthItem && $lastMonthItem['rank'] === 1 && $lastMonthItem['qty'] > 0;
+                            $isTopForecast = !empty($topForecastProduct) && $topForecastProduct['id'] === $product->id && $predictedSales > 0;
                         @endphp
                         <tr class="hover:bg-slate-50/50 transition-colors {{ ($selectedProduct && $selectedProduct->id === $product->id) ? 'bg-sky-50/40' : '' }}">
                             <td class="py-4 px-6 font-bold text-slate-900">
@@ -290,12 +328,32 @@
                                     <span>{{ $product->product_name }} ({{ $product->size }})</span>
                                     <i class="bi bi-bar-chart-line text-[10px] text-slate-400"></i>
                                 </a>
+                                @if($isTopLastMonth)
+                                    <span class="block mt-1">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <i class="bi bi-trophy-fill text-[8px]"></i> #1 Seller in {{ $lastMonthStats['reference_label'] }}
+                                        </span>
+                                    </span>
+                                @endif
                             </td>
                             <td class="py-4 px-6 text-slate-600 font-medium">{{ $product->category->category_name }}</td>
                             <td class="py-4 px-6 font-semibold text-slate-800">{{ $product->stock }} units</td>
+                            <td class="py-4 px-6">
+                                @if($lastMonthItem && $lastMonthItem['qty'] > 0)
+                                    <span class="font-bold text-slate-800">{{ number_format($lastMonthItem['qty']) }} units</span>
+                                    <span class="block text-[10px] text-slate-400 font-medium">₱{{ number_format($lastMonthItem['revenue'], 2) }}</span>
+                                @else
+                                    <span class="text-slate-400">0 units</span>
+                                @endif
+                            </td>
                             <td class="py-4 px-6 font-bold">
                                 @if($forecast)
-                                    <span class="text-indigo-600 text-sm font-black">{{ round($predictedSales, 1) }} units</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-indigo-600 text-sm font-black">{{ round($predictedSales, 1) }} units</span>
+                                        @if($isTopForecast)
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-100 text-indigo-700">Top Forecast</span>
+                                        @endif
+                                    </div>
                                     <p class="text-[9px] text-slate-400 font-medium">Updated {{ $forecast->updated_at->format('M d, Y') }}</p>
                                 @else
                                     <span class="text-slate-400 italic">Not generated</span>
@@ -357,7 +415,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="8" class="py-12 text-center text-slate-400 italic">No products found.</td>
+                            <td colspan="9" class="py-12 text-center text-slate-400 italic">No products found.</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -389,7 +447,7 @@
                         <div class="flex items-center justify-between text-xs p-2 rounded-xl {{ $sMonth['seasonal_index'] >= 1.15 ? 'bg-amber-50/70 border border-amber-200/70' : 'bg-slate-50 border border-slate-100' }}">
                             <div>
                                 <span class="font-bold text-slate-800">{{ $sMonth['full_name'] }}</span>
-                                <span class="block text-[10px] text-slate-400">Avg: {{ $sMonth['avg_qty'] }} units</span>
+                                <span class="block text-[10px] text-slate-400">Avg: {{ $sMonth['avg_qty'] }} units (₱{{ number_format($sMonth['avg_revenue'], 2) }})</span>
                             </div>
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-black {{ $sMonth['seasonal_index'] >= 1.15 ? 'bg-amber-500 text-slate-950' : ($sMonth['seasonal_index'] >= 0.9 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-700') }}">
                                 {{ $sMonth['seasonal_index'] }}x
@@ -402,6 +460,32 @@
             @endif
         </div>
 
+        @if(!empty($analytics['high_sales_days']))
+        <!-- Peak High Sales Days Card -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-3">
+            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider pb-3 border-b border-slate-100 flex items-center space-x-2">
+                <i class="bi bi-graph-up text-emerald-600"></i>
+                <span>High Sales Days</span>
+            </h3>
+            <p class="text-[11px] text-slate-500 leading-relaxed">
+                Top recorded single-day sales dates ({{ $selectedProduct ? $selectedProduct->product_name : 'Storewide' }}):
+            </p>
+            <div class="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                @foreach($analytics['high_sales_days'] as $highDay)
+                    <div class="flex items-center justify-between text-xs px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <div>
+                            <span class="font-bold text-slate-800">{{ $highDay['label'] }}</span>
+                            <span class="block text-[10px] text-slate-400">{{ number_format($highDay['total_qty']) }} units</span>
+                        </div>
+                        <span class="font-extrabold text-emerald-700 text-[11px]">
+                            ₱{{ number_format($highDay['total_revenue'], 2) }}
+                        </span>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         <!-- Forecasting Methodology -->
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
             <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider pb-3 border-b border-slate-100 flex items-center space-x-2">
@@ -411,8 +495,8 @@
             
             <div class="space-y-3 text-slate-600 text-xs">
                 <div class="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1">
-                    <span class="block text-[9px] font-black text-slate-400 uppercase tracking-wider">1. Historical Trend Analysis</span>
-                    <p class="font-medium text-slate-700 leading-relaxed">Applies Linear Regression over monthly historical sales records to measure long-term demand growth or decline.</p>
+                    <span class="block text-[9px] font-black text-slate-400 uppercase tracking-wider">1. Last-Month Momentum & Trend</span>
+                    <p class="font-medium text-slate-700 leading-relaxed">Combines recent sales momentum (weighting last month's best-selling products) with Linear Regression across historical months.</p>
                 </div>
                 
                 <div class="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1">
@@ -482,6 +566,7 @@
                 return {
                     label: String(series.year) + ' Sales (Units)',
                     data: series.quantities,
+                    revenues: series.revenues,
                     borderColor: color.border,
                     backgroundColor: color.bg,
                     borderWidth: 2.5,
@@ -519,7 +604,9 @@
                         tooltip: {
                             callbacks: {
                                 label: function(ctx) {
-                                    return ' ' + ctx.dataset.label + ': ' + Number(ctx.raw).toLocaleString() + ' units';
+                                    const rev = ctx.dataset.revenues ? Number(ctx.dataset.revenues[ctx.dataIndex] || 0) : 0;
+                                    const revFormatted = '₱' + rev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    return ' ' + ctx.dataset.label + ': ' + Number(ctx.raw).toLocaleString() + ' units (' + revFormatted + ')';
                                 }
                             }
                         }

@@ -22,16 +22,41 @@ class ForecastController extends Controller
 
         $allProducts = Product::where('status', 'active')->orderBy('product_name')->get();
 
-        $products = Product::with(['category', 'forecasts' => function($q) {
-            $q->orderBy('forecast_month', 'desc');
-        }])->latest()->paginate($perPage)->withQueryString();
-
         // Next calendar month
         $targetMonth = Carbon::now()->addMonth()->format('Y-m');
         $targetMonthLabel = Carbon::now()->addMonth()->format('F Y');
 
         // Historical Sales Trend & Seasonal Demand Analytics
         $analytics = ForecastService::getHistoricalAnalytics($selectedProduct?->id);
+
+        // Last Month Product Sales Stats (drives next-month momentum predictions)
+        $lastMonthStats = ForecastService::getLastMonthProductStats($targetMonth);
+
+        // Auto-generate forecasts for targetMonth if historical sales exist and any active product lacks a forecast
+        if ($analytics['has_data']) {
+            $missingForecastCount = Product::where('status', 'active')
+                ->whereDoesntHave('forecasts', function ($q) use ($targetMonth) {
+                    $q->where('forecast_month', $targetMonth);
+                })
+                ->count();
+
+            if ($missingForecastCount > 0) {
+                ForecastService::generateAllProducts($targetMonth);
+            }
+        }
+
+        $products = Product::with(['category', 'forecasts' => function($q) {
+            $q->orderBy('forecast_month', 'desc');
+        }])
+        ->orderByDesc(
+            Forecast::select('predicted_sales')
+                ->whereColumn('forecasts.product_id', 'products.id')
+                ->where('forecast_month', $targetMonth)
+                ->limit(1)
+        )
+        ->latest()
+        ->paginate($perPage)
+        ->withQueryString();
 
         // Overall inventory planning summary across all active products for targetMonth
         $activeForecastProducts = Product::where('status', 'active')
@@ -43,6 +68,7 @@ class ForecastController extends Controller
         $totalPredictedUnits = 0;
         $totalRestockUnits = 0;
         $productsRequiringStock = 0;
+        $topForecastProduct = null;
 
         foreach ($activeForecastProducts as $prod) {
             $fc = $prod->forecasts->first();
@@ -54,6 +80,15 @@ class ForecastController extends Controller
                 if ($restock > 0) {
                     $productsRequiringStock++;
                 }
+                if (!$topForecastProduct || $pred > $topForecastProduct['predicted_sales']) {
+                    $topForecastProduct = [
+                        'id' => $prod->id,
+                        'name' => $prod->product_name,
+                        'size' => $prod->size,
+                        'predicted_sales' => $pred,
+                        'expected_revenue' => round($pred * (float) $prod->price, 2),
+                    ];
+                }
             }
         }
 
@@ -64,6 +99,8 @@ class ForecastController extends Controller
             'targetMonth',
             'targetMonthLabel',
             'analytics',
+            'lastMonthStats',
+            'topForecastProduct',
             'totalPredictedUnits',
             'totalRestockUnits',
             'productsRequiringStock'

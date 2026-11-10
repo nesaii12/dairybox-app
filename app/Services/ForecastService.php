@@ -11,13 +11,13 @@ class ForecastService
 {
     /**
      * Predict demand for a product in a target month using
-     * linear regression with seasonal adjustment.
+     * last-month sales momentum combined with linear regression and seasonal adjustment.
      */
     public static function predictProductDemand(int $productId, string $targetMonthYear): float
     {
         $dateExpr = "COALESCE(sales.sales_date, DATE(orders.created_at))";
 
-        // Fetch monthly sales history for the product
+        // Fetch monthly sales history for the product prior to the target month
         $salesHistory = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
@@ -27,23 +27,58 @@ class ForecastService
             )
             ->where('order_items.product_id', $productId)
             ->where('orders.order_status', 'Delivered')
+            ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear])
             ->groupBy('month')
             ->orderBy('month', 'asc')
             ->get();
 
         $n = $salesHistory->count();
-        if ($n < 3) {
-            // Not enough data — fall back to simple average
-            return $salesHistory->avg('total_qty') ?? 0.0;
+        if ($n === 0) {
+            return 0.0;
         }
 
-        // Linear Regression: y = slope * x + intercept
+        // Handle partial ongoing current month so early-month data doesn't drag down momentum or trend
+        $currentYm = Carbon::now()->format('Y-m');
+        $latestRec = $salesHistory->last();
+        $prevRec = $n >= 2 ? $salesHistory->slice(-2, 1)->first() : null;
+
+        $effectiveHistory = $salesHistory->values();
+        if (
+            $n >= 2
+            && $latestRec->month === $currentYm
+            && Carbon::now()->day < 25
+            && (float) $latestRec->total_qty < (float) $prevRec->total_qty
+        ) {
+            // Use completed months for regression trend if current month is still early/partial,
+            // while keeping the higher of current vs last completed month for recent momentum
+            $regressionHistory = $salesHistory->slice(0, $n - 1)->values();
+            $lastMonthQty = max((float) $latestRec->total_qty, (float) $prevRec->total_qty);
+            $priorMonthQty = $n >= 3
+                ? (float) $salesHistory->slice(-3, 1)->first()->total_qty
+                : (float) $prevRec->total_qty;
+            $referenceMonthNum = (int) date('m', strtotime($prevRec->month . '-01'));
+        } else {
+            $regressionHistory = $effectiveHistory;
+            $lastMonthQty = (float) $latestRec->total_qty;
+            $priorMonthQty = $prevRec ? (float) $prevRec->total_qty : $lastMonthQty;
+            $referenceMonthNum = (int) date('m', strtotime($latestRec->month . '-01'));
+        }
+
+        // 1. Recent Momentum Forecast (anchored on last month's sales so top sellers last month lead next month)
+        $recentMomentum = ($lastMonthQty * 0.75) + ($priorMonthQty * 0.25);
+
+        $regCount = $regressionHistory->count();
+        if ($regCount < 2) {
+            return round(max(0.0, $recentMomentum), 2);
+        }
+
+        // 2. Linear Regression Trend: y = slope * x + intercept
         $sumX = 0;
         $sumY = 0;
         $sumXY = 0;
         $sumX2 = 0;
 
-        foreach ($salesHistory as $index => $history) {
+        foreach ($regressionHistory as $index => $history) {
             $x = $index + 1;
             $y = (float) $history->total_qty;
             $sumX += $x;
@@ -52,17 +87,16 @@ class ForecastService
             $sumX2 += $x * $x;
         }
 
-        $denominator = $n * $sumX2 - $sumX * $sumX;
+        $denominator = $regCount * $sumX2 - $sumX * $sumX;
         $slope = $denominator != 0
-            ? ($n * $sumXY - $sumX * $sumY) / $denominator
+            ? ($regCount * $sumXY - $sumX * $sumY) / $denominator
             : 0;
-        $intercept = ($sumY - $slope * $sumX) / $n;
+        $intercept = ($sumY - $slope * $sumX) / $regCount;
 
-        // Predict for next month index
-        $predictedIndex = $n + 1;
-        $trendForecast = $slope * $predictedIndex + $intercept;
+        $predictedIndex = $regCount + 1;
+        $trendForecast = max(0.0, $slope * $predictedIndex + $intercept);
 
-        // Apply seasonal adjustment if we have data for the same calendar month
+        // 3. Seasonal Adjustment for target calendar month
         $targetMonthNum = (int) date('m', strtotime($targetMonthYear . '-01'));
         $seasonalData = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
@@ -74,15 +108,136 @@ class ForecastService
             ->groupBy(DB::raw("YEAR({$dateExpr})"))
             ->pluck('qty');
 
-        if ($seasonalData->isNotEmpty()) {
-            $seasonalAverage = $seasonalData->avg();
-            $overallAverage = $sumY / max(1, $n);
+        $overallAverage = $sumY / max(1, $regCount);
+        $seasonalIndex = 1.0;
 
-            $seasonalIndex = $overallAverage > 0 ? ($seasonalAverage / $overallAverage) : 1.0;
-            return max(0.0, $trendForecast * $seasonalIndex);
+        if ($seasonalData->isNotEmpty() && $overallAverage > 0) {
+            $seasonalAverage = (float) $seasonalData->avg();
+            $seasonalIndex = $seasonalAverage / $overallAverage;
+        } else {
+            // Fall back to storewide seasonal index for that calendar month if product-specific month is not yet recorded
+            $storeMonthAvg = DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
+                ->where('orders.order_status', 'Delivered')
+                ->whereRaw("MONTH({$dateExpr}) = ?", [$targetMonthNum])
+                ->select(DB::raw('SUM(order_items.quantity) as qty'))
+                ->groupBy(DB::raw("YEAR({$dateExpr})"))
+                ->pluck('qty')
+                ->avg();
+
+            $storeOverallAvg = DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
+                ->where('orders.order_status', 'Delivered')
+                ->select(DB::raw('SUM(order_items.quantity) as qty'))
+                ->groupBy(DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m')"))
+                ->pluck('qty')
+                ->avg();
+
+            if ($storeMonthAvg && $storeOverallAvg > 0) {
+                $seasonalIndex = (float) $storeMonthAvg / (float) $storeOverallAvg;
+            }
         }
 
-        return max(0.0, $trendForecast);
+        $clampedSeasonal = max(0.75, min(1.35, $seasonalIndex));
+        $seasonalTrendForecast = $trendForecast * $clampedSeasonal;
+        $seasonalMomentumForecast = $recentMomentum * max(0.85, min(1.25, $seasonalIndex));
+
+        // Blend 65% recent last-month momentum with 35% seasonal trend so last month's top-selling product leads next month
+        $blended = (0.65 * $seasonalMomentumForecast) + (0.35 * $seasonalTrendForecast);
+
+        return round(max(0.0, $blended), 2);
+    }
+
+    /**
+     * Retrieve last month's sales performance per product to explain next-month demand predictions.
+     */
+    public static function getLastMonthProductStats(?string $targetMonthYear = null): array
+    {
+        $targetMonthYear = $targetMonthYear ?? Carbon::now()->addMonth()->format('Y-m');
+        $dateExpr = "COALESCE(sales.sales_date, DATE(orders.created_at))";
+
+        // Find the latest recorded month prior to targetMonthYear
+        $recordedMonths = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
+            ->where('orders.order_status', 'Delivered')
+            ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear])
+            ->select(
+                DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m') as ym"),
+                DB::raw("SUM(order_items.quantity) as total_qty")
+            )
+            ->groupBy('ym')
+            ->orderBy('ym', 'desc')
+            ->limit(2)
+            ->get();
+
+        if ($recordedMonths->isEmpty()) {
+            return [
+                'reference_ym' => null,
+                'reference_label' => null,
+                'products' => [],
+                'top_product' => null,
+            ];
+        }
+
+        // If the most recent month is the current ongoing month and is still partial compared to the last full month,
+        // pick the month with the more complete dataset or combine reference awareness
+        $latest = $recordedMonths->first();
+        $previous = $recordedMonths->count() > 1 ? $recordedMonths->get(1) : null;
+        $currentYm = Carbon::now()->format('Y-m');
+
+        $referenceYm = (
+            $previous
+            && $latest->ym === $currentYm
+            && Carbon::now()->day < 25
+            && (int) $latest->total_qty < (int) $previous->total_qty
+        ) ? $previous->ym : $latest->ym;
+
+        $rows = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->where('orders.order_status', 'Delivered')
+            ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') = ?", [$referenceYm])
+            ->select(
+                'products.id as product_id',
+                'products.product_name',
+                'products.size',
+                DB::raw('SUM(order_items.quantity) as total_qty'),
+                DB::raw('SUM(order_items.subtotal) as total_revenue')
+            )
+            ->groupBy('products.id', 'products.product_name', 'products.size')
+            ->orderByDesc('total_qty')
+            ->get();
+
+        $productMap = [];
+        foreach ($rows as $idx => $row) {
+            $productMap[(int) $row->product_id] = [
+                'product_id' => (int) $row->product_id,
+                'product_name' => $row->product_name,
+                'size' => $row->size,
+                'qty' => (int) $row->total_qty,
+                'revenue' => (float) $row->total_revenue,
+                'rank' => $idx + 1,
+            ];
+        }
+
+        $topRow = $rows->first();
+
+        return [
+            'reference_ym' => $referenceYm,
+            'reference_label' => Carbon::createFromFormat('Y-m', $referenceYm)->format('F Y'),
+            'products' => $productMap,
+            'top_product' => $topRow ? [
+                'product_id' => (int) $topRow->product_id,
+                'product_name' => $topRow->product_name,
+                'size' => $topRow->size,
+                'qty' => (int) $topRow->total_qty,
+                'revenue' => (float) $topRow->total_revenue,
+            ] : null,
+        ];
     }
 
     /**
@@ -266,11 +421,22 @@ class ForecastService
 
         // Trend slope direction across chronological months
         $n = $monthlyRecords->count();
+        $currentYm = Carbon::now()->format('Y-m');
+        $trendRecords = (
+            $n >= 3
+            && $latestRecord
+            && $prevRecord
+            && $latestRecord->ym === $currentYm
+            && Carbon::now()->day < 25
+            && (float) $latestRecord->total_qty < (float) $prevRecord->total_qty
+        ) ? $monthlyRecords->slice(0, $n - 1)->values() : $monthlyRecords->values();
+
+        $trendCount = $trendRecords->count();
         $trendDirection = 'insufficient';
         $trendSlope = 0.0;
-        if ($n >= 2) {
+        if ($trendCount >= 2) {
             $sumX = 0; $sumY = 0; $sumXY = 0; $sumX2 = 0;
-            foreach ($monthlyRecords->values() as $idx => $rec) {
+            foreach ($trendRecords as $idx => $rec) {
                 $x = $idx + 1;
                 $y = (float) $rec->total_qty;
                 $sumX += $x;
@@ -278,8 +444,8 @@ class ForecastService
                 $sumXY += $x * $y;
                 $sumX2 += $x * $x;
             }
-            $denom = ($n * $sumX2) - ($sumX * $sumX);
-            $trendSlope = $denom != 0 ? round((($n * $sumXY) - ($sumX * $sumY)) / $denom, 2) : 0.0;
+            $denom = ($trendCount * $sumX2) - ($sumX * $sumX);
+            $trendSlope = $denom != 0 ? round((($trendCount * $sumXY) - ($sumX * $sumY)) / $denom, 2) : 0.0;
             if ($trendSlope > 0.5) {
                 $trendDirection = 'upward';
             } elseif ($trendSlope < -0.5) {
@@ -288,6 +454,25 @@ class ForecastService
                 $trendDirection = 'stable';
             }
         }
+
+        // Top High Sales Days recorded in history
+        $highSalesDays = (clone $baseQuery)
+            ->select(
+                DB::raw("{$dateExpr} as sales_day"),
+                DB::raw("SUM(order_items.quantity) as total_qty"),
+                DB::raw("SUM(order_items.subtotal) as total_revenue")
+            )
+            ->groupBy('sales_day')
+            ->orderByDesc('total_revenue')
+            ->limit(10)
+            ->get()
+            ->map(fn($d) => [
+                'date' => $d->sales_day,
+                'label' => Carbon::parse($d->sales_day)->format('M j, Y'),
+                'total_qty' => (int) $d->total_qty,
+                'total_revenue' => (float) $d->total_revenue,
+            ])
+            ->toArray();
 
         // Timeline labels & values for chronological trend chart
         $timelineLabels = $monthlyRecords->map(fn($r) => Carbon::createFromFormat('Y-m', $r->ym)->format('M Y'))->values()->toArray();
@@ -306,6 +491,7 @@ class ForecastService
             'peak_seasonal_month' => $peakSeasonalMonth,
             'low_seasonal_month' => $lowSeasonalMonth,
             'peak_historical_period' => $peakHistoricalPeriod,
+            'high_sales_days' => $highSalesDays,
             'mom_growth' => $momGrowth,
             'trend_direction' => $trendDirection,
             'trend_slope' => $trendSlope,
