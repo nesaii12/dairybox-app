@@ -329,6 +329,63 @@
         </div>
     </div>
 
+    <!-- Inventory Logs Export Panel -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <i class="bi bi-archive-fill"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-950">Inventory Transaction Logs Export</h3>
+                    <p class="text-[10px] text-slate-400 font-medium">Export batch intake lists, stock deductions, and FIFO audits</p>
+                </div>
+            </div>
+        </div>
+
+        <form action="" method="GET" id="inventory-form" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                    <label for="inv_filter" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Window</label>
+                    <select name="filter_type" id="inv_filter" onchange="toggleInvDateFields()"
+                        class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500">
+                        <option value="daily">Daily Logs (Today)</option>
+                        <option value="weekly">Weekly Logs (This Week)</option>
+                        <option value="monthly" selected>Monthly Logs (This Month)</option>
+                        <option value="annual">Annual Logs (This Year)</option>
+                        <option value="custom">Custom Date Range...</option>
+                    </select>
+                </div>
+
+                <div id="inv_custom_dates" class="sm:col-span-2 grid grid-cols-2 gap-3" style="display: none;">
+                    <div>
+                        <label for="inv_start" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
+                        <input type="date" name="start_date" id="inv_start"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs">
+                    </div>
+                    <div>
+                        <label for="inv_end" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
+                        <input type="date" name="end_date" id="inv_end"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs">
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-3 flex items-center gap-3">
+                <button type="button" onclick="submitInventoryReport('excel')"
+                    class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 transition-colors shadow-2xs cursor-pointer">
+                    <i class="bi bi-file-earmark-excel-fill text-sm"></i>
+                    <span>Export Inventory Excel</span>
+                </button>
+                <button type="button" onclick="submitInventoryReport('pdf')"
+                    class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 transition-colors shadow-2xs cursor-pointer">
+                    <i class="bi bi-file-earmark-pdf-fill text-sm"></i>
+                    <span>Export Inventory PDF</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Sales Transaction Ledger -->
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
@@ -398,63 +455,6 @@
                 {{ $salesLedger->links() }}
             </div>
         @endif
-    </div>
-
-    <!-- Inventory Logs Export Panel (Maintained cleanly for system completeness) -->
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-            <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <i class="bi bi-archive-fill"></i>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-slate-950">Inventory Transaction Logs Export</h3>
-                    <p class="text-[10px] text-slate-400 font-medium">Export batch intake lists, stock deductions, and FIFO audits</p>
-                </div>
-            </div>
-        </div>
-
-        <form action="" method="GET" id="inventory-form" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                <div>
-                    <label for="inv_filter" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Window</label>
-                    <select name="filter_type" id="inv_filter" onchange="toggleInvDateFields()"
-                        class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500">
-                        <option value="daily">Daily Logs (Today)</option>
-                        <option value="weekly">Weekly Logs (This Week)</option>
-                        <option value="monthly" selected>Monthly Logs (This Month)</option>
-                        <option value="annual">Annual Logs (This Year)</option>
-                        <option value="custom">Custom Date Range...</option>
-                    </select>
-                </div>
-
-                <div id="inv_custom_dates" class="sm:col-span-2 grid grid-cols-2 gap-3" style="display: none;">
-                    <div>
-                        <label for="inv_start" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
-                        <input type="date" name="start_date" id="inv_start"
-                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs">
-                    </div>
-                    <div>
-                        <label for="inv_end" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
-                        <input type="date" name="end_date" id="inv_end"
-                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs">
-                    </div>
-                </div>
-            </div>
-
-            <div class="pt-3 flex items-center gap-3">
-                <button type="button" onclick="submitInventoryReport('excel')"
-                    class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 transition-colors shadow-2xs cursor-pointer">
-                    <i class="bi bi-file-earmark-excel-fill text-sm"></i>
-                    <span>Export Inventory Excel</span>
-                </button>
-                <button type="button" onclick="submitInventoryReport('pdf')"
-                    class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 transition-colors shadow-2xs cursor-pointer">
-                    <i class="bi bi-file-earmark-pdf-fill text-sm"></i>
-                    <span>Export Inventory PDF</span>
-                </button>
-            </div>
-        </form>
     </div>
 </div>
 @endsection
