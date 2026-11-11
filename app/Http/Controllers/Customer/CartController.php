@@ -401,14 +401,34 @@ class CartController extends Controller
 
     public function placeOrder(Request $request, XenditService $xenditService)
     {
+        $nowInManila = Carbon::now('Asia/Manila');
+        $todayStr = $nowInManila->format('Y-m-d');
+
         $request->validate([
             'batch_id' => 'nullable|integer',
             'order_type' => 'required|in:Delivery,Pickup',
             'delivery_address' => 'required_if:order_type,Delivery|nullable|string|max:255',
-            'schedule_date' => 'required|date|after_or_equal:today',
-            'schedule_time' => 'required',
+            'schedule_date' => 'required|date|after_or_equal:' . $todayStr,
+            'schedule_time' => 'required|in:08:00:00,13:00:00',
             'payment_method' => 'required|in:cod,xendit',
         ]);
+
+        // Validate time slot cutoff if schedule_date is today
+        if ($request->schedule_date === $todayStr) {
+            $currentTimeMinutes = ((int)$nowInManila->format('G')) * 60 + ((int)$nowInManila->format('i'));
+
+            if ($request->schedule_time === '08:00:00' && $currentTimeMinutes >= 720) {
+                return back()->withInput()->withErrors([
+                    'schedule_time' => 'The Morning time slot (08:00 AM - 12:00 PM) has already passed for today. Please select the Afternoon slot or choose a future delivery date.'
+                ]);
+            }
+
+            if ($request->schedule_time === '13:00:00' && $currentTimeMinutes >= 1020) {
+                return back()->withInput()->withErrors([
+                    'schedule_time' => 'All delivery slots for today have ended (cut-off 5:00 PM). Please select tomorrow or a later delivery date.'
+                ]);
+            }
+        }
 
         $batchQuery = Cart::where('customer_id', auth()->id())->has('cartItems');
         if ($request->filled('batch_id')) {
