@@ -17,7 +17,7 @@
             <p class="text-xs text-slate-500">Configure product specifications, select or upload flavor photos, and set initial FIFO stock.</p>
         </div>
 
-        <form action="{{ route('admin.products.store') }}" method="POST" enctype="multipart/form-data" class="mt-8 space-y-6" id="productForm">
+        <form action="{{ route('admin.products.store') }}" method="POST" enctype="multipart/form-data" class="mt-8 space-y-6" id="productForm" onsubmit="return validateCreateDates(event)">
             @csrf
 
             <!-- Product Details Group -->
@@ -174,16 +174,27 @@
                     <div>
                         <label for="manufacturing_date" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Manufacturing Date</label>
                         <input type="date" name="manufacturing_date" id="manufacturing_date" value="{{ old('manufacturing_date', date('Y-m-d')) }}" max="{{ date('Y-m-d') }}"
+                            oninput="syncCreateDates()" onchange="syncCreateDates()"
                             class="mt-1.5 block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 text-xs transition-all">
                         @error('manufacturing_date')
                             <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                         @enderror
                     </div>
 
+                    @php
+                        $createMfgVal = old('manufacturing_date', date('Y-m-d'));
+                        $createMinExpiry = $createMfgVal ? \Carbon\Carbon::parse($createMfgVal)->addDay()->format('Y-m-d') : '';
+                    @endphp
                     <div>
                         <label for="expiration_date" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expiration Date</label>
                         <input type="date" name="expiration_date" id="expiration_date" value="{{ old('expiration_date') }}"
+                            @if($createMinExpiry) min="{{ $createMinExpiry }}" @endif
+                            oninput="syncCreateDates()" onchange="syncCreateDates()"
                             class="mt-1.5 block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 text-xs transition-all">
+                        <p id="create_date_error" class="hidden text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                            <i class="bi bi-exclamation-circle-fill"></i>
+                            <span id="create_date_error_text">Expiration date must be strictly after the manufacturing date.</span>
+                        </p>
                         @error('expiration_date')
                             <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                         @enderror
@@ -247,7 +258,7 @@
                 <a href="{{ route('admin.products.index') }}" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-bold transition-all">
                     Cancel
                 </a>
-                <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-100 transition-all cursor-pointer">
+                <button type="submit" id="createSubmitBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-100 transition-all cursor-pointer">
                     Register Product
                 </button>
             </div>
@@ -298,5 +309,90 @@
         if (fileInput) fileInput.value = '';
         document.getElementById('previewContainer').classList.add('hidden');
     }
+
+    function syncCreateDates(showErrorImmediately = true) {
+        const mfgInput = document.getElementById('manufacturing_date');
+        const expInput = document.getElementById('expiration_date');
+        const errContainer = document.getElementById('create_date_error');
+        const errText = document.getElementById('create_date_error_text');
+        const submitBtn = document.getElementById('createSubmitBtn');
+
+        if (!mfgInput || !expInput) return true;
+
+        const mfgVal = mfgInput.value;
+        const expVal = expInput.value;
+
+        if (mfgVal) {
+            const parts = mfgVal.split('-');
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+
+            const nextDay = new Date(year, month - 1, day + 1);
+            const nextY = nextDay.getFullYear();
+            const nextM = String(nextDay.getMonth() + 1).padStart(2, '0');
+            const nextD = String(nextDay.getDate()).padStart(2, '0');
+            const minExpiryStr = `${nextY}-${nextM}-${nextD}`;
+
+            expInput.min = minExpiryStr;
+
+            if (expVal && expVal <= mfgVal) {
+                if (showErrorImmediately) {
+                    if (errContainer && errText) {
+                        const mfgDateObj = new Date(year, month - 1, day);
+                        const formattedMfg = mfgDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        errText.textContent = `Expiration date must be strictly after the manufacturing date (${formattedMfg}).`;
+                        errContainer.classList.remove('hidden');
+                    }
+                    expInput.classList.remove('border-slate-200', 'bg-white', 'focus:border-sky-500', 'focus:ring-sky-500/10');
+                    expInput.classList.add('border-rose-500', 'bg-rose-50/40', 'focus:border-rose-500', 'focus:ring-rose-500/20', 'text-rose-900');
+                }
+
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                return false;
+            }
+        } else {
+            expInput.removeAttribute('min');
+        }
+
+        if (errContainer) {
+            errContainer.classList.add('hidden');
+        }
+        expInput.classList.remove('border-rose-500', 'bg-rose-50/40', 'focus:border-rose-500', 'focus:ring-rose-500/20', 'text-rose-900');
+        expInput.classList.add('border-slate-200', 'bg-white', 'focus:border-sky-500', 'focus:ring-sky-500/10');
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        return true;
+    }
+
+    function validateCreateDates(event) {
+        const isValid = syncCreateDates(true);
+        if (!isValid) {
+            if (event) event.preventDefault();
+            const expInput = document.getElementById('expiration_date');
+            if (expInput) expInput.focus();
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Expiration Date',
+                    text: 'Expiration date must be strictly after the manufacturing date.',
+                    confirmButtonColor: '#0284c7'
+                });
+            }
+            return false;
+        }
+        return true;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        syncCreateDates(false);
+    });
 </script>
 @endsection

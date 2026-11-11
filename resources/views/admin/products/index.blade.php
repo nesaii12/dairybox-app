@@ -209,7 +209,7 @@
                                          </div>
 
                                          <!-- Body Form -->
-                                         <form action="{{ route('admin.products.update', $product->id) }}" method="POST" enctype="multipart/form-data" class="flex-grow overflow-y-auto p-6 space-y-5">
+                                         <form action="{{ route('admin.products.update', $product->id) }}" method="POST" enctype="multipart/form-data" id="editProductForm_{{ $product->id }}" onsubmit="return validateProductDates({{ $product->id }}, event)" class="flex-grow overflow-y-auto p-6 space-y-5">
                                              @csrf
                                              @method('PUT')
 
@@ -313,14 +313,25 @@
                                                  <div class="space-y-1 text-left">
                                                      <label for="manufacturing_date_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Manufacturing Date</label>
                                                      <input type="date" name="manufacturing_date" id="manufacturing_date_{{ $product->id }}" value="{{ old('manufacturing_date', $product->manufacturing_date ? \Carbon\Carbon::parse($product->manufacturing_date)->format('Y-m-d') : '') }}" max="{{ date('Y-m-d') }}"
+                                                         oninput="syncProductDates({{ $product->id }})" onchange="syncProductDates({{ $product->id }})"
                                                          class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all">
                                                  </div>
 
                                                  <!-- Expiration Date -->
+                                                 @php
+                                                     $mfgVal = old('manufacturing_date', $product->manufacturing_date ? \Carbon\Carbon::parse($product->manufacturing_date)->format('Y-m-d') : '');
+                                                     $minExpiry = $mfgVal ? \Carbon\Carbon::parse($mfgVal)->addDay()->format('Y-m-d') : '';
+                                                 @endphp
                                                  <div class="space-y-1 text-left">
                                                      <label for="expiration_date_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Expiration Date</label>
                                                      <input type="date" name="expiration_date" id="expiration_date_{{ $product->id }}" value="{{ old('expiration_date', $product->expiration_date ? \Carbon\Carbon::parse($product->expiration_date)->format('Y-m-d') : '') }}"
+                                                         @if($minExpiry) min="{{ $minExpiry }}" @endif
+                                                         oninput="syncProductDates({{ $product->id }})" onchange="syncProductDates({{ $product->id }})"
                                                          class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all">
+                                                     <p id="date_error_{{ $product->id }}" class="hidden text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                                                         <i class="bi bi-exclamation-circle-fill"></i>
+                                                         <span id="date_error_text_{{ $product->id }}">Expiration date must be strictly after the manufacturing date.</span>
+                                                     </p>
                                                  </div>
 
                                                  <!-- Status -->
@@ -363,7 +374,7 @@
                                                  <button type="button" onclick="toggleEditProductModal({{ $product->id }})" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold transition-all cursor-pointer">
                                                      Cancel
                                                  </button>
-                                                 <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-100 transition-all cursor-pointer">
+                                                 <button type="submit" id="submitBtn_{{ $product->id }}" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-100 transition-all cursor-pointer">
                                                      Update Product
                                                  </button>
                                              </div>
@@ -448,14 +459,111 @@
         }
     }
 
+    function syncProductDates(productId, showErrorImmediately = true) {
+        const mfgInput = document.getElementById('manufacturing_date_' + productId);
+        const expInput = document.getElementById('expiration_date_' + productId);
+        const errContainer = document.getElementById('date_error_' + productId);
+        const errText = document.getElementById('date_error_text_' + productId);
+        const submitBtn = document.getElementById('submitBtn_' + productId);
+
+        if (!mfgInput || !expInput) return true;
+
+        const mfgVal = mfgInput.value;
+        const expVal = expInput.value;
+
+        if (mfgVal) {
+            // Parse manufacturing date
+            const parts = mfgVal.split('-');
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+
+            // Earliest allowable expiration date is day + 1 (strictly after manufacturing date)
+            const nextDay = new Date(year, month - 1, day + 1);
+            const nextY = nextDay.getFullYear();
+            const nextM = String(nextDay.getMonth() + 1).padStart(2, '0');
+            const nextD = String(nextDay.getDate()).padStart(2, '0');
+            const minExpiryStr = `${nextY}-${nextM}-${nextD}`;
+
+            // This makes all dates on or before manufacturing date unclickable and greyed out in the datepicker
+            expInput.min = minExpiryStr;
+
+            // Real-time validation check: expiry date cannot be on or before manufacturing date
+            if (expVal && expVal <= mfgVal) {
+                if (showErrorImmediately) {
+                    if (errContainer && errText) {
+                        const mfgDateObj = new Date(year, month - 1, day);
+                        const formattedMfg = mfgDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        errText.textContent = `Expiration date must be strictly after the manufacturing date (${formattedMfg}).`;
+                        errContainer.classList.remove('hidden');
+                    }
+                    expInput.classList.remove('border-slate-200', 'bg-slate-50', 'focus:border-sky-500', 'focus:ring-sky-500/20');
+                    expInput.classList.add('border-rose-500', 'bg-rose-50/40', 'focus:border-rose-500', 'focus:ring-rose-500/20', 'text-rose-900');
+                }
+
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                return false;
+            }
+        } else {
+            expInput.removeAttribute('min');
+        }
+
+        // Valid state
+        if (errContainer) {
+            errContainer.classList.add('hidden');
+        }
+        expInput.classList.remove('border-rose-500', 'bg-rose-50/40', 'focus:border-rose-500', 'focus:ring-rose-500/20', 'text-rose-900');
+        expInput.classList.add('border-slate-200', 'bg-slate-50', 'focus:border-sky-500', 'focus:ring-sky-500/20');
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        return true;
+    }
+
+    function validateProductDates(productId, event) {
+        const isValid = syncProductDates(productId, true);
+        if (!isValid) {
+            if (event) event.preventDefault();
+            const expInput = document.getElementById('expiration_date_' + productId);
+            if (expInput) {
+                expInput.focus();
+            }
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Expiration Date',
+                    text: 'Expiration date must be strictly after the manufacturing date.',
+                    confirmButtonColor: '#0284c7'
+                });
+            }
+            return false;
+        }
+        return true;
+    }
+
     function toggleEditProductModal(id) {
         const modal = document.getElementById('editProductModal-' + id);
         if (modal) {
             modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                syncProductDates(id, true);
+            }
         }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Initialize date constraints for all products rendered on page
+        document.querySelectorAll('[id^="manufacturing_date_"]').forEach(input => {
+            const prodId = input.id.replace('manufacturing_date_', '');
+            syncProductDates(prodId, false);
+        });
+
         const urlParams = new URLSearchParams(window.location.search);
         const editProductId = urlParams.get('edit_product_id');
         if (editProductId) {

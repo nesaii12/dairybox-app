@@ -80,10 +80,11 @@ class ProductController extends Controller
             'preset_image' => 'nullable|string|max:255',
             'initial_stock' => 'required|integer|min:0',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
-            'expiration_date' => 'nullable|date|after_or_equal:manufacturing_date',
+            'expiration_date' => 'nullable|date|after:manufacturing_date',
         ], [
             'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
             'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
+            'expiration_date.after' => 'The expiration date must be strictly after the manufacturing date.',
         ]);
 
         $milkTypes = array_values(array_unique($request->milk_types));
@@ -167,10 +168,11 @@ class ProductController extends Controller
             'preset_image' => 'nullable|string|max:255',
             'status' => 'required|in:active,inactive',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
-            'expiration_date' => 'nullable|date|after_or_equal:manufacturing_date',
+            'expiration_date' => 'nullable|date|after:manufacturing_date',
         ], [
             'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
             'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
+            'expiration_date.after' => 'The expiration date must be strictly after the manufacturing date.',
         ]);
 
         $milkTypes = array_values(array_unique($request->milk_types));
