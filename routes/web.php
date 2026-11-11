@@ -90,6 +90,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 
     // Rider Cash Remittances & Daily Cash Ledger
     Route::get('/remittances', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'index'])->name('remittances.index');
+    Route::get('/remittances/export/excel', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'exportExcel'])->name('remittances.export.excel');
+    Route::get('/remittances/export/pdf', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'exportPdf'])->name('remittances.export.pdf');
     Route::get('/remittances/rider/{rider}/orders', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'getRiderOrders'])->name('remittances.riderOrders');
     Route::post('/remittances', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'store'])->name('remittances.store');
     Route::get('/remittances/{remittance}', [\App\Http\Controllers\Admin\RiderRemittanceController::class, 'show'])->name('remittances.show');

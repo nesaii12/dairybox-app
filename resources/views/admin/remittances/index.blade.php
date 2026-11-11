@@ -296,73 +296,119 @@
 
     <!-- Remittance History Table Section -->
     <div id="remittanceHistorySection" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <!-- Section Header with Filters -->
+        <!-- Section Header with Filters & Export -->
         <div class="p-6 border-b border-slate-100">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
                 <div>
                     <h2 class="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
                         <i class="bi bi-clock-history text-sky-600"></i>
-                        <span>Remittance History & Audit Log</span>
+                        <span>Remittance History &amp; Audit Log</span>
                     </h2>
                     <p class="text-xs text-slate-500 mt-0.5">Comprehensive audit trail of all physical and electronic cash handovers recorded across the fleet.</p>
                 </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-100">
+                        <i class="bi bi-calendar3 mr-1.5 text-sky-500"></i> {{ $dateRangeLabel ?? 'Monthly Logs (This Month)' }}
+                    </span>
+                    <span class="text-xs text-slate-400 font-mono">{{ $remittances->total() }} {{ Str::plural('record', $remittances->total()) }}</span>
+                </div>
             </div>
 
-            <!-- Filter Controls -->
-            <form action="{{ route('admin.remittances.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <!-- Search -->
-                <div>
-                    <label for="history_search" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Search</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                            <i class="bi bi-search text-xs"></i>
-                        </span>
-                        <input type="text" name="search" id="history_search" value="{{ request('search') }}" placeholder="Ref#, rider, notes..."
-                            class="block w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+            <!-- Filter Controls Form -->
+            <form action="{{ route('admin.remittances.index') }}" method="GET" id="remittanceFilterForm" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                    <!-- 1. WINDOW Timeframe Filter Dropdown -->
+                    <div>
+                        <label for="remit_filter" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">WINDOW</label>
+                        <select name="filter_type" id="remit_filter" onchange="toggleRemitDateFields(); this.form.submit();"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 cursor-pointer">
+                            <option value="daily" {{ request('filter_type') === 'daily' ? 'selected' : '' }}>Daily Logs (Today)</option>
+                            <option value="weekly" {{ request('filter_type') === 'weekly' ? 'selected' : '' }}>Weekly Logs (This Week)</option>
+                            <option value="monthly" {{ request('filter_type', 'monthly') === 'monthly' ? 'selected' : '' }}>Monthly Logs (This Month)</option>
+                            <option value="annual" {{ request('filter_type') === 'annual' ? 'selected' : '' }}>Annual Logs (This Year)</option>
+                            <option value="all" {{ request('filter_type') === 'all' ? 'selected' : '' }}>All Logs</option>
+                            <option value="custom" {{ request('filter_type') === 'custom' ? 'selected' : '' }}>Custom Date Range...</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. Delivery Rider Filter -->
+                    <div>
+                        <label for="filter_rider" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Rider</label>
+                        <select name="rider_id" id="filter_rider" onchange="this.form.submit()"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer">
+                            <option value="">All Delivery Riders</option>
+                            @foreach($activeRiders as $r)
+                                <option value="{{ $r->id }}" {{ (string) request('rider_id') === (string) $r->id ? 'selected' : '' }}>{{ $r->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- 3. Status Filter -->
+                    <div>
+                        <label for="filter_status" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
+                        <select name="status" id="filter_status" onchange="this.form.submit()"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer">
+                            <option value="all">All Statuses</option>
+                            <option value="confirmed" {{ request('status') === 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+                            <option value="pending_verification" {{ request('status') === 'pending_verification' ? 'selected' : '' }}>Pending Verification</option>
+                            <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected / Void</option>
+                        </select>
+                    </div>
+
+                    <!-- 4. Search Filter -->
+                    <div>
+                        <label for="history_search" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Search</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i class="bi bi-search text-xs"></i>
+                            </span>
+                            <input type="text" name="search" id="history_search" value="{{ request('search') }}" placeholder="Ref#, notes..."
+                                class="block w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                        </div>
                     </div>
                 </div>
 
-                <!-- Rider Filter -->
-                <div>
-                    <label for="filter_rider" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Rider</label>
-                    <select name="rider_id" id="filter_rider" onchange="this.form.submit()"
-                        class="block w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer">
-                        <option value="">All Delivery Riders</option>
-                        @foreach($activeRiders as $r)
-                            <option value="{{ $r->id }}" {{ (string) request('rider_id') === (string) $r->id ? 'selected' : '' }}>{{ $r->name }}</option>
-                        @endforeach
-                    </select>
+                <!-- Custom Date Range Picker Fields (visible only when custom is chosen) -->
+                <div id="remit_custom_dates" class="grid grid-cols-1 sm:grid-cols-2 gap-3" style="{{ request('filter_type') === 'custom' ? '' : 'display: none;' }}">
+                    <div>
+                        <label for="remit_start" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
+                        <input type="date" name="start_date" id="remit_start" value="{{ request('start_date') }}"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label for="remit_end" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
+                        <input type="date" name="end_date" id="remit_end" value="{{ request('end_date') }}"
+                            class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                    </div>
                 </div>
 
-                <!-- Status Filter -->
-                <div>
-                    <label for="filter_status" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
-                    <select name="status" id="filter_status" onchange="this.form.submit()"
-                        class="block w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer">
-                        <option value="all">All Statuses</option>
-                        <option value="confirmed" {{ request('status') === 'confirmed' ? 'selected' : '' }}>Confirmed</option>
-                        <option value="pending_verification" {{ request('status') === 'pending_verification' ? 'selected' : '' }}>Pending Verification</option>
-                        <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected / Void</option>
-                    </select>
-                </div>
+                <!-- Export Buttons and Form Action Controls -->
+                <div class="pt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100">
+                    <!-- Export Remittance Excel and PDF Buttons -->
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" onclick="submitRemittanceExport('excel')"
+                            class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 transition-colors shadow-2xs cursor-pointer">
+                            <i class="bi bi-file-earmark-excel-fill text-sm"></i>
+                            <span>Export Remittance Excel</span>
+                        </button>
+                        <button type="button" onclick="submitRemittanceExport('pdf')"
+                            class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 transition-colors shadow-2xs cursor-pointer">
+                            <i class="bi bi-file-earmark-pdf-fill text-sm"></i>
+                            <span>Export Remittance PDF</span>
+                        </button>
+                    </div>
 
-                <!-- Date Filter -->
-                <div>
-                    <label for="filter_date" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Handover Date</label>
-                    <input type="date" name="date" id="filter_date" value="{{ request('date') }}" onchange="this.form.submit()"
-                        class="block w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer">
-                </div>
-
-                <!-- Reset / Filter button -->
-                <div class="flex items-end gap-1.5">
-                    <button type="submit" class="flex-1 py-1.5 px-3 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition">
-                        Filter
-                    </button>
-                    @if(request()->hasAny(['search', 'rider_id', 'status', 'date']))
-                        <a href="{{ route('admin.remittances.index') }}" class="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition">
-                            Reset
-                        </a>
-                    @endif
+                    <!-- Filter & Reset Buttons -->
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="py-2 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer">
+                            <i class="bi bi-funnel mr-1"></i> Apply Filter
+                        </button>
+                        @if(request()->hasAny(['search', 'rider_id', 'status', 'date', 'filter_type', 'start_date', 'end_date']))
+                            <a href="{{ route('admin.remittances.index') }}" class="py-2 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition shadow-2xs">
+                                Reset
+                            </a>
+                        @endif
+                    </div>
                 </div>
             </form>
         </div>
@@ -1100,9 +1146,41 @@
         return false;
     };
 
+    // Remittance Timeframe Window & Export Handlers
+    window.toggleRemitDateFields = function () {
+        const val = document.getElementById('remit_filter')?.value;
+        const customDiv = document.getElementById('remit_custom_dates');
+        if (customDiv) {
+            customDiv.style.display = (val === 'custom') ? 'grid' : 'none';
+        }
+    };
+
+    window.submitRemittanceExport = function (type) {
+        const form = document.getElementById('remittanceFilterForm');
+        if (!form) return;
+
+        const oldAction = form.action;
+        const oldTarget = form.target;
+
+        if (type === 'excel') {
+            form.action = "{{ route('admin.remittances.export.excel') }}";
+        } else {
+            form.action = "{{ route('admin.remittances.export.pdf') }}";
+        }
+
+        form.target = "_blank";
+        form.submit();
+
+        // Restore back to standard index action
+        setTimeout(() => {
+            form.action = oldAction;
+            form.target = oldTarget;
+        }, 400);
+    };
+
     // Auto-trigger rider load if pre-selected via query string
     document.addEventListener('DOMContentLoaded', function () {
-        if (riderSelect.value) {
+        if (typeof riderSelect !== 'undefined' && riderSelect && riderSelect.value) {
             loadRiderOrders(riderSelect.value);
         }
     });

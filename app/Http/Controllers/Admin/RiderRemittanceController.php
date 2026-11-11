@@ -9,6 +9,9 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\AuditLog;
 use App\Models\AppNotification;
+use App\Exports\RemittanceExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -51,38 +54,11 @@ class RiderRemittanceController extends Controller
             ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
             ->sum('total_amount');
 
-        // 3. Remittance History with filtering
-        $historyQuery = RiderRemittance::with(['rider', 'admin', 'orders'])
-            ->latest('id');
-
-        if ($request->filled('search')) {
-            $search = trim($request->search);
-            $historyQuery->where(function ($q) use ($search) {
-                $q->where('reference_no', 'like', "%{$search}%")
-                  ->orWhere('payment_method', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%")
-                  ->orWhereHas('rider', function ($rq) use ($search) {
-                      $rq->where('name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('admin', function ($aq) use ($search) {
-                      $aq->where('name', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        if ($request->filled('rider_id')) {
-            $historyQuery->where('rider_id', $request->rider_id);
-        }
-
-        if ($request->filled('status') && $request->status !== 'all') {
-            $historyQuery->where('status', $request->status);
-        }
-
-        if ($request->filled('date')) {
-            $historyQuery->whereDate('created_at', $request->date);
-        }
-
+        // 3. Remittance History with timeframe and multi-criteria filtering
+        [$historyQuery, $dates] = $this->buildRemittanceQuery($request);
         $remittances = $historyQuery->paginate(10)->withQueryString();
+        $dateRangeLabel = $dates['label'];
+        $filterType = $dates['filter_type'];
 
         // 4. Daily Cash Ledger with filtering
         $ledgerQuery = CashLedgerEntry::with(['admin', 'rider', 'remittance'])
@@ -108,8 +84,168 @@ class RiderRemittanceController extends Controller
             'pendingVerificationsCount',
             'todayNetVariance',
             'totalUnremittedCash',
-            'selectedRiderId'
+            'selectedRiderId',
+            'dateRangeLabel',
+            'filterType'
         ));
+    }
+
+    /**
+     * Parse date range inputs supporting presets and custom windows.
+     */
+    public function parseDateRange(Request $request): array
+    {
+        $filterType = $request->input('filter_type', 'monthly');
+
+        switch ($filterType) {
+            case 'daily':
+                $start = Carbon::today()->startOfDay();
+                $end = Carbon::today()->endOfDay();
+                $label = 'Daily Logs (' . Carbon::today()->format('M d, Y') . ')';
+                break;
+            case 'weekly':
+                $start = Carbon::now()->startOfWeek();
+                $end = Carbon::now()->endOfWeek();
+                $label = 'Weekly Logs (' . $start->format('M d') . ' - ' . $end->format('M d, Y') . ')';
+                break;
+            case 'annual':
+                $start = Carbon::now()->startOfYear();
+                $end = Carbon::now()->endOfYear();
+                $label = 'Annual Logs (' . $start->format('Y') . ')';
+                break;
+            case 'all':
+                $start = Carbon::parse('2025-01-01')->startOfDay();
+                $end = Carbon::now()->endOfDay();
+                $label = 'All Logs';
+                break;
+            case 'custom':
+                if ($request->filled('start_date') && $request->filled('end_date')) {
+                    $start = Carbon::parse($request->input('start_date'))->startOfDay();
+                    $end = Carbon::parse($request->input('end_date'))->endOfDay();
+                    $label = $start->format('M d, Y') . ' - ' . $end->format('M d, Y');
+                } else {
+                    $start = Carbon::now()->startOfMonth();
+                    $end = Carbon::now()->endOfMonth();
+                    $label = 'Monthly Logs (' . Carbon::now()->format('F Y') . ')';
+                }
+                break;
+            case 'monthly':
+            default:
+                $start = Carbon::now()->startOfMonth();
+                $end = Carbon::now()->endOfMonth();
+                $label = 'Monthly Logs (' . Carbon::now()->format('F Y') . ')';
+                break;
+        }
+
+        return [
+            'start' => $start,
+            'end' => $end,
+            'label' => $label,
+            'filter_type' => $filterType,
+        ];
+    }
+
+    /**
+     * Build unified remittance query matching active filters.
+     */
+    protected function buildRemittanceQuery(Request $request): array
+    {
+        $dates = $this->parseDateRange($request);
+        $start = $dates['start'];
+        $end = $dates['end'];
+
+        $historyQuery = RiderRemittance::with(['rider', 'admin', 'orders'])
+            ->latest('id');
+
+        if ($request->filled('date')) {
+            $historyQuery->whereDate('created_at', $request->date);
+        } elseif ($dates['filter_type'] !== 'all') {
+            $historyQuery->whereBetween('created_at', [$start, $end]);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $historyQuery->where(function ($q) use ($search) {
+                $q->where('reference_no', 'like', "%{$search}%")
+                  ->orWhere('payment_method', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhereHas('rider', function ($rq) use ($search) {
+                      $rq->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('admin', function ($aq) use ($search) {
+                      $aq->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->filled('rider_id')) {
+            $historyQuery->where('rider_id', $request->rider_id);
+        }
+
+        if ($request->filled('status') && $request->status !== 'all') {
+            $historyQuery->where('status', $request->status);
+        }
+
+        return [$historyQuery, $dates];
+    }
+
+    /**
+     * Download filtered remittance transaction records as Excel spreadsheet.
+     */
+    public function exportExcel(Request $request)
+    {
+        [$query, $dates] = $this->buildRemittanceQuery($request);
+        $remittances = $query->get();
+
+        $startStr = $dates['start']->format('Ymd');
+        $endStr = $dates['end']->format('Ymd');
+        $filename = "remittance_report_{$startStr}_to_{$endStr}.xlsx";
+
+        return Excel::download(new RemittanceExport($remittances), $filename);
+    }
+
+    /**
+     * Download filtered remittance transaction records as PDF summary.
+     */
+    public function exportPdf(Request $request)
+    {
+        [$query, $dates] = $this->buildRemittanceQuery($request);
+        $remittances = $query->get();
+
+        $start = $dates['start'];
+        $end = $dates['end'];
+        $dateRangeLabel = $dates['label'];
+
+        $totalExpected = (float) $remittances->sum('expected_amount');
+        $totalActual = (float) $remittances->sum('actual_amount');
+        $totalVariance = (float) $remittances->sum('variance');
+        $totalOrders = (int) $remittances->sum('orders_count');
+
+        $activeRiderName = null;
+        if ($request->filled('rider_id')) {
+            $activeRiderName = User::find($request->rider_id)?->name;
+        }
+
+        $activeStatus = $request->input('status', 'all');
+
+        $pdf = Pdf::loadView('admin.remittances.remittance_pdf', compact(
+            'remittances',
+            'start',
+            'end',
+            'dateRangeLabel',
+            'totalExpected',
+            'totalActual',
+            'totalVariance',
+            'totalOrders',
+            'activeRiderName',
+            'activeStatus'
+        ))->setPaper('a4', 'landscape');
+
+        $startStr = $dates['start']->format('Ymd');
+        $endStr = $dates['end']->format('Ymd');
+        $filename = "remittance_report_{$startStr}_to_{$endStr}.pdf";
+
+        return $pdf->download($filename);
     }
 
     /**
