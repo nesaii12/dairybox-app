@@ -32,8 +32,9 @@ class OrderController extends Controller
         session(['per_page_orders' => $perPage]);
 
         $orders = $query->orderBy('created_at', 'desc')->paginate($perPage)->withQueryString();
+        $riders = User::where('role', 'rider')->where('status', 'active')->orderBy('name')->get();
 
-        return view('admin.orders.index', compact('orders'));
+        return view('admin.orders.index', compact('orders', 'riders'));
     }
 
     public function show(Order $order)
@@ -57,14 +58,14 @@ class OrderController extends Controller
         $newStatus = $request->order_status;
         $cancellationReason = trim($request->input('cancellation_reason')) ?: 'Cancelled by administrator.';
 
-        if ($oldStatus === $newStatus) {
-            return redirect()->back()->with('success', 'Order status updated (no changes).');
+        if ($order->order_type === 'Delivery' && !$order->rider_id && in_array($newStatus, ['Out for Delivery', 'Delivered', 'Delivered - Pending Remittance'])) {
+            return redirect()->back()
+                ->with('error', "Invalid action: No delivery rider is in charge. Order {$order->order_number} cannot be marked as '{$newStatus}' while rider status is Unassigned. Please assign a delivery driver first.")
+                ->withErrors(['rider_id' => "Invalid: Please select and assign a delivery rider before setting the order to {$newStatus}."]);
         }
 
-        if ($newStatus === 'Out for Delivery' && !$order->rider_id) {
-            return redirect()->back()
-                ->with('error', 'Invalid action: No delivery rider is in charge. Please assign a delivery rider first before setting the order to Out for Delivery.')
-                ->withErrors(['rider_id' => 'Invalid: Please select and assign the rider in charge of delivering this order first.']);
+        if ($oldStatus === $newStatus) {
+            return redirect()->back()->with('success', 'Order status updated (no changes).');
         }
 
         try {

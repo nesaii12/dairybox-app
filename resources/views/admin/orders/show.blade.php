@@ -340,6 +340,18 @@
             @if(!in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled']))
             <form id="adminStatusUpdateForm" action="{{ route('admin.orders.updateStatus', $order->id) }}" method="POST" onsubmit="return validateAdminStatusUpdate(event)" class="space-y-4 pt-4 border-t border-slate-100">
                 @csrf
+                @if($order->order_type === 'Delivery' && !$order->rider_id)
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2 mb-2">
+                    <i class="bi bi-exclamation-triangle-fill text-amber-500 text-sm mt-0.5 flex-shrink-0"></i>
+                    <div>
+                        <span class="font-bold block">Delivery Driver Assignment Required</span>
+                        <span class="text-[11px] text-amber-800 leading-relaxed block mt-0.5">
+                            This delivery order cannot be marked as <strong>Out for Delivery</strong> or <strong>Delivered</strong> while its rider status is <strong>Unassigned</strong>. Please select and assign a delivery driver in the panel below first.
+                        </span>
+                    </div>
+                </div>
+                @endif
+
                 <div>
                     <label for="order_status" class="block text-xs font-semibold text-slate-700">Update Status To</label>
                     <select name="order_status" id="order_status" required onchange="toggleAdminCancellationReason(this.value)"
@@ -355,20 +367,24 @@
                             @if($order->order_type === 'Pickup')
                                 <option value="Ready for Pickup">Set Ready for Pickup</option>
                             @else
-                                <option value="Out for Delivery">Set Out for Delivery</option>
+                                <option value="Out for Delivery" {{ !$order->rider_id ? 'disabled class=text-slate-400' : '' }}>
+                                    Set Out for Delivery {{ !$order->rider_id ? '(Disabled: Assign Rider First)' : '' }}
+                                </option>
                             @endif
                             <option value="Cancelled">Cancel Order</option>
                         @elseif($order->order_status === 'Ready for Pickup')
                             <option value="Delivered">Mark Delivered (Picked Up)</option>
                             <option value="Cancelled">Cancel Order</option>
                         @elseif($order->order_status === 'Out for Delivery')
-                            <option value="Delivered">Mark Delivered</option>
+                            <option value="Delivered" {{ ($order->order_type === 'Delivery' && !$order->rider_id) ? 'disabled class=text-slate-400' : '' }}>
+                                Mark Delivered {{ ($order->order_type === 'Delivery' && !$order->rider_id) ? '(Disabled: Assign Rider First)' : '' }}
+                            </option>
                             <option value="Cancelled">Cancel Order</option>
                         @endif
                     </select>
                     <p id="status_no_rider_error" class="{{ $errors->has('rider_id') ? '' : 'hidden' }} mt-1.5 text-[11px] font-semibold text-rose-600 flex items-start gap-1">
                         <i class="bi bi-exclamation-circle-fill mt-0.5 flex-shrink-0"></i>
-                        <span>Invalid: Cannot set Out for Delivery while no rider is in charge. Please assign a rider below first.</span>
+                        <span>Invalid: Cannot set Out for Delivery or Delivered while rider status is Unassigned. Please assign a delivery driver below first.</span>
                     </p>
                 </div>
 
@@ -503,12 +519,13 @@
 @section('scripts')
 <script>
     const hasAssignedRider = @json((bool) $order->rider_id);
+    const isDeliveryOrder = @json($order->order_type === 'Delivery');
 
     function validateAdminStatusUpdate(event) {
         const statusSelect = document.getElementById('order_status');
         if (!statusSelect) return true;
 
-        if (statusSelect.value === 'Out for Delivery' && !hasAssignedRider) {
+        if (['Out for Delivery', 'Delivered'].includes(statusSelect.value) && !hasAssignedRider && isDeliveryOrder) {
             event.preventDefault();
 
             const statusError = document.getElementById('status_no_rider_error');
@@ -554,7 +571,7 @@
                 Swal.fire({
                     icon: 'error',
                     title: 'Invalid Pipeline Update',
-                    text: 'No rider is in charge of this delivery yet. Please fulfill and assign the delivery rider first before setting the order to Out for Delivery.',
+                    text: `No delivery rider is assigned to this order yet. An order cannot be set to "${statusSelect.value}" while rider status is Unassigned. Please assign a delivery rider first.`,
                     confirmButtonText: 'Assign Rider Now',
                     confirmButtonColor: '#4f46e5',
                     customClass: {

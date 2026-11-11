@@ -151,17 +151,63 @@
                     <!-- Rider -->
                     <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-600">
                         @if($order->rider)
-                            <span class="order-rider-name font-bold text-slate-800"><i class="bi bi-person mr-1"></i>{{ $order->rider->name }}</span>
+                            <div class="flex items-center space-x-1.5">
+                                <div class="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-[10px] font-bold">
+                                    <i class="bi bi-bicycle"></i>
+                                </div>
+                                <div>
+                                    <span class="order-rider-name font-bold text-slate-900 block">{{ $order->rider->name }}</span>
+                                    <span class="text-[10px] text-slate-400 font-mono block">{{ $order->rider->phone }}</span>
+                                </div>
+                            </div>
+                        @elseif($order->order_type === 'Pickup')
+                            <span class="text-slate-400 italic text-[11px] flex items-center gap-1">
+                                <i class="bi bi-shop text-slate-400"></i> Storefront Pickup
+                            </span>
                         @else
-                            <span class="order-rider-name text-slate-400 italic">Unassigned</span>
+                            <div class="space-y-1.5">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    <i class="bi bi-exclamation-triangle-fill mr-1 text-amber-500"></i> Unassigned
+                                </span>
+                                @if(!in_array($order->order_status, ['Cancelled', 'Paid & Remitted']))
+                                <form action="{{ route('admin.orders.assignRider', $order->id) }}" method="POST" class="flex items-center space-x-1" onsubmit="return confirmTableRiderAssign(event, this, '{{ $order->order_number }}')">
+                                    @csrf
+                                    <select name="rider_id" required onchange="this.form.requestSubmit()"
+                                        class="text-[11px] font-bold py-1 px-2 bg-amber-50/70 hover:bg-amber-50 border border-amber-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer shadow-2xs">
+                                        <option value="">-- Assign Rider --</option>
+                                        @foreach($riders as $rider)
+                                            <option value="{{ $rider->id }}">{{ $rider->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </form>
+                                @endif
+                            </div>
                         @endif
                     </td>
                     <!-- Actions -->
                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <a href="{{ route('admin.orders.show', $order->id) }}" class="inline-flex items-center space-x-1 py-1.5 px-3 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 transition-all border border-sky-100">
-                            <span>Process Order</span>
-                            <i class="bi bi-arrow-right-short text-base"></i>
-                        </a>
+                        @php
+                            $isUnassignedDelivery = ($order->order_type === 'Delivery' && !$order->rider_id && !in_array($order->order_status, ['Cancelled', 'Paid & Remitted']));
+                        @endphp
+
+                        @if($isUnassignedDelivery)
+                            <div class="flex flex-col items-center justify-center space-y-1">
+                                <span class="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                    <i class="bi bi-exclamation-triangle-fill mr-1 text-amber-500 text-[9px]"></i> Rider Required
+                                </span>
+                                <button type="button" onclick="showUnassignedRiderPrompt('{{ $order->order_number }}', '{{ route('admin.orders.show', $order->id) }}')"
+                                    class="inline-flex items-center space-x-1 py-1.5 px-3 rounded-lg text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-80 shadow-2xs"
+                                    title="Unassigned Rider: Choose a delivery driver from the dropdown to enable processing">
+                                    <i class="bi bi-lock-fill text-[10px] mr-0.5"></i>
+                                    <span>Process Order</span>
+                                </button>
+                            </div>
+                        @else
+                            <a href="{{ route('admin.orders.show', $order->id) }}" class="inline-flex items-center space-x-1 py-1.5 px-3 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 transition-all border border-sky-100 shadow-2xs">
+                                <span>Process Order</span>
+                                <i class="bi bi-arrow-right-short text-base"></i>
+                            </a>
+                        @endif
                     </td>
                 </tr>
                 @empty
@@ -186,4 +232,52 @@
     </div>
     @endif
 </div>
+
+@section('scripts')
+<script>
+    function confirmTableRiderAssign(event, form, orderNumber) {
+        const select = form.querySelector('select[name="rider_id"]');
+        if (!select || !select.value) {
+            event.preventDefault();
+            return false;
+        }
+        const riderName = select.options[select.selectedIndex].text;
+
+        if (typeof Swal !== 'undefined') {
+            event.preventDefault();
+            Swal.fire({
+                title: 'Assign Rider & Dispatch?',
+                text: `Assign ${riderName} to Order ${orderNumber} and update status to Out for Delivery?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Assign Rider',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#0284c7'
+            }).then(result => {
+                if (result.isConfirmed) {
+                    form.submit();
+                } else {
+                    select.value = '';
+                }
+            });
+            return false;
+        }
+        return true;
+    }
+
+    function showUnassignedRiderNotice(orderNumber) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Rider Required',
+                html: `<p class="text-xs text-slate-600 mb-2">Order <strong>${orderNumber}</strong> is a delivery order that cannot be processed or set to Out for Delivery / Delivered while its rider status is <strong>Unassigned</strong>.</p><p class="text-xs text-amber-800 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200">Please choose an active delivery driver from the dropdown in the Rider column to assign and enable order processing.</p>`,
+                confirmButtonText: 'Understood',
+                confirmButtonColor: '#0284c7'
+            });
+        } else {
+            alert(`Order ${orderNumber} cannot be processed: Please select a delivery driver from the dropdown first.`);
+        }
+    }
+</script>
+@endsection
 @endsection
