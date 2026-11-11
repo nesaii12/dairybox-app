@@ -32,9 +32,8 @@ class OrderController extends Controller
         session(['per_page_orders' => $perPage]);
 
         $orders = $query->orderBy('created_at', 'desc')->paginate($perPage)->withQueryString();
-        $riders = User::where('role', 'rider')->where('status', 'active')->orderBy('name')->get();
 
-        return view('admin.orders.index', compact('orders', 'riders'));
+        return view('admin.orders.index', compact('orders'));
     }
 
     public function show(Order $order)
