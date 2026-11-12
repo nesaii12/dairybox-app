@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="mermaid.min.js"></script>
+<style>
+  body {
+    background-color: #ffffff;
+    margin: 0;
+    padding: 40px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: inline-block;
+  }
+  .mermaid {
+    display: inline-block;
+  }
+  svg {
+    max-width: none !important;
+  }
+</style>
+</head>
+<body>
+<div id="container" class="mermaid">
+flowchart LR
+    subgraph CustomerWorkflow ["1. Customer Workflow"]
+        C1["Browse Catalog & Expiry"] --> C2["Manage Cart Batches"]
+        C2 --> C3["Checkout (Schedule & Payment)"]
+        C3 --> C4["Track Delivery / Receive Alerts"]
+        C4 --> C5["Rate Product Post-Delivery"]
+    end
+
+    subgraph OrderWorkflow ["2. Order Lifecycle"]
+        O1["Order Placed (Pending)"] --> O2["FIFO Stock Deducted"]
+        O2 --> O3{"Payment Type?"}
+        O3 -->|Xendit| O4["Webhook Confirms Payment"]
+        O3 -->|COD| O5["Confirmed for Dispatch"]
+        O4 --> O5
+        O5 --> O6["Out for Delivery"]
+        O6 --> O7["Delivered"]
+    end
+
+    subgraph DeliveryWorkflow ["3. Delivery & Fleet"]
+        D_Dispatch["Admin Assigns Rider"] --> D_Queue["Rider Live Queue"]
+        D_Queue --> D_Arrival["Rider Marks Arrival"]
+        D_Arrival --> D_Outcome{"Outcome?"}
+        D_Outcome -->|Success| D_Delivered["Delivered (Pending Remittance)"]
+        D_Outcome -->|Cancelled Post-Arrival| D_Incident["Incident Review & 3-Day Ban"]
+    end
+
+    subgraph RemittanceWorkflow ["4. Remittance & Ledger"]
+        R_Collect["Rider Collects COD"] --> R_Submit["Admin Logs Remittance"]
+        R_Submit --> R_Reconcile{"Variance Check"}
+        R_Reconcile --> R_Ledger["Post to Daily Cash Ledger"]
+        R_Ledger --> R_Close["Order Marked Paid & Remitted"]
+    end
+
+    CustomerWorkflow --> OrderWorkflow
+    OrderWorkflow --> DeliveryWorkflow
+    DeliveryWorkflow --> RemittanceWorkflow
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis'
+    }
+  });
+</script>
+</body>
+</html>
