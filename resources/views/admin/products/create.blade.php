@@ -161,7 +161,7 @@
                 </h4>
                 <p class="text-[11px] text-slate-500 mt-1">This registers the initial stock batch with its own expiration date under FIFO logic.</p>
                 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                     <div>
                         <label for="initial_stock" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Initial Stock Count</label>
                         <input type="number" name="initial_stock" id="initial_stock" required value="{{ old('initial_stock', 0) }}" min="0"
@@ -196,6 +196,30 @@
                             <span id="create_date_error_text">Expiration date must be strictly after the manufacturing date.</span>
                         </p>
                         @error('expiration_date')
+                            <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <label for="create_status" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Visibility Status</label>
+                            <span id="create_status_lock" class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 {{ old('expiration_date') ? 'hidden' : '' }}">
+                                <i class="bi bi-lock-fill text-amber-500"></i> Expiry Required
+                            </span>
+                        </div>
+                        <select name="status" id="create_status" required onchange="handleCreateStatusChange(this)"
+                            class="mt-1.5 block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 text-xs transition-all font-semibold cursor-pointer">
+                            <option value="active" id="create_opt_active" {{ old('status', 'active') == 'active' && old('expiration_date') ? 'selected' : '' }} {{ old('expiration_date') ? '' : 'disabled' }}>
+                                Active (Storefront)
+                            </option>
+                            <option value="inactive" id="create_opt_inactive" {{ old('status') == 'inactive' || !old('expiration_date') ? 'selected' : '' }}>
+                                Inactive (Hidden)
+                            </option>
+                        </select>
+                        <p class="text-[10px] text-slate-400 mt-1">
+                            Active requires valid expiry.
+                        </p>
+                        @error('status')
                             <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                         @enderror
                     </div>
@@ -316,11 +340,36 @@
         const errContainer = document.getElementById('create_date_error');
         const errText = document.getElementById('create_date_error_text');
         const submitBtn = document.getElementById('createSubmitBtn');
+        const optActive = document.getElementById('create_opt_active');
+        const statusSelect = document.getElementById('create_status');
+        const statusLock = document.getElementById('create_status_lock');
 
         if (!mfgInput || !expInput) return true;
 
         const mfgVal = mfgInput.value;
         const expVal = expInput.value;
+
+        // Block setting Catalog Visibility Status to Active if expiration date is empty
+        if (!expVal) {
+            if (optActive) {
+                optActive.disabled = true;
+                optActive.textContent = 'Active (Requires Expiry Date)';
+            }
+            if (statusSelect && statusSelect.value === 'active') {
+                statusSelect.value = 'inactive';
+            }
+            if (statusLock) {
+                statusLock.classList.remove('hidden');
+            }
+        } else {
+            if (optActive) {
+                optActive.disabled = false;
+                optActive.textContent = 'Active (Storefront)';
+            }
+            if (statusLock) {
+                statusLock.classList.add('hidden');
+            }
+        }
 
         if (mfgVal) {
             const parts = mfgVal.split('-');
@@ -371,11 +420,48 @@
         return true;
     }
 
+    function handleCreateStatusChange(select) {
+        const expInput = document.getElementById('expiration_date');
+        if (select.value === 'active' && (!expInput || !expInput.value)) {
+            select.value = 'inactive';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Expiration Date Required',
+                    text: 'Products cannot be set to Active without a valid expiration date. Please enter an expiration date first.',
+                    confirmButtonColor: '#0284c7'
+                });
+            } else {
+                alert('Products cannot be set to Active without a valid expiration date. Please enter an expiration date first.');
+            }
+            if (expInput) expInput.focus();
+        }
+    }
+
     function validateCreateDates(event) {
+        const statusSelect = document.getElementById('create_status');
+        const expInput = document.getElementById('expiration_date');
+
+        if (statusSelect && statusSelect.value === 'active' && (!expInput || !expInput.value)) {
+            if (event) event.preventDefault();
+            statusSelect.value = 'inactive';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Active Status Blocked',
+                    text: 'A valid expiration date is required before registering a product as Active.',
+                    confirmButtonColor: '#0284c7'
+                });
+            } else {
+                alert('A valid expiration date is required before registering a product as Active.');
+            }
+            if (expInput) expInput.focus();
+            return false;
+        }
+
         const isValid = syncCreateDates(true);
         if (!isValid) {
             if (event) event.preventDefault();
-            const expInput = document.getElementById('expiration_date');
             if (expInput) expInput.focus();
 
             if (typeof Swal !== 'undefined') {
@@ -390,6 +476,10 @@
         }
         return true;
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        syncCreateDates(false);
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
         syncCreateDates(false);

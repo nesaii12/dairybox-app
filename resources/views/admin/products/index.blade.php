@@ -148,7 +148,10 @@
                                     <span>{{ \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') }}</span>
                                 </div>
                             @else
-                                <span class="text-xs font-medium text-slate-400">N/A</span>
+                                <span class="text-xs font-semibold text-slate-400">N/A</span>
+                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <i class="bi bi-tag mr-1 text-[8px]"></i> Unlabelled
+                                </span>
                             @endif
                             @if($isExpired)
                                 <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
@@ -167,7 +170,11 @@
                     </td>
                     <!-- Status -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        @if($product->stock == 0)
+                        @if(empty($product->expiration_date))
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Missing Expiration Date — Blocked from Active status until expiry is provided">
+                                <i class="bi bi-slash-circle text-[10px]"></i> Inactive
+                            </span>
+                        @elseif($product->stock == 0)
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200">
                                 <i class="bi bi-dash-circle text-[10px]"></i> Inactive
                             </span>
@@ -336,12 +343,24 @@
 
                                                  <!-- Status -->
                                                  <div class="space-y-1 sm:col-span-2 text-left">
-                                                     <label for="status_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Catalog Visibility Status</label>
-                                                     <select name="status" id="status_{{ $product->id }}" required
-                                                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all focus:bg-white">
-                                                         <option value="active" {{ old('status', $product->status) == 'active' ? 'selected' : '' }}>Active (Visible to Storefront)</option>
-                                                         <option value="inactive" {{ old('status', $product->status) == 'inactive' ? 'selected' : '' }}>Inactive (Hidden)</option>
+                                                     <div class="flex items-center justify-between">
+                                                         <label for="status_{{ $product->id }}" class="block text-xs font-bold text-slate-700">Catalog Visibility Status</label>
+                                                         <span id="status_lock_notice_{{ $product->id }}" class="{{ $product->expiration_date ? 'hidden' : '' }} text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                                                             <i class="bi bi-lock-fill text-amber-500"></i> Expiration Date Required for Active
+                                                         </span>
+                                                     </div>
+                                                     <select name="status" id="status_{{ $product->id }}" required onchange="handleStatusChange({{ $product->id }}, this)"
+                                                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-xs transition-all focus:bg-white cursor-pointer font-medium">
+                                                         <option value="active" id="opt_active_{{ $product->id }}" {{ old('status', $product->status) == 'active' && $product->expiration_date ? 'selected' : '' }} {{ empty($product->expiration_date) ? 'disabled' : '' }}>
+                                                             Active (Visible to Storefront)
+                                                         </option>
+                                                         <option value="inactive" id="opt_inactive_{{ $product->id }}" {{ old('status', $product->status) == 'inactive' || empty($product->expiration_date) ? 'selected' : '' }}>
+                                                             Inactive (Hidden)
+                                                         </option>
                                                      </select>
+                                                     <p id="status_help_{{ $product->id }}" class="text-[10px] text-slate-400 mt-0.5">
+                                                         Unlabelled products lacking expiration data cannot be set to Active or sold to customers.
+                                                     </p>
                                                  </div>
 
                                                  <!-- Description -->
@@ -465,11 +484,36 @@
         const errContainer = document.getElementById('date_error_' + productId);
         const errText = document.getElementById('date_error_text_' + productId);
         const submitBtn = document.getElementById('submitBtn_' + productId);
+        const optActive = document.getElementById('opt_active_' + productId);
+        const statusSelect = document.getElementById('status_' + productId);
+        const lockNotice = document.getElementById('status_lock_notice_' + productId);
 
         if (!mfgInput || !expInput) return true;
 
         const mfgVal = mfgInput.value;
         const expVal = expInput.value;
+
+        // Block setting Catalog Visibility Status to Active if expiration date is empty
+        if (!expVal) {
+            if (optActive) {
+                optActive.disabled = true;
+                optActive.textContent = 'Active (Requires Expiration Date)';
+            }
+            if (statusSelect && statusSelect.value === 'active') {
+                statusSelect.value = 'inactive';
+            }
+            if (lockNotice) {
+                lockNotice.classList.remove('hidden');
+            }
+        } else {
+            if (optActive) {
+                optActive.disabled = false;
+                optActive.textContent = 'Active (Visible to Storefront)';
+            }
+            if (lockNotice) {
+                lockNotice.classList.add('hidden');
+            }
+        }
 
         if (mfgVal) {
             // Parse manufacturing date
@@ -525,11 +569,49 @@
         return true;
     }
 
+    function handleStatusChange(productId, select) {
+        const expInput = document.getElementById('expiration_date_' + productId);
+        if (select.value === 'active' && (!expInput || !expInput.value)) {
+            select.value = 'inactive';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Expiration Date Required',
+                    text: 'Products cannot be set to Active without a valid expiration date. Please enter an expiration date first.',
+                    confirmButtonColor: '#0284c7'
+                });
+            } else {
+                alert('Products cannot be set to Active without a valid expiration date. Please enter an expiration date first.');
+            }
+            if (expInput) expInput.focus();
+        }
+    }
+
     function validateProductDates(productId, event) {
+        const statusSelect = document.getElementById('status_' + productId);
+        const expInput = document.getElementById('expiration_date_' + productId);
+
+        // Disallow saving Active if expiration date is missing
+        if (statusSelect && statusSelect.value === 'active' && (!expInput || !expInput.value)) {
+            if (event) event.preventDefault();
+            statusSelect.value = 'inactive';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Active Status Blocked',
+                    text: 'A valid expiration date is required before setting Catalog Visibility Status to Active.',
+                    confirmButtonColor: '#0284c7'
+                });
+            } else {
+                alert('A valid expiration date is required before setting Catalog Visibility Status to Active.');
+            }
+            if (expInput) expInput.focus();
+            return false;
+        }
+
         const isValid = syncProductDates(productId, true);
         if (!isValid) {
             if (event) event.preventDefault();
-            const expInput = document.getElementById('expiration_date_' + productId);
             if (expInput) {
                 expInput.focus();
             }

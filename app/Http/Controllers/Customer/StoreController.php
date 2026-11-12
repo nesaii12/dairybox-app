@@ -13,8 +13,10 @@ class StoreController extends Controller
     {
         $categories = Category::all();
 
-        // Determine available active, in-stock, non-expired products for availability checks
-        $allActiveProducts = Product::where('status', 'active')->get();
+        // Determine available active, in-stock, non-expired products for availability checks (exclude missing/unlabelled expiry)
+        $allActiveProducts = Product::where('status', 'active')
+            ->whereNotNull('expiration_date')
+            ->get();
         $availableProducts = $allActiveProducts->filter(function ($p) {
             $expired = $p->expiration_date && \Carbon\Carbon::parse($p->expiration_date)->startOfDay()->lt(now()->startOfDay());
             return !$expired && $p->stock > 0;
@@ -41,6 +43,7 @@ class StoreController extends Controller
         }
         
         $query = Product::where('status', 'active')
+            ->whereNotNull('expiration_date')
             ->withCount('ratings')
             ->withAvg('ratings', 'rating');
 
@@ -131,8 +134,8 @@ class StoreController extends Controller
 
     public function show(Product $product)
     {
-        if ($product->status !== 'active') {
-            abort(404, 'Product not found.');
+        if ($product->status !== 'active' || is_null($product->expiration_date)) {
+            abort(404, 'Product not found or unavailable for purchase.');
         }
 
         $cartItemQuantity = 0;
@@ -145,8 +148,9 @@ class StoreController extends Controller
             }
         }
 
-        // Load all active variants of this product (matching product_name) for Milk Type & Size customization
+        // Load all active variants of this product with verified expiration info
         $siblingVariants = Product::where('status', 'active')
+            ->whereNotNull('expiration_date')
             ->whereRaw('LOWER(TRIM(product_name)) = ?', [strtolower(trim($product->product_name))])
             ->get();
 

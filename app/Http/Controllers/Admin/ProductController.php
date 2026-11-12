@@ -66,6 +66,9 @@ class ProductController extends Controller
             $request->merge(['sizes' => [$request->size]]);
         }
 
+        $requestedStatus = $request->input('status', 'active');
+        $hasExpiration = $request->filled('expiration_date');
+
         $request->validate([
             'product_name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -79,11 +82,15 @@ class ProductController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'preset_image' => 'nullable|string|max:255',
             'initial_stock' => 'required|integer|min:0',
+            'status' => 'nullable|in:active,inactive',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
-            'expiration_date' => 'nullable|date|after:manufacturing_date',
+            'expiration_date' => $requestedStatus === 'active'
+                ? 'required|date|after:manufacturing_date'
+                : 'nullable|date|after:manufacturing_date',
         ], [
             'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
             'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
+            'expiration_date.required' => 'A valid expiration date is required before setting Catalog Visibility Status to Active.',
             'expiration_date.after' => 'The expiration date must be strictly after the manufacturing date.',
         ]);
 
@@ -99,6 +106,8 @@ class ProductController extends Controller
             $imagePath = $request->preset_image;
         }
 
+        $finalStatus = ($hasExpiration && $requestedStatus === 'active') ? 'active' : 'inactive';
+
         $product = Product::create([
             'category_id' => $request->category_id,
             'product_name' => $request->product_name,
@@ -111,7 +120,7 @@ class ProductController extends Controller
             'stock' => 0, // Stock-in using FIFO service below will sync this correctly
             'manufacturing_date' => $request->manufacturing_date,
             'expiration_date' => $request->expiration_date,
-            'status' => 'active',
+            'status' => $finalStatus,
         ]);
 
         Product::saveProductOptions($product->id, $milkTypes, $sizes);
@@ -154,6 +163,9 @@ class ProductController extends Controller
             $request->merge(['sizes' => [$request->size]]);
         }
 
+        $requestedStatus = $request->input('status', 'inactive');
+        $hasExpiration = $request->filled('expiration_date');
+
         $request->validate([
             'product_name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -168,10 +180,13 @@ class ProductController extends Controller
             'preset_image' => 'nullable|string|max:255',
             'status' => 'required|in:active,inactive',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
-            'expiration_date' => 'nullable|date|after:manufacturing_date',
+            'expiration_date' => $requestedStatus === 'active'
+                ? 'required|date|after:manufacturing_date'
+                : 'nullable|date|after:manufacturing_date',
         ], [
             'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
             'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
+            'expiration_date.required' => 'A valid expiration date is required before setting Catalog Visibility Status to Active.',
             'expiration_date.after' => 'The expiration date must be strictly after the manufacturing date.',
         ]);
 
@@ -179,6 +194,8 @@ class ProductController extends Controller
         $sizes = array_values(array_unique($request->sizes));
         $primaryMilk = $milkTypes[0];
         $primarySize = $sizes[0];
+
+        $finalStatus = ($hasExpiration && $requestedStatus === 'active') ? 'active' : 'inactive';
 
         $data = [
             'category_id' => $request->category_id,
@@ -188,7 +205,7 @@ class ProductController extends Controller
             'flavor' => $request->flavor,
             'size' => $primarySize,
             'price' => $request->price,
-            'status' => $request->status,
+            'status' => $finalStatus,
             'manufacturing_date' => $request->manufacturing_date,
             'expiration_date' => $request->expiration_date,
         ];

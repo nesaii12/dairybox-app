@@ -122,12 +122,42 @@ class Product extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function ($product) {
+            // A product without a valid expiration date cannot be set to Active
+            if (empty($product->expiration_date)) {
+                $product->status = 'inactive';
+            }
+        });
+    }
+
     /**
-     * Scope to filter active products only.
+     * Accessor: Ensure products without expiration date are always presented as inactive.
+     */
+    public function getStatusAttribute($value): string
+    {
+        if (empty($this->attributes['expiration_date'])) {
+            return 'inactive';
+        }
+        return $value ?? 'inactive';
+    }
+
+    /**
+     * Check if product has a valid expiration date assigned.
+     */
+    public function hasValidExpiration(): bool
+    {
+        return !empty($this->expiration_date);
+    }
+
+    /**
+     * Scope to filter active products only (must have active status and valid expiration date).
      */
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->where('status', 'active')
+            ->whereNotNull('expiration_date');
     }
 
     /**

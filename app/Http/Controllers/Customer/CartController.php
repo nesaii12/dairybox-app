@@ -46,9 +46,13 @@ class CartController extends Controller
 
         foreach ($batches as $batch) {
             foreach ($batch->cartItems as $item) {
-                $freshStock = $item->product ? $item->product->fresh()->stock : 0;
+                $freshProduct = $item->product ? $item->product->fresh() : null;
+                $freshStock = $freshProduct ? $freshProduct->stock : 0;
 
-                if ($freshStock > 0 && $item->quantity > $freshStock) {
+                if (!$freshProduct || empty($freshProduct->expiration_date) || $freshProduct->status !== 'active') {
+                    $pName = $freshProduct ? $freshProduct->product_name : 'An item';
+                    $adjustedItems[] = "{$pName} lacks verified expiration date info and cannot be checked out.";
+                } elseif ($freshStock > 0 && $item->quantity > $freshStock) {
                     $item->update([
                         'quantity' => $freshStock,
                         'subtotal' => $item->product->price * $freshStock,
@@ -101,6 +105,20 @@ class CartController extends Controller
         ]);
 
         $qty = (int) $request->quantity;
+
+        // Block products without valid expiration info or inactive
+        if (empty($product->expiration_date) || $product->status !== 'active') {
+            $msg = "{$product->product_name} cannot be added to cart because it lacks verified expiration data.";
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                    'available_left' => 0,
+                    'stock' => 0,
+                ], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         // Check if product is expired
         if ($product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
@@ -367,10 +385,17 @@ class CartController extends Controller
 
         $items = $selectedBatch->cartItems;
         
-        // Double check stock availability for this batch before checkout screen
+        // Double check stock and expiration availability for this batch before checkout screen
         foreach ($items as $item) {
             $freshProduct = $item->product ? $item->product->fresh() : null;
             $freshStock   = $freshProduct ? $freshProduct->stock : 0;
+
+            // Block products without valid expiration info or inactive
+            if (!$freshProduct || empty($freshProduct->expiration_date) || $freshProduct->status !== 'active') {
+                $pName = $freshProduct ? $freshProduct->product_name : 'An item';
+                return redirect()->route('customer.cart.index')
+                    ->with('error', "{$pName} in Cart #{$batchNumber} cannot be checked out because its expiration date information is missing or unverified. Please remove it from your cart.");
+            }
 
             // Block expired products
             if ($freshProduct && $freshProduct->expiration_date &&
@@ -484,6 +509,11 @@ class CartController extends Controller
                     throw new \Exception("Insufficient stock for product '{$item->product->product_name}'. Available: {$available}, Requested: {$item->quantity}");
                 }
 
+                // Block products without valid expiration info or inactive at order placement
+                if (empty($product->expiration_date) || $product->status !== 'active') {
+                    throw new \Exception("'{$product->product_name}' cannot be ordered because its expiration date information is missing or unverified. Please remove it from your cart.");
+                }
+
                 // Block expired products at order placement
                 if ($product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
                     throw new \Exception("'{$product->product_name}' has expired and cannot be ordered. Please remove it from your cart.");
@@ -558,6 +588,20 @@ class CartController extends Controller
                     'link' => route('admin.orders.show', $order->id),
                     'is_read' => false,
                 ]);
+            }
+
+            // Create notification for active delivery fleet riders if this is a delivery order
+            if ($request->order_type === 'Delivery') {
+                $activeRiders = User::where('role', 'rider')->where('status', 'active')->get();
+                foreach ($activeRiders as $rider) {
+                    AppNotification::create([
+                        'user_id' => $rider->id,
+                        'title' => 'New Customer Delivery Order',
+                        'message' => "New delivery order {$orderNumber} placed by " . auth()->user()->name . " to {$order->delivery_address} (₱" . number_format($totalAmount, 2) . ").",
+                        'link' => route('rider.dashboard'),
+                        'is_read' => false,
+                    ]);
+                }
             }
 
             DB::commit();
