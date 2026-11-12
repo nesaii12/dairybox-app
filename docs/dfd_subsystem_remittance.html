@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="mermaid.min.js"></script>
+<style>
+  body {
+    background-color: #ffffff;
+    margin: 0;
+    padding: 30px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    display: inline-block;
+  }
+  .mermaid {
+    display: inline-block;
+  }
+  svg {
+    max-width: none !important;
+  }
+</style>
+</head>
+<body>
+<div id="container" class="mermaid">
+flowchart TD
+    classDef entity fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B,font-weight:bold;
+    classDef process fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20,font-weight:bold;
+    classDef store fill:#FFF8E1,stroke:#FFA000,stroke-width:2px,color:#E65100,font-weight:bold;
+
+    Rider["Delivery Rider"]:::entity
+    Admin["Store Administrator"]:::entity
+
+    P51(("5.1: COD Order
+Aggregation")):::process
+    P52(("5.2: Cash Intake &
+Variance Reconciliation")):::process
+    P53(("5.3: Ledger Posting &
+Audit Reporting")):::process
+
+    D5[("D5: orders
+(COD Delivered)")]:::store
+    D8A[("D8a: rider_remittances
+& pivot orders")]:::store
+    D8B[("D8b: cash_ledger_entries
+(Daily Cash Ledger)")]:::store
+    D11[("D11: notifications")]:::store
+
+    %% Step 1: Aggregation
+    Rider -->|"1. Physical COD Cash Handover"| P51
+    D5 -->|"Query Delivered Orders (remittance_id IS NULL)"| P51
+    P51 -->|"Display Pending Orders & Expected Total Cash"| Admin
+
+    %% Step 2: Intake & Variance
+    Admin -->|"2. Input Actual Cash & Payment Mode (Cash/GCash)"| P52
+    P52 -->|"Compute Variance (Actual - Expected Amount)"| P52
+    P52 -->|"Action: 'Confirm' (Immediate) or 'Pending Verification'"| P52
+    P52 -->|"Create Remittance Record (REF-YYYYMMDD-XXXX)"| D8A
+    P52 -->|"Attach Selected Orders to Remittance Pivot"| D8A
+
+    %% Step 3: Posting & Clearance
+    P52 -->|"3. If Confirmed: Mark Orders as 'Paid & Remitted'"| D5
+    P52 -->|"Post Entry into Daily Cash Ledger Table"| D8B
+    P52 -->|"Send Clearance Notification to Rider"| D11
+    D11 -->|"Remittance Confirmed Alert"| Rider
+
+    %% Step 4: Verification & Reports
+    Admin -->|"4. Verify Outstanding Pending Remittances"| P53
+    P53 -->|"Confirm Remittance & Post to Daily Ledger"| D8B
+    P53 -->|"Export Daily/Monthly Audited Reports (PDF & Excel)"| Admin
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis'
+    }
+  });
+</script>
+</body>
+</html>

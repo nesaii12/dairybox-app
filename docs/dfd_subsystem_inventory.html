@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="mermaid.min.js"></script>
+<style>
+  body {
+    background-color: #ffffff;
+    margin: 0;
+    padding: 30px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    display: inline-block;
+  }
+  .mermaid {
+    display: inline-block;
+  }
+  svg {
+    max-width: none !important;
+  }
+</style>
+</head>
+<body>
+<div id="container" class="mermaid">
+flowchart TD
+    classDef entity fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B,font-weight:bold;
+    classDef process fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20,font-weight:bold;
+    classDef store fill:#FFF8E1,stroke:#FFA000,stroke-width:2px,color:#E65100,font-weight:bold;
+
+    Admin["Store Administrator"]:::entity
+    Customer["Customer"]:::entity
+
+    P21(("2.1: Product Catalog
+& Category Management")):::process
+    P22(("2.2: FIFO Batch Stock-In
+& Stock-Out Adjustment")):::process
+    P23(("2.3: Expiration Monitoring
+& Safety Safeguards")):::process
+
+    D2[("D2: products & categories")]:::store
+    D3[("D3: inventories
+(FIFO Batch Records)")]:::store
+    D11[("D11: notifications")]:::store
+
+    %% Step 1: Catalog
+    Admin -->|"1. Add/Edit Products (Milk Type, Size, Flavor, Price)"| P21
+    P21 -->|"Persist Product Master Records"| D2
+    D2 -->|"Publish Active Catalog to Storefront"| Customer
+
+    %% Step 2: FIFO Adjustments
+    Admin -->|"2. Stock-In Batch (Qty, Mfg Date, Expiry Date, Remarks)"| P22
+    P22 -->|"Create Inward Batch (remaining_stock = stock_in)"| D3
+    P22 -->|"Increment Total Product Available Stock"| D2
+
+    Admin -->|"3. Stock-Out Adjustment (Deduct Spoiled/Damaged Units)"| P22
+    P22 -->|"Deduct from Oldest Active Batches (FIFO)"| D3
+    P22 -->|"Decrement Product Stock"| D2
+
+    %% Step 3: Automated Safeguards
+    D3 -->|"Scan Batches: Expiration <= 7 Days"| P23
+    P23 -->|"Send Near-Expiry Warning Alert"| D11
+    D2 -->|"Scan Stock: Units < 10"| P23
+    P23 -->|"Send Low-Stock Alert"| D11
+    P23 -->|"Automatic Catalog Shield: Suppress Expired/Zero-Stock Items"| Customer
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis'
+    }
+  });
+</script>
+</body>
+</html>

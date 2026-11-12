@@ -7,8 +7,8 @@
   body {
     background-color: #ffffff;
     margin: 0;
-    padding: 40px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 30px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     display: inline-block;
   }
   .mermaid {
@@ -22,51 +22,45 @@
 <body>
 <div id="container" class="mermaid">
 flowchart TD
-    %% External Entities
-    Customer["Customer"]
-    Rider["Delivery Rider"]
-    Admin["Store Administrator"]
-    Xendit["Xendit Payment Gateway"]
-    OtpService["Email / SMS Gateway"]
+    classDef entity fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B,font-weight:bold;
+    classDef process fill:#E8F5E9,stroke:#2E7D32,stroke-width:3px,color:#1B5E20,font-weight:bold;
+    classDef thirdparty fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100,font-weight:bold;
+
+    %% Primary External Entities
+    Customer["Customer
+(Storefront Shopper)"]:::entity
+    Admin["Store Administrator
+(Backoffice & Warehouse Manager)"]:::entity
+    Rider["Delivery Rider
+(Field Delivery Fleet)"]:::entity
 
     %% Central Process
-    System(("0: DairyBox E-Commerce & Delivery System"))
+    System(("0: DairyBox System
+(Ordering, Delivery, Inventory & Remittances)")):::process
+
+    %% External Gateways
+    Xendit["Xendit Payment Gateway
+(Online Payments)"]:::thirdparty
+    OtpGateway["Email / SMS Gateway
+(Verification Service)"]:::thirdparty
 
     %% Customer Data Flows
-    Customer -->|"Registration, Login Credentials & OTP"| System
-    Customer -->|"Cart Actions, Delivery Info & Checkout Request"| System
-    Customer -->|"Order Cancellation Request & Reason"| System
-    Customer -->|"Product Ratings & Review Comments"| System
-    Customer -->|"Profile & Password Updates"| System
-    System -->|"Catalog Browsing, Stock & Expiration Status"| Customer
-    System -->|"Order Confirmations, Real-time Status & Notifications"| Customer
-    System -->|"Payment Invoice URL (Xendit Redirection)"| Customer
-    System -->|"Account Restriction Warnings (3-Day Suspension)"| Customer
-
-    %% Rider Data Flows
-    Rider -->|"Rider Authentication & Queue Inquiries"| System
-    Rider -->|"Arrival Status Timestamp (markArrived)"| System
-    Rider -->|"Fulfillment Status (Delivered / Failed / Post-Arrival Cancelled)"| System
-    Rider -->|"Physical COD Cash Remittance Handover"| System
-    System -->|"Assigned Deliveries, Route Address & Customer Contact"| Rider
-    System -->|"Remittance Receipts, Clearance & Confirmation Alerts"| Rider
+    Customer -->|"Registration, OTP, Cart Items, Checkout Schedule & Reviews"| System
+    System -->|"Active Catalog, Stock Availability, Order Status & In-App Alerts"| Customer
 
     %% Admin Data Flows
-    Admin -->|"Product Catalog & Category CRUD Data"| System
-    Admin -->|"Inventory Adjustments (Stock In/Out, Expiration, Mfg Dates)"| System
-    Admin -->|"Order Status Overrides & Rider Dispatch Assignments"| System
-    Admin -->|"Delivery Incident Verification & Account Restrictions"| System
-    Admin -->|"Remittance Auditing, Variance Reconciliation & Ledger Confirmation"| System
-    Admin -->|"Demand Forecast Generation Triggers"| System
-    System -->|"Sales, Inventory & Remittance PDF/Excel Reports"| System
-    System -->|"System Performance KPIs, Low-Stock & Expiry Alerts"| Admin
-    System -->|"Daily Cash Ledger Balances & Audit Trails"| Admin
+    Admin -->|"Product Catalog, FIFO Stock Adjustments, Rider Dispatch & Remittance Verification"| System
+    System -->|"Dashboard KPIs, Low Stock / Expiry Warnings, Remittance Audits & PDF/Excel Reports"| Admin
 
-    %% Third-Party Services
-    System -->|"Invoice Creation Request (Order & Amount)"| Xendit
-    Xendit -->|"Webhook Payment Callbacks (Paid / Settled / Expired)"| System
-    System -->|"Verification OTP Generation Requests"| OtpService
-    OtpService -->|"One-Time Passwords & Password Reset Links"| Customer
+    %% Rider Data Flows
+    Rider -->|"Arrival Timestamps (markArrived), Completion Status & COD Cash Turnover"| System
+    System -->|"Assigned Run Addresses, Customer Contacts, Dispatch Alerts & Remittance Receipts"| Rider
+
+    %% Third-Party Integrations
+    System -->|"Invoice Generation Request"| Xendit
+    Xendit -->|"Payment Confirmation Webhook (PAID)"| System
+    System -->|"OTP & Reset Link Triggers"| OtpGateway
+    OtpGateway -->|"One-Time Passwords"| Customer
 </div>
 <script>
   mermaid.initialize({

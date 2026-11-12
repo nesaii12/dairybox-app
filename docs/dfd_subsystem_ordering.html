@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="mermaid.min.js"></script>
+<style>
+  body {
+    background-color: #ffffff;
+    margin: 0;
+    padding: 30px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    display: inline-block;
+  }
+  .mermaid {
+    display: inline-block;
+  }
+  svg {
+    max-width: none !important;
+  }
+</style>
+</head>
+<body>
+<div id="container" class="mermaid">
+flowchart TD
+    classDef entity fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B,font-weight:bold;
+    classDef process fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20,font-weight:bold;
+    classDef store fill:#FFF8E1,stroke:#FFA000,stroke-width:2px,color:#E65100,font-weight:bold;
+    classDef thirdparty fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100,font-weight:bold;
+
+    Customer["Customer"]:::entity
+    Xendit["Xendit Payment Gateway"]:::thirdparty
+    Admin["Store Administrator"]:::entity
+
+    P31(("3.1: Staging & Cart
+Management")):::process
+    P32(("3.2: Checkout Validation
+& Stock Reservation")):::process
+    P33(("3.3: Payment Resolution
+& Order Lifecycle")):::process
+
+    D1[("D1: users
+(Restriction Check)")]:::store
+    D2[("D2: products
+(Stock Count)")]:::store
+    D3[("D3: inventories
+(FIFO Batch Deduction)")]:::store
+    D4[("D4: carts & cart_items
+(Active Batches)")]:::store
+    D5[("D5: orders & order_items
+(Order Registry)")]:::store
+    D11[("D11: notifications")]:::store
+
+    %% Step 1
+    Customer -->|"1. Add to Cart (Milk Type, Size, Qty)"| P31
+    P31 <-->|"Store & Retrieve Cart Items"| D4
+    D2 -->|"Verify Active & Fresh Stock"| P31
+
+    %% Step 2
+    Customer -->|"2. Place Order (Delivery/Pickup, Slot, Payment Mode)"| P32
+    P32 <-->|"Check 3-Day Suspension Status"| D1
+    P32 -->|"Validate Cutoff & Verify Fresh Stock"| D2
+    P32 -->|"Deduct Stock via FIFO Batch Deduction"| D3
+    P32 -->|"Update Product Aggregate Stock"| D2
+    P32 -->|"Create Order DB-YYYYMMDD-XXXX (Status: Pending)"| D5
+    P32 -->|"Clear Staged Cart Batch"| D4
+
+    %% Step 3
+    P32 -->|"3a. Online Payment: Request Invoice"| Xendit
+    Xendit -->|"3b. Webhook: Payment Verified (PAID)"| P33
+    P33 -->|"Update Payment Status = paid & Order = Confirmed"| D5
+    Customer -->|"Cancel Order (Pending Only)"| P33
+    Admin -->|"Approve / Reject Order"| P33
+    P33 -->|"Restock Goods via FIFO (if Cancelled)"| D3
+    P33 -->|"Restore Product Aggregate Stock"| D2
+    P33 -->|"Push Status Notifications"| D11
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis'
+    }
+  });
+</script>
+</body>
+</html>

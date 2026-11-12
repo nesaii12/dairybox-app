@@ -7,8 +7,8 @@
   body {
     background-color: #ffffff;
     margin: 0;
-    padding: 40px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 30px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     display: inline-block;
   }
   .mermaid {
@@ -22,125 +22,118 @@
 <body>
 <div id="container" class="mermaid">
 flowchart TD
+    classDef entity fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B,font-weight:bold;
+    classDef process fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20,font-weight:bold;
+    classDef store fill:#FFF8E1,stroke:#FFA000,stroke-width:2px,color:#E65100,font-weight:bold;
+
     %% External Entities
-    E1["Customer"]
-    E2["Delivery Rider"]
-    E3["Store Administrator"]
-    E4["Xendit Payment Gateway"]
-    E5["Email / SMS Gateway"]
+    Customer["Customer"]:::entity
+    Admin["Store Administrator"]:::entity
+    Rider["Delivery Rider"]:::entity
+    Xendit["Xendit Gateway"]:::entity
 
-    %% Data Stores
-    D1[("D1: users")]
-    D2[("D2: products & categories")]
-    D3[("D3: inventories")]
-    D4[("D4: carts & cart_items")]
-    D5[("D5: orders & order_items")]
-    D6[("D6: deliveries")]
-    D7[("D7: sales")]
-    D8[("D8: rider_remittances & cash_ledger_entries")]
-    D9[("D9: ratings")]
-    D10[("D10: forecasts")]
-    D11[("D11: notifications")]
-    D12[("D12: audit_logs")]
+    %% Subgraph 1: Customer Account & Ordering Subsystem
+    subgraph Zone1 ["1. Customer Intake & Ordering Subsystem"]
+        P1(("1.0: Account & Restriction
+Management")):::process
+        P3(("3.0: Shopping Cart, Order
+& Payment Processing")):::process
+        D1[("D1: users")]:::store
+        D4[("D4: carts & cart_items")]:::store
+        D5[("D5: orders & order_items")]:::store
+    end
 
-    %% Process 1.0: Customer & Account Management
-    P1(("1.0: Customer & Account Management"))
-    E1 -->|"Registration Form, Login, Phone/Email"| P1
-    E5 -->|"OTP Verification Codes"| P1
-    P1 -->|"Create / Update User Records"| D1
-    D1 -->|"User Credentials, Roles & Restriction Expiry"| P1
-    P1 -->|"Dispatch OTP Request"| E5
-    P1 -->|"Auth Tokens, Restriction Warnings & Profile State"| E1
-    E3 -->|"Manage Customers, Ban / Unban (3-Day Restriction)"| P1
-    P1 -->|"Write Action Logs"| D12
+    %% Subgraph 2: Warehouse Inventory Subsystem
+    subgraph Zone2 ["2. Warehouse & FIFO Inventory Subsystem"]
+        P2(("2.0: Product Catalog & FIFO
+Inventory Management")):::process
+        D2[("D2: products & categories")]:::store
+        D3[("D3: inventories
+(FIFO Batches)")]:::store
+    end
 
-    %% Process 2.0: Product & Inventory Management
-    P2(("2.0: Product & FIFO Inventory Management"))
-    E3 -->|"Product Attributes, Prices, Images & Categories"| P2
-    E3 -->|"Stock Adjustments (In/Out, Mfg & Expiry Dates, Remarks)"| P2
-    P2 -->|"CRUD Product & Category Records"| D2
-    P2 -->|"Insert Batch Log & Adjust Remaining Stock"| D3
-    D3 -->|"Batch Availability & Remaining Stock (FIFO Order)"| P2
-    D2 -->|"Product Master Data & Stock Aggregates"| P2
-    P2 -->|"Low Stock & Near-Expiry Alerts"| D11
-    P2 -->|"Log Inventory Adjustments"| D12
-    P2 -->|"Catalog Display with Expiry & Stock Badges"| E1
+    %% Subgraph 3: Logistics & Fleet Fulfillment Subsystem
+    subgraph Zone3 ["3. Fleet Logistics & Delivery Monitoring"]
+        P4(("4.0: Delivery Dispatch, Live Tracking
+& Incident Handling")):::process
+        D6[("D6: deliveries")]:::store
+    end
 
-    %% Process 3.0: Shopping Cart, Order Placement & Payments
-    P3(("3.0: Shopping Cart, Order Placement & Payments"))
-    E1 -->|"Add Item, Customizations (Milk/Size), Update Batches"| P3
-    P3 -->|"Persist Cart Items & Batches"| D4
-    D4 -->|"Fetch Active Cart Batches & Line Items"| P3
-    D2 -->|"Validate Price, Active Status & Fresh Stock"| P3
-    E1 -->|"Checkout Schedule, Fulfillment Type & Payment Option"| P3
-    P3 -->|"Create Order & Items (Status: Pending)"| D5
-    P3 -->|"Clear Checked-Out Cart Batch"| D4
-    P3 -->|"FIFO Stock Deduction (Stock Out Batch Logs)"| D3
-    P3 -->|"Update Aggregated Product Stock"| D2
-    P3 -->|"Invoice Creation Request"| E4
-    E4 -->|"Webhook: Invoice Settled / Paid"| P3
-    P3 -->|"Update Payment Status (Paid, Channel, Paid_At)"| D5
-    E1 -->|"Order Cancellation Request (Pending Only)"| P3
-    E3 -->|"Admin Order Status Update (Confirmed/Cancelled/Preparing)"| P3
-    P3 -->|"FIFO Stock Restoration (on Cancellation)"| D3
-    P3 -->|"Update Product Stock (on Cancellation)"| D2
-    P3 -->|"Order Dispatched / Cancelled Notifications"| D11
-    P3 -->|"Log Order Lifecycle Events"| D12
-    P3 -->|"Order Summary, Invoice Redirect & Status"| E1
+    %% Subgraph 4: Financial Settlement & Daily Cash Ledger
+    subgraph Zone4 ["4. Financial Settlement & Remittances"]
+        P5(("5.0: Rider Remittance & Daily
+Cash Ledger Management")):::process
+        D7[("D7: sales")]:::store
+        D8[("D8: rider_remittances &
+cash_ledger_entries")]:::store
+    end
 
-    %% Process 4.0: Delivery Dispatch, Live Tracking & Incident Handling
-    P4(("4.0: Delivery Dispatch, Live Tracking & Incident Handling"))
-    E3 -->|"Assign Rider to Order"| P4
-    D5 -->|"Order Details, Delivery Address & Payment Method"| P4
-    P4 -->|"Create / Update Delivery Record (Out for Delivery)"| D6
-    P4 -->|"Update Order Status (Out for Delivery)"| D5
-    P4 -->|"Dispatch Queue & Arrival Push Alerts"| D11
-    D6 -->|"Active Runs, Queues & Delivery Details"| P4
-    P4 -->|"Real-time Live Check / Deliveries List"| E2
-    E2 -->|"Mark Arrival at Destination (markArrived)"| P4
-    P4 -->|"Timestamp Arrival (arrived_at)"| D6
-    P4 -->|"Alert Customer of Rider Arrival"| D11
-    E2 -->|"Fulfillment Outcome (Delivered / Cancelled / Failed)"| P4
-    P4 -->|"Update Delivery Outcome & Timestamps"| D6
-    P4 -->|"Update Order Status (Delivered - Pending Remittance / Cancelled)"| D5
-    P4 -->|"Generate Sales Record (if Delivered)"| D7
-    P4 -->|"FIFO Restock Returned Goods (if Delivery Cancelled/Failed)"| D3
-    P4 -->|"Alert Admin of Post-Arrival Cancellation Incident"| D11
-    E3 -->|"Verify Post-Arrival Incident & Suspend Account"| P4
-    P4 -->|"Apply 3-Day Restriction (restricted_until)"| D1
-    P4 -->|"Log Delivery Audit Trails"| D12
-    P4 -->|"Fulfillment Confirmations"| E2
+    %% Subgraph 5: Analytics & Intelligence Subsystem
+    subgraph Zone5 ["5. Analytics, Feedback & Intelligence"]
+        P6(("6.0: Sales Analytics, Forecasting
+& Customer Feedback")):::process
+        D9[("D9: ratings")]:::store
+        D10[("D10: forecasts")]:::store
+        D11[("D11: notifications")]:::store
+        D12[("D12: audit_logs")]:::store
+    end
 
-    %% Process 5.0: Rider Remittance & Daily Cash Ledger
-    P5(("5.0: Rider Remittance & Daily Cash Ledger"))
-    E2 -->|"Cash Turnover & Handover of Collected COD"| P5
-    D5 -->|"Fetch Unremitted COD Orders (Delivered, Remittance_Id Null)"| P5
-    E3 -->|"Input Remittance Form (Actual Cash, Payment Mode, Action Type)"| P5
-    P5 -->|"Create Rider Remittance Record (Pending or Confirmed)"| D8
-    P5 -->|"Attach Orders to Remittance Pivot & Set Status to Paid & Remitted"| D5
-    P5 -->|"Record Daily Cash Ledger Entry (Expected, Actual, Variance)"| D8
-    E3 -->|"Verify & Confirm Pending Remittances"| P5
-    P5 -->|"Update Remittance Status to Confirmed & Log Ledger Entry"| D8
-    D8 -->|"Remittance History & Daily Ledger Balances"| P5
-    P5 -->|"Remittance Clearance Notifications"| D11
-    P5 -->|"Log Remittance Audit Details"| D12
-    P5 -->|"Export Remittance Reports (PDF & Excel)"| E3
-    P5 -->|"Remittance Receipts & Cleared History"| E2
+    %% Core Data Interconnections
+    %% Zone 1 (Customer & Orders)
+    Customer -->|"Registration, OTP & Profile"| P1
+    P1 <-->|"Read/Write User Accounts & 3-Day Suspensions"| D1
+    Customer -->|"Cart Batches & Customizations"| P3
+    P3 <-->|"Manage Staged Batches"| D4
+    P3 -->|"Create Order (Pending) & Items"| D5
+    P3 -->|"Deduct Batch Stock (FIFO)"| D3
+    P3 -->|"Update Available Stock"| D2
+    P3 -->|"Create Online Invoice"| Xendit
+    Xendit -->|"Webhook Payment Callback"| P3
+    P3 -->|"Update Payment Status (Paid)"| D5
+    P3 -->|"Push Order Alerts"| D11
 
-    %% Process 6.0: Sales Analytics, Reporting & Forecasting
-    P6(("6.0: Sales Analytics, Reporting & Forecasting"))
-    D7 -->|"Sales Transactions & Historical Revenue Records"| P6
-    D5 -->|"Order Item Quantities & Fulfillment Types"| P6
-    D3 -->|"Inventory Batch History & Expiry Logs"| P6
-    D9 -->|"Customer Product Ratings & Reviews"| P6
-    P6 -->|"Compute Linear Demand Forecasts by Month"| D10
-    D10 -->|"Target Month Predictions & Recommended Restock Units"| P6
-    E3 -->|"Trigger Forecast Generation / Filter Analytics Timeframe"| P6
-    P6 -->|"Render Dashboard KPIs, Sales Trends & Top Products"| E3
-    P6 -->|"Generate Sales & Inventory PDF/Excel Reports"| E3
-    E1 -->|"Submit Product Rating & Review"| P6
-    P6 -->|"Save Rating & Feedback (Verified Buyers Only)"| D9
-    P6 -->|"Log Analytics & Report Access"| D12
+    %% Zone 2 (Inventory)
+    Admin -->|"Product Catalog CRUD & Stock In/Out Adjustments"| P2
+    P2 <-->|"Product Master Data"| D2
+    P2 <-->|"Batch Logs (Mfg & Expiry Dates)"| D3
+    P2 -->|"Broadcast Low Stock / Expiry Alerts"| D11
+    P2 -->|"Display Active Catalog & Live Stock"| Customer
+
+    %% Zone 3 (Delivery)
+    Admin -->|"Assign Rider to Confirmed Order"| P4
+    D5 -->|"Order Details & Address"| P4
+    P4 -->|"Create / Update Delivery Record"| D6
+    P4 -->|"Update Order (Out for Delivery)"| D5
+    P4 -->|"Dispatch Alerts & Real-time Live Queue"| Rider
+    Rider -->|"Mark Arrival at Location (arrived_at)"| P4
+    P4 -->|"Notify Customer of Arrival"| D11
+    Rider -->|"Submit Delivery Outcome (Delivered / Cancelled)"| P4
+    P4 -->|"Update Delivery Timestamps"| D6
+    P4 -->|"Set Order (Delivered - Pending Remittance)"| D5
+    P4 -->|"Restock Goods if Delivery Cancelled/Failed"| D3
+    P4 -->|"Alert Admin if Cancelled Post-Arrival (Incident)"| D11
+    Admin -->|"Verify Incident & Impose 3-Day Suspension"| P4
+    P4 -->|"Set Customer Status = Restricted (3 Days)"| D1
+
+    %% Zone 4 (Remittance & Sales)
+    P4 -->|"Insert Revenue Record on Successful Delivery"| D7
+    Rider -->|"Handover Collected COD Cash"| P5
+    D5 -->|"Fetch Completed Unremitted COD Orders"| P5
+    Admin -->|"Submit Remittance Form & Reconcile Variance"| P5
+    P5 -->|"Save Remittance & Order Pivot Associations"| D8
+    P5 -->|"Update Order Status to 'Paid & Remitted'"| D5
+    P5 -->|"Post Confirmed Turnover to Daily Cash Ledger"| D8
+    P5 -->|"Remittance Clearance Receipt"| Rider
+    P5 -->|"Export Audited Remittance Reports (PDF/Excel)"| Admin
+
+    %% Zone 5 (Analytics & Forecasting)
+    Customer -->|"Submit Star Rating & Review (Verified Buyers)"| P6
+    P6 -->|"Store Product Feedback"| D9
+    D7 -->|"Sales Revenues"| P6
+    D5 -->|"Product Quantities"| P6
+    P6 -->|"Compute Demand Forecasts & Restock Targets"| D10
+    P6 -->|"Render Dashboard KPIs & Trend Visualizations"| Admin
+    P1 & P2 & P3 & P4 & P5 & P6 -->|"Log Regulatory & Administrative Actions"| D12
 </div>
 <script>
   mermaid.initialize({
