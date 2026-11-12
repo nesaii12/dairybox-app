@@ -78,6 +78,11 @@
                 <a href="{{ route('admin.deliveries.index', array_merge(request()->query(), ['status' => $key, 'page' => 1])) }}"
                     class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all {{ $statusFilter === $key ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60' }}">
                     <span>{{ $label }}</span>
+                    @if($key === 'arrived' && $arrivedCount > 0)
+                        <span class="ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-black {{ $statusFilter === 'arrived' ? 'bg-white text-amber-600' : 'bg-amber-500 text-white' }}">
+                            {{ $arrivedCount }}
+                        </span>
+                    @endif
                     @if($key === 'incidents' && $incidentsCount > 0)
                         <span class="ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-black {{ $statusFilter === 'incidents' ? 'bg-white text-rose-600' : 'bg-rose-500 text-white' }}">
                             {{ $incidentsCount }}

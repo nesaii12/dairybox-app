@@ -239,9 +239,17 @@
                     <span>Rider Remittance</span>
                 </a>
 
-                <a href="{{ route('admin.deliveries.index') }}" class="group flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.deliveries.*') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                    <i class="bi bi-truck text-base {{ request()->routeIs('admin.deliveries.*') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200' }}"></i>
-                    <span>Delivery Monitor</span>
+                <a href="{{ route('admin.deliveries.index') }}" class="group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.deliveries.*') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                    <div class="flex items-center space-x-3">
+                        <i class="bi bi-truck text-base {{ request()->routeIs('admin.deliveries.*') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200' }}"></i>
+                        <span>Delivery Monitor</span>
+                    </div>
+                    @if(($arrivedDeliveriesCount ?? 0) > 0)
+                        <span class="inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold rounded-full {{ request()->routeIs('admin.deliveries.*') ? 'bg-sky-950/90 text-amber-300 border border-amber-400/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30' }}" title="{{ $arrivedDeliveriesCount }} rider(s) arrived at customer location">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1 animate-pulse"></span>
+                            {{ $arrivedDeliveriesCount }}
+                        </span>
+                    @endif
                 </a>
 
                 <a href="{{ route('admin.forecast.index') }}" class="group flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.forecast.index') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">

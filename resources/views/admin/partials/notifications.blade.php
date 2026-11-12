@@ -42,6 +42,7 @@
                     $isExpiryAlert = str_contains(strtolower($notif->title), 'expir');
                     $isCriticalExpiry = str_contains(strtolower($notif->title), 'critical') || str_contains(strtolower($notif->title), 'expired') || str_contains(strtolower($notif->title), 'urgent');
                     $isLowStock = str_contains(strtolower($notif->title), 'low stock');
+                    $isRiderArrived = str_contains(strtolower($notif->title), 'arrived');
                 @endphp
                 <div class="group relative admin-notif-item p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/40 {{ !$notif->is_read ? 'bg-sky-50/15' : '' }}" data-id="{{ $notif->id }}">
                     <a href="{{ route('notifications.readAndRedirect', $notif->id) }}" class="flex space-x-2.5 min-w-0 flex-1 block">
@@ -53,6 +54,10 @@
                             @elseif($isLowStock)
                                 <div class="w-6 h-6 rounded-lg flex items-center justify-center bg-rose-50 text-rose-600 border border-rose-100">
                                     <i class="bi bi-box-seam text-xs"></i>
+                                </div>
+                            @elseif($isRiderArrived)
+                                <div class="w-6 h-6 rounded-lg flex items-center justify-center bg-amber-50 text-amber-600 border border-amber-100">
+                                    <i class="bi bi-geo-alt-fill text-xs"></i>
                                 </div>
                             @elseif(!$notif->is_read)
                                 <span class="notif-dot block w-2 h-2 mt-1 rounded-full bg-sky-500 ring-4 ring-sky-100"></span>

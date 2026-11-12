@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Order;
+use App\Models\Delivery;
 use App\Models\AppNotification;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -40,6 +41,14 @@ class AppServiceProvider extends ServiceProvider
             }
 
             try {
+                $arrivedDeliveriesCount = Delivery::where('delivery_status', 'Out for Delivery')
+                    ->whereNotNull('arrived_at')
+                    ->count();
+            } catch (\Throwable $e) {
+                $arrivedDeliveriesCount = 0;
+            }
+
+            try {
                 \App\Services\ExpiryNotificationService::checkAndNotify();
             } catch (\Throwable $e) {
                 // Ignore transient check errors
@@ -56,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with([
                 'pendingOrdersCount' => $pendingOrdersCount,
+                'arrivedDeliveriesCount' => $arrivedDeliveriesCount,
                 'adminNotifCount' => $adminNotifCount,
                 'adminNotifications' => $adminNotifications,
             ]);
