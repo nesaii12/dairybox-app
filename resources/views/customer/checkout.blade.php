@@ -14,21 +14,18 @@
     </a>
     <div class="flex flex-wrap items-center gap-3 mt-2">
         <h2 class="text-2xl font-black text-slate-900">Order Summary &amp; Checkout</h2>
-        @if(isset($batchNumber))
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0284c7] text-white text-xs font-black tracking-wide shadow-2xs">
-                <i class="bi bi-box-seam text-[11px]"></i>
-                <span>#{{ $batchNumber }}</span>
-            </span>
-            <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">
-                {{ $batchItemCount }} {{ \Illuminate\Support\Str::plural('item', $batchItemCount) }} &bull; {{ $batchUnitCount }} {{ \Illuminate\Support\Str::plural('unit', $batchUnitCount) }}
-            </span>
-        @endif
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">
+            {{ $batchItemCount }} {{ \Illuminate\Support\Str::plural('item', $batchItemCount) }} &bull; {{ $batchUnitCount }} {{ \Illuminate\Support\Str::plural('unit', $batchUnitCount) }}
+        </span>
     </div>
-    <p class="text-xs text-slate-500 mt-1">Review the items for Cart #{{ $batchNumber ?? 1 }} and complete your shipping and payment details.</p>
+    <p class="text-xs text-slate-500 mt-1">Review your selected products and complete your shipping and payment details.</p>
 </div>
 
 <form action="{{ route('customer.checkout.placeOrder') }}" method="POST" id="checkout-form">
     @csrf
+    @foreach($items as $item)
+        <input type="hidden" name="item_ids[]" value="{{ $item->id }}">
+    @endforeach
     @if(isset($selectedBatch))
         <input type="hidden" name="batch_id" value="{{ $selectedBatch->id }}">
     @endif
@@ -215,14 +212,8 @@
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="text-base font-black text-slate-950">Order Summary</h3>
-                        <p class="text-[10px] text-slate-400 font-medium">Cart {{ $batchNumber ?? 1 }}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">{{ $batchItemCount }} {{ \Illuminate\Support\Str::plural('item', $batchItemCount) }} selected</p>
                     </div>
-                    @if(isset($batchNumber))
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0284c7] text-white text-[11px] font-black shadow-2xs">
-                            <i class="bi bi-box-seam text-[10px]"></i>
-                            <span>#{{ $batchNumber }}</span>
-                        </span>
-                    @endif
                 </div>
 
                 <!-- Customer & Shipping Summary Snapshot -->

@@ -6,247 +6,305 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
     <div>
         <h2 class="text-2xl font-black text-slate-900">Shopping Cart</h2>
-        <p class="text-xs text-slate-500">Review your carts and adjust quantities before placing your order.</p>
+        <p class="text-xs text-slate-500">Review your products, adjust quantities, and select items to checkout.</p>
     </div>
 
-    @if($batches->isNotEmpty())
+    @if($items->isNotEmpty())
         <div class="flex items-center gap-2.5">
             <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
-                <i class="bi bi-layers text-sky-600"></i>
-                <span>{{ $batches->count() }} {{ \Illuminate\Support\Str::plural('Cart', $batches->count()) }}</span>
+                <i class="bi bi-cart-check text-sky-600"></i>
+                <span><span id="totalItemsHeaderCount">{{ $items->count() }}</span> {{ \Illuminate\Support\Str::plural('Product', $items->count()) }}</span>
             </span>
-            <a href="{{ route('customer.catalog', ['new_batch' => 1]) }}" class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200/80 transition-all shadow-2xs">
-                <i class="bi bi-plus-circle-fill text-sky-600"></i>
-                <span>New Cart</span>
+            <a href="{{ route('customer.catalog') }}" class="inline-flex items-center space-x-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200/80 transition-all shadow-2xs">
+                <i class="bi bi-shop text-sky-600"></i>
+                <span>Add More Products</span>
             </a>
         </div>
     @endif
 </div>
 
-@if($batches->isEmpty())
+@if($items->isEmpty())
     <div class="bg-white rounded-2xl border border-slate-100 p-12 text-center shadow-sm max-w-lg mx-auto mt-12">
         <i class="bi bi-cart-x text-5xl text-slate-300 mb-4 block"></i>
         <h3 class="text-base font-bold text-slate-800">Your Cart is Empty</h3>
-        <p class="text-xs text-slate-500 mt-1">Explore our delicious milk flavors and ice creams to add them here.</p>
+        <p class="text-xs text-slate-500 mt-1">Explore our delicious fresh milks, yogurts, and ice creams to add them to your cart.</p>
         <a href="{{ route('customer.catalog') }}" class="mt-6 inline-flex items-center space-x-2 py-2.5 px-5 rounded-xl text-xs font-bold text-white bg-sky-500 hover:bg-sky-600 transition-all shadow-md shadow-sky-100">
             <i class="bi bi-shop"></i>
             <span>Browse Products</span>
         </a>
     </div>
 @else
-    <div class="space-y-6">
-        @foreach($batches as $batch)
-            @php
-                $batchNumber = $batch->cart_number ?? ($batches->count() - $loop->index);
-                $batchSubtotal = $batch->cartItems->sum('subtotal');
-                $batchUnitCount = $batch->cartItems->sum('quantity');
-                $batchItemCount = $batch->cartItems->count();
-                $batchHasStockExceeded = $batch->cartItems->contains(function ($i) {
-                    return !$i->product || $i->product->stock <= 0 || $i->quantity > $i->product->stock;
-                });
-                $latestActivity = $batch->updated_at ?? $batch->created_at;
-            @endphp
+    <!-- Consolidated Merged Shopping Cart Layout -->
+    <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden mb-8">
+        
+        <!-- Cart Table Header Bar with Select All -->
+        <div class="bg-slate-50/90 border-b border-slate-200/80 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+            <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+                <input type="checkbox" id="selectAllCheckbox" checked class="h-4.5 w-4.5 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer">
+                <span class="text-xs font-bold text-slate-800">Select All (<span id="selectAllLabelCount">{{ $items->count() }}</span> items)</span>
+            </label>
+            <span class="text-[11px] text-slate-400 font-medium hidden sm:inline">Choose specific products to checkout</span>
+        </div>
 
-            <!-- Distinct Cart Container Box -->
-            <div class="cart-batch-box bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden transition-all" id="cart-batch-{{ $batch->id }}" data-batch-id="{{ $batch->id }}">
-                
-                <!-- Cart Header Bar -->
-                <div class="bg-slate-50/90 border-b border-slate-200/80 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0284c7] text-white text-xs font-black tracking-wide shadow-2xs">
-                            <i class="bi bi-box-seam text-[11px]"></i>
-                            <span>#{{ $batchNumber }}</span>
-                        </span>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs font-bold text-slate-800">
-                                    Cart {{ $batchNumber }} &mdash; Added {{ $latestActivity ? $latestActivity->diffForHumans() : 'recently' }}
-                                </span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-600">
-                                    {{ $batchItemCount }} {{ \Illuminate\Support\Str::plural('item', $batchItemCount) }} &bull;
-                                    <span class="batch-unit-count ml-0.5" data-batch-id="{{ $batch->id }}">{{ $batchUnitCount }}</span>&nbsp;{{ \Illuminate\Support\Str::plural('unit', $batchUnitCount) }}
-                                </span>
-                            </div>
-                            @if($latestActivity)
-                                <span class="block text-[10px] text-slate-400 font-medium mt-0.5">
-                                    Recorded {{ $latestActivity->format('M d, Y h:i A') }}
-                                </span>
+        <!-- Merged Product Items List -->
+        <div class="divide-y divide-slate-100" id="cartItemsList">
+            @foreach($items as $item)
+                @php
+                    $itemCustom = \App\Models\Product::getCartItemCustomization($item->id, $item->product);
+                    $isExpired = $item->product?->expiration_date && \Carbon\Carbon::parse($item->product->expiration_date)->startOfDay()->lt(now()->startOfDay());
+                    $isOutOfStock = !$item->product || $item->product->stock <= 0;
+                    $isItemUnavailable = $isExpired || $isOutOfStock || ($item->product?->status !== 'active');
+                @endphp
+                <div class="cart-item-row p-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/40 transition-colors {{ $isItemUnavailable ? 'opacity-70 bg-slate-50/30' : '' }}"
+                     id="cart-item-{{ $item->id }}"
+                     data-item-id="{{ $item->id }}"
+                     data-subtotal="{{ (float) $item->subtotal }}"
+                     data-qty="{{ $item->quantity }}"
+                     data-unavailable="{{ $isItemUnavailable ? '1' : '0' }}">
+                    
+                    <!-- Checkbox, Image & Product Details -->
+                    <div class="flex items-center space-x-3.5 w-full sm:w-auto flex-1 min-w-0">
+                        <!-- Checkbox to select specific product -->
+                        <div class="flex items-center flex-shrink-0">
+                            <input type="checkbox"
+                                   name="selected_items[]"
+                                   value="{{ $item->id }}"
+                                   class="item-checkbox h-4.5 w-4.5 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                   {{ $isItemUnavailable ? 'disabled' : 'checked' }}
+                                   data-id="{{ $item->id }}"
+                                   data-subtotal="{{ (float) $item->subtotal }}"
+                                   data-qty="{{ $item->quantity }}"
+                                   title="{{ $isExpired ? 'Product expired' : ($isOutOfStock ? 'Out of stock' : 'Select product for checkout') }}">
+                        </div>
+
+                        <!-- Product Thumbnail -->
+                        <a href="{{ route('customer.product', $item->product->id) }}" class="h-16 w-16 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 hover:opacity-90 transition-opacity">
+                            @if($item->product->image)
+                                <img src="{{ asset('storage/' . $item->product->image) }}" alt="{{ $item->product->product_name }}" class="h-full w-full object-cover">
+                            @else
+                                <i class="bi bi-image text-slate-300 text-xl"></i>
                             @endif
+                        </a>
+
+                        <!-- Name and Customization Options -->
+                        <div class="min-w-0 flex-1">
+                            <h4 class="text-sm font-bold text-slate-900 hover:text-sky-600 truncate">
+                                <a href="{{ route('customer.product', $item->product->id) }}">{{ $item->product->product_name }}</a>
+                            </h4>
+                            <div class="flex flex-wrap gap-1.5 mt-1 items-center">
+                                <span class="bg-slate-100 border border-slate-200/70 text-slate-700 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase">{{ $itemCustom['milk_type'] }} Milk</span>
+                                <span class="bg-sky-50 border border-sky-200/70 text-sky-800 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase">Size: {{ $itemCustom['size'] }}</span>
+                                @if($item->product->manufacturing_date)
+                                    <span class="bg-slate-50 border border-slate-100 text-slate-500 text-[9px] px-2 py-0.5 rounded font-medium">Mfg: {{ \Carbon\Carbon::parse($item->product->manufacturing_date)->format('M d, Y') }}</span>
+                                @endif
+                                @if($item->product->expiration_date)
+                                    <span class="bg-amber-50 border border-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-medium">Exp: {{ \Carbon\Carbon::parse($item->product->expiration_date)->format('M d, Y') }}</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Cart Action Controls -->
-                    <div class="flex items-center gap-2">
-                        <a href="{{ route('customer.catalog', ['batch' => $batch->id]) }}"
-                           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200/70 transition-all"
-                           title="Add more products to Cart #{{ $batchNumber }}">
-                            <i class="bi bi-plus-lg text-[10px]"></i>
-                            <span>Add to Cart</span>
-                        </a>
+                    <!-- Unit Price, Stepper, Subtotal, Remove Action -->
+                    <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+                        <!-- Unit Price -->
+                        <div class="text-left sm:text-right min-w-[70px]">
+                            <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Unit Price</span>
+                            <span class="text-sm font-bold text-slate-900">₱{{ number_format($item->unit_price, 2) }}</span>
+                            @if($isExpired)
+                                <span class="block text-[9px] font-bold text-rose-600">Expired</span>
+                            @elseif($isOutOfStock)
+                                <span class="block text-[9px] font-bold text-rose-600">Out of stock</span>
+                            @elseif($item->product->stock <= 5)
+                                <span class="block text-[9px] font-bold text-amber-600">Only {{ $item->product->stock }} left</span>
+                            @else
+                                <span class="block text-[9px] text-slate-400 font-medium">{{ $item->product->stock }} in stock</span>
+                            @endif
+                        </div>
 
-                        <button type="button"
-                                onclick="focusBatchQuantities({{ $batch->id }})"
-                                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer"
-                                title="Edit quantities in Cart #{{ $batchNumber }}">
-                            <i class="bi bi-pencil-square text-[10px] text-slate-500"></i>
-                            <span>Edit Cart</span>
-                        </button>
-
-                        <form action="{{ route('customer.cart.removeBatch', $batch->id) }}" method="POST" onsubmit="return confirm('Remove Cart #{{ $batchNumber }} and all items inside this cart?')">
+                        <!-- Stepper Form -->
+                        <form action="{{ route('customer.cart.update', $item->id) }}" method="POST"
+                              class="cart-qty-form flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 w-28 justify-between focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400/20 transition-all"
+                              data-item-id="{{ $item->id }}"
+                              data-stock="{{ $item->product->stock }}">
                             @csrf
-                            <button type="submit"
-                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold text-rose-600 bg-rose-50/80 hover:bg-rose-100 border border-rose-200/70 transition-all cursor-pointer"
-                                    title="Remove entire Cart #{{ $batchNumber }}">
-                                <i class="bi bi-trash3 text-[11px]"></i>
-                                <span>Remove Cart</span>
+                            <button type="button" class="btn-qty-minus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $item->quantity <= 1 ? 'disabled' : '' }} title="Decrease">
+                                <i class="bi bi-dash pointer-events-none"></i>
+                            </button>
+                            <input type="number" name="quantity" value="{{ min($item->quantity, max(1, $item->product->stock)) }}" min="1" max="{{ max(1, $item->product->stock) }}"
+                                class="qty-input w-full min-w-0 text-center text-xs font-bold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                autocomplete="off"
+                                title="Enter quantity">
+                            <button type="button" class="btn-qty-plus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $item->product->stock <= $item->quantity ? 'disabled' : '' }} title="Increase">
+                                <i class="bi bi-plus pointer-events-none"></i>
+                            </button>
+                        </form>
+
+                        <!-- Subtotal -->
+                        <div class="text-right min-w-[80px]">
+                            <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Subtotal</span>
+                            <span class="item-subtotal text-sm font-black text-slate-950">₱{{ number_format($item->subtotal, 2) }}</span>
+                        </div>
+
+                        <!-- Remove Item Button -->
+                        <form action="{{ route('customer.cart.remove', $item->id) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all cursor-pointer" title="Remove item from cart">
+                                <i class="bi bi-trash3 text-base"></i>
                             </button>
                         </form>
                     </div>
                 </div>
+            @endforeach
+        </div>
 
-                <!-- Batch Items List Inside the Box -->
-                <div class="divide-y divide-slate-100">
-                    @foreach($batch->cartItems as $item)
-                        <div class="cart-item-row p-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/40 transition-colors"
-                             id="cart-item-{{ $item->id }}"
-                             data-batch-id="{{ $batch->id }}">
-                            <!-- Product Thumb & Names -->
-                            <div class="flex items-center space-x-4 w-full sm:w-auto">
-                                <div class="h-16 w-16 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0">
-                                    @if($item->product->image)
-                                        <img src="{{ asset('storage/' . $item->product->image) }}" alt="{{ $item->product->product_name }}" class="h-full w-full object-cover">
-                                    @else
-                                        <i class="bi bi-image text-slate-300 text-xl"></i>
-                                    @endif
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-bold text-slate-900 hover:text-sky-600">
-                                        <a href="{{ route('customer.product', $item->product->id) }}">{{ $item->product->product_name }}</a>
-                                    </h4>
-                                    @php
-                                        $itemCustom = \App\Models\Product::getCartItemCustomization($item->id, $item->product);
-                                    @endphp
-                                    <div class="flex flex-wrap gap-1.5 mt-1 items-center">
-                                        <span class="bg-slate-50 border border-slate-100 text-slate-600 text-[9px] px-2 py-0.5 rounded font-bold uppercase">{{ $itemCustom['milk_type'] }} Milk</span>
-                                        <span class="bg-slate-50 border border-slate-100 text-slate-600 text-[9px] px-2 py-0.5 rounded font-bold uppercase">Size: {{ $itemCustom['size'] }}</span>
-                                        @if($item->product->manufacturing_date)
-                                            <span class="bg-sky-50 border border-sky-100 text-sky-700 text-[9px] px-2 py-0.5 rounded font-medium">Mfg: {{ \Carbon\Carbon::parse($item->product->manufacturing_date)->format('M d, Y') }}</span>
-                                        @endif
-                                        @if($item->product->expiration_date)
-                                            <span class="bg-amber-50 border border-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-medium">Exp: {{ \Carbon\Carbon::parse($item->product->expiration_date)->format('M d, Y') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Quantity Adjust Controls -->
-                            <div class="flex items-center justify-between sm:justify-start gap-5 sm:gap-8 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-50">
-                                <div class="text-left sm:text-right">
-                                    <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Unit Price</span>
-                                    <span class="text-sm font-bold text-slate-900">₱{{ number_format($item->unit_price, 2) }}</span>
-                                    @if($item->product->stock <= 0)
-                                        <span class="block text-[9px] font-bold text-rose-600">Out of stock</span>
-                                    @elseif($item->product->stock <= 5)
-                                        <span class="block text-[9px] font-bold text-amber-600">Only {{ $item->product->stock }} left</span>
-                                    @else
-                                        <span class="block text-[9px] text-slate-400 font-medium">{{ $item->product->stock }} in stock</span>
-                                    @endif
-                                </div>
-                                
-                                <!-- Form with inline post submission / AJAX handling -->
-                                <form action="{{ route('customer.cart.update', $item->id) }}" method="POST"
-                                      class="cart-qty-form flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 w-28 justify-between focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400/20 transition-all"
-                                      data-item-id="{{ $item->id }}"
-                                      data-batch-id="{{ $batch->id }}"
-                                      data-stock="{{ $item->product->stock }}">
-                                    @csrf
-                                    <button type="button" class="btn-qty-minus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $item->quantity <= 1 ? 'disabled' : '' }} title="Decrease">
-                                        <i class="bi bi-dash pointer-events-none"></i>
-                                    </button>
-                                    <input type="number" name="quantity" value="{{ min($item->quantity, max(1, $item->product->stock)) }}" min="1" max="{{ max(1, $item->product->stock) }}"
-                                        class="qty-input w-full min-w-0 text-center text-xs font-bold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        autocomplete="off"
-                                        title="Enter quantity">
-                                    <button type="button" class="btn-qty-plus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $item->product->stock <= $item->quantity ? 'disabled' : '' }} title="Increase">
-                                        <i class="bi bi-plus pointer-events-none"></i>
-                                    </button>
-                                </form>
-
-                                <div class="text-right min-w-[80px]">
-                                    <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Subtotal</span>
-                                    <span class="item-subtotal text-sm font-black text-slate-950">₱{{ number_format($item->subtotal, 2) }}</span>
-                                </div>
-
-                                <!-- Remove Single Item button -->
-                                <form action="{{ route('customer.cart.remove', $item->id) }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all cursor-pointer" title="Remove Item from Cart #{{ $batchNumber }}">
-                                        <i class="bi bi-trash3 text-base"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-
-                <!-- Cart Footer with Individual Cart Subtotal & Prominent "Checkout Cart" Button -->
-                <div class="bg-slate-50/70 border-t border-slate-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <span class="text-xs text-slate-500 font-semibold">
-                        #{{ $batchNumber }} Total (<span class="batch-unit-count font-bold text-slate-700" data-batch-id="{{ $batch->id }}">{{ $batchUnitCount }}</span> units)
-                    </span>
-
-                    <div class="flex flex-wrap items-center justify-between sm:justify-end gap-4 sm:gap-5">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Cart Subtotal:</span>
-                            <span class="batch-subtotal text-lg font-black text-sky-600" data-batch-id="{{ $batch->id }}">₱{{ number_format($batchSubtotal, 2) }}</span>
-                        </div>
-
-                        @if(auth()->user()->isRestricted())
-                            <button type="button" disabled
-                                    class="inline-flex items-center space-x-2 py-2.5 px-5 rounded-xl text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed"
-                                    title="Ordering restricted until {{ auth()->user()->restricted_until->format('M d, Y h:i A') }}">
-                                <i class="bi bi-lock-fill"></i>
-                                <span>Checkout Restricted</span>
-                            </button>
-                        @elseif($batchHasStockExceeded)
-                            <button type="button" disabled
-                                    class="inline-flex items-center space-x-2 py-2.5 px-5 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 cursor-not-allowed"
-                                    title="Adjust item quantities to match available warehouse stock">
-                                <i class="bi bi-exclamation-triangle-fill"></i>
-                                <span>Stock Limit Exceeded</span>
-                            </button>
-                        @else
-                            <a href="{{ route('customer.checkout.index', ['batch' => $batch->id]) }}"
-                               class="inline-flex items-center space-x-2 py-2.5 px-5 rounded-xl text-xs font-black text-white bg-sky-500 hover:bg-sky-600 shadow-md shadow-sky-500/20 transition-all hover:-translate-y-0.5 cursor-pointer">
-                                <span>Checkout Cart</span>
-                                <i class="bi bi-arrow-right"></i>
-                            </a>
-                        @endif
-                    </div>
-                </div>
+        <!-- Sticky / Bottom Consolidated Checkout Bar -->
+        <div class="bg-slate-50/95 border-t border-slate-200/90 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky bottom-0 z-20 shadow-md">
+            <!-- Left: Checkbox & Count Info -->
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="bottomSelectAllCheckbox" checked class="h-4.5 w-4.5 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer">
+                    <span class="text-xs font-bold text-slate-700">Select All</span>
+                </label>
+                <span class="text-slate-300">|</span>
+                <span class="text-xs text-slate-600">
+                    Selected: <span id="selectedCountDisplay" class="font-bold text-slate-900">{{ $items->where('product.stock', '>', 0)->count() }}</span> of {{ $items->count() }} items
+                    (<span id="selectedUnitsDisplay" class="font-bold text-slate-900">{{ $items->where('product.stock', '>', 0)->sum('quantity') }}</span> units)
+                </span>
             </div>
-        @endforeach
+
+            <!-- Right: Subtotal & Checkout Action Button -->
+            <div class="flex items-center justify-between sm:justify-end gap-5">
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Selected</span>
+                    <span class="text-xl font-black text-sky-600" id="selectedTotalDisplay">₱{{ number_format($total, 2) }}</span>
+                </div>
+
+                @if(auth()->user()->isRestricted())
+                    <button type="button" disabled
+                            class="inline-flex items-center space-x-2 py-2.5 px-6 rounded-xl text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed"
+                            title="Ordering restricted until {{ auth()->user()->restricted_until->format('M d, Y h:i A') }}">
+                        <i class="bi bi-lock-fill"></i>
+                        <span>Checkout Restricted</span>
+                    </button>
+                @else
+                    <button type="button"
+                            id="checkoutSelectedBtn"
+                            onclick="proceedToCheckout()"
+                            class="inline-flex items-center space-x-2 py-3 px-7 rounded-xl text-xs font-black text-white bg-sky-500 hover:bg-sky-600 shadow-md shadow-sky-500/20 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                        <span>Checkout Selected (<span id="btnSelectedCount">{{ $items->where('product.stock', '>', 0)->count() }}</span>)</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </button>
+                @endif
+            </div>
+        </div>
     </div>
 @endif
 
 <script>
-function focusBatchQuantities(batchId) {
-    const batchBox = document.getElementById(`cart-batch-${batchId}`);
-    if (!batchBox) return;
+// Calculate and update selection statistics in real time
+function updateSelection() {
+    const checkedBoxes = Array.from(document.querySelectorAll('.item-checkbox:checked'));
+    const totalSelectableBoxes = document.querySelectorAll('.item-checkbox:not(:disabled)');
 
-    batchBox.classList.add('ring-2', 'ring-sky-400', 'border-sky-400');
-    setTimeout(() => {
-        batchBox.classList.remove('ring-2', 'ring-sky-400', 'border-sky-400');
-    }, 1800);
+    let totalSubtotal = 0;
+    let totalUnits = 0;
 
-    const firstInput = batchBox.querySelector('.qty-input');
-    if (firstInput) {
-        firstInput.focus();
-        firstInput.select();
+    checkedBoxes.forEach(cb => {
+        const row = cb.closest('.cart-item-row');
+        if (row) {
+            const subtotal = parseFloat(row.dataset.subtotal) || 0;
+            const qty = parseInt(row.dataset.qty, 10) || 0;
+            totalSubtotal += subtotal;
+            totalUnits += qty;
+        }
+    });
+
+    // Update count labels
+    const selectedCountEl = document.getElementById('selectedCountDisplay');
+    const selectedUnitsEl = document.getElementById('selectedUnitsDisplay');
+    const btnCountEl = document.getElementById('btnSelectedCount');
+    const totalDisplayEl = document.getElementById('selectedTotalDisplay');
+
+    if (selectedCountEl) selectedCountEl.textContent = checkedBoxes.length;
+    if (selectedUnitsEl) selectedUnitsEl.textContent = totalUnits;
+    if (btnCountEl) btnCountEl.textContent = checkedBoxes.length;
+    if (totalDisplayEl) {
+        totalDisplayEl.textContent = '₱' + totalSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Sync Master Checkboxes state
+    const allChecked = totalSelectableBoxes.length > 0 && checkedBoxes.length === totalSelectableBoxes.length;
+    const someChecked = checkedBoxes.length > 0 && !allChecked;
+
+    const topMaster = document.getElementById('selectAllCheckbox');
+    const bottomMaster = document.getElementById('bottomSelectAllCheckbox');
+
+    if (topMaster) {
+        topMaster.checked = allChecked;
+        topMaster.indeterminate = someChecked;
+    }
+    if (bottomMaster) {
+        bottomMaster.checked = allChecked;
+        bottomMaster.indeterminate = someChecked;
+    }
+
+    // Toggle checkout button state
+    const checkoutBtn = document.getElementById('checkoutSelectedBtn');
+    if (checkoutBtn) {
+        checkoutBtn.disabled = (checkedBoxes.length === 0);
     }
 }
 
+// Master checkbox toggle handler
+function toggleSelectAll(checked) {
+    const checkboxes = document.querySelectorAll('.item-checkbox:not(:disabled)');
+    checkboxes.forEach(cb => {
+        cb.checked = checked;
+    });
+    updateSelection();
+}
+
+// Proceed to checkout with only the checked products
+function proceedToCheckout() {
+    const checkedBoxes = Array.from(document.querySelectorAll('.item-checkbox:checked'));
+    if (checkedBoxes.length === 0) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'info',
+                title: 'No Products Selected',
+                text: 'Please select at least one product using the checkbox to checkout.',
+                confirmButtonColor: '#0ea5e9'
+            });
+        } else {
+            alert('Please select at least one product using the checkbox to checkout.');
+        }
+        return;
+    }
+
+    const itemIds = checkedBoxes.map(cb => cb.value).join(',');
+    window.location.href = "{{ route('customer.checkout.index') }}?items=" + encodeURIComponent(itemIds);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Checkbox listeners
+    const topMaster = document.getElementById('selectAllCheckbox');
+    const bottomMaster = document.getElementById('bottomSelectAllCheckbox');
+
+    if (topMaster) {
+        topMaster.addEventListener('change', () => toggleSelectAll(topMaster.checked));
+    }
+    if (bottomMaster) {
+        bottomMaster.addEventListener('change', () => toggleSelectAll(bottomMaster.checked));
+    }
+
+    document.querySelectorAll('.item-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelection);
+    });
+
+    // Initialize selection count & total on load
+    updateSelection();
+
+    // Live AJAX quantity stepper updates
     const qtyForms = document.querySelectorAll('.cart-qty-form');
 
     qtyForms.forEach(form => {
@@ -274,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Stock Limit',
-                        text: `Cannot exceed available stock of ${maxStock} units.`,
+                        text: `Cannot exceed available warehouse stock of ${maxStock} units.`,
                         timer: 2000,
                         showConfirmButton: false,
                         customClass: { popup: 'rounded-2xl border border-slate-100 shadow-xl' }
@@ -316,17 +374,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         subtotalEl.textContent = data.subtotal;
                     }
 
-                    // Update this Selection Batch's Subtotal & Unit Count in the batch header & footer
-                    if (data.batch_id) {
-                        document.querySelectorAll(`.batch-subtotal[data-batch-id="${data.batch_id}"]`).forEach(el => {
-                            el.textContent = data.batch_subtotal;
-                        });
-                        document.querySelectorAll(`.batch-unit-count[data-batch-id="${data.batch_id}"]`).forEach(el => {
-                            el.textContent = data.batch_unit_count;
-                        });
+                    // Update parent row dataset for instant live calculation
+                    if (parentRow) {
+                        const rawSubtotal = data.subtotal_raw !== undefined ? data.subtotal_raw : (data.unit_price * data.quantity);
+                        parentRow.dataset.subtotal = rawSubtotal;
+                        parentRow.dataset.qty = data.quantity;
                     }
 
-                    // Update navbar badges if available
+                    // Update navbar cart counters
                     document.querySelectorAll('.cart-nav-badge').forEach(badge => {
                         badge.textContent = data.cart_count;
                         if (data.cart_count > 0) {
@@ -338,6 +393,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     minusBtn.disabled = (data.quantity <= 1);
                     plusBtn.disabled = (data.quantity >= data.max_stock);
+
+                    // Re-calculate live selected total
+                    updateSelection();
                 } else {
                     if (data.message && typeof Swal !== 'undefined') {
                         Swal.fire({
@@ -364,49 +422,31 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Stepper buttons
         minusBtn.addEventListener('click', (e) => {
             e.preventDefault();
             const current = parseInt(qtyInput.value, 10) || 1;
-            if (current > 1) {
-                updateQuantity(current - 1);
-            }
+            if (current > 1) updateQuantity(current - 1);
         });
 
         plusBtn.addEventListener('click', (e) => {
             e.preventDefault();
             const current = parseInt(qtyInput.value, 10) || 1;
-            if (current < maxStock) {
-                updateQuantity(current + 1);
-            }
+            if (current < maxStock) updateQuantity(current + 1);
         });
 
-        // Quick input interaction: auto-select on focus
         qtyInput.addEventListener('focus', () => {
             qtyInput.select();
         });
 
-        // Real-time stock limit clamping on input
         qtyInput.addEventListener('input', () => {
             let val = parseInt(qtyInput.value, 10);
             if (val > maxStock) {
                 qtyInput.value = maxStock;
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Stock Limit',
-                        text: `Cannot exceed available warehouse stock of ${maxStock} units.`,
-                        timer: 2000,
-                        showConfirmButton: false,
-                        customClass: { popup: 'rounded-2xl border border-slate-100 shadow-xl' }
-                    });
-                }
             } else if (val < 1 && qtyInput.value !== '') {
                 qtyInput.value = 1;
             }
         });
 
-        // Handle Enter key on input
         qtyInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -414,12 +454,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Handle blur to commit value
         qtyInput.addEventListener('blur', () => {
             updateQuantity(qtyInput.value);
         });
 
-        // Prevent standard form submit reload
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             updateQuantity(qtyInput.value);

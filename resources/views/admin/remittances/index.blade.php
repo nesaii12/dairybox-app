@@ -418,29 +418,43 @@
             <table class="min-w-full divide-y divide-slate-100 text-left">
                 <thead class="bg-slate-50">
                     <tr>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Reference & Date</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Rider</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Orders Attached</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Expected</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Actual Remitted</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Variance</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Method</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                        <th class="w-10 px-3 py-3.5 text-center text-xs font-bold text-slate-400 uppercase tracking-wider"></th>
+                        <th class="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Reference &amp; Date</th>
+                        <th class="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Rider</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Orders Attached</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Total Sales Value</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Expected COD</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Actual Remitted</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Variance</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Method</th>
+                        <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        <th class="px-5 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 bg-white text-xs">
                     @forelse($remittances as $remittance)
-                    <tr class="hover:bg-slate-50/70 transition-colors">
+                    @php
+                        $totalSalesValue = (float) $remittance->orders->sum('total_amount');
+                    @endphp
+                    <tr class="hover:bg-slate-50/70 transition-colors group">
+                        <!-- Expand Toggle Button -->
+                        <td class="w-10 px-3 py-4 text-center whitespace-nowrap">
+                            <button type="button" onclick="toggleBreakdownRow({{ $remittance->id }})" id="btn-toggle-{{ $remittance->id }}"
+                                class="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition cursor-pointer"
+                                title="Toggle itemized product receipt" aria-expanded="false">
+                                <i class="bi bi-chevron-down text-xs transition-transform duration-200" id="chevron-{{ $remittance->id }}"></i>
+                            </button>
+                        </td>
+
                         <!-- Ref & Date -->
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-5 py-4 whitespace-nowrap">
                             <span class="font-black text-slate-900 block font-mono">{{ $remittance->reference_no }}</span>
                             <span class="text-[11px] text-slate-400 block">{{ $remittance->created_at->format('M d, Y • h:i A') }}</span>
                             <span class="text-[10px] text-slate-500 block">By: {{ $remittance->admin?->name ?? 'Admin' }}</span>
                         </td>
 
                         <!-- Rider -->
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-5 py-4 whitespace-nowrap">
                             <div class="flex items-center space-x-2.5">
                                 <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-700 font-bold flex items-center justify-center text-xs">
                                     {{ strtoupper(substr($remittance->rider?->name ?? 'R', 0, 2)) }}
@@ -453,24 +467,30 @@
                         </td>
 
                         <!-- Orders Count -->
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-700">
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <button type="button" onclick="toggleBreakdownRow({{ $remittance->id }})"
+                                class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 hover:bg-sky-100 text-slate-700 hover:text-sky-700 transition cursor-pointer">
                                 <i class="bi bi-box-seam mr-1 text-[10px]"></i> {{ $remittance->orders_count }} {{ Str::plural('order', $remittance->orders_count) }}
-                            </span>
+                            </button>
                         </td>
 
-                        <!-- Expected -->
-                        <td class="px-6 py-4 whitespace-nowrap font-bold text-slate-600">
+                        <!-- Total Order Sales Value -->
+                        <td class="px-4 py-4 whitespace-nowrap font-black text-slate-900">
+                            ₱{{ number_format($totalSalesValue, 2) }}
+                        </td>
+
+                        <!-- Expected COD -->
+                        <td class="px-4 py-4 whitespace-nowrap font-bold text-slate-600">
                             ₱{{ number_format($remittance->expected_amount, 2) }}
                         </td>
 
-                        <!-- Actual -->
-                        <td class="px-6 py-4 whitespace-nowrap font-black text-slate-900">
+                        <!-- Actual Remitted -->
+                        <td class="px-4 py-4 whitespace-nowrap font-black text-slate-900">
                             ₱{{ number_format($remittance->actual_amount, 2) }}
                         </td>
 
                         <!-- Variance -->
-                        <td class="px-6 py-4 whitespace-nowrap font-bold">
+                        <td class="px-4 py-4 whitespace-nowrap font-bold">
                             @if($remittance->variance == 0)
                                 <span class="text-emerald-600 inline-flex items-center gap-1">
                                     <i class="bi bi-check-circle-fill text-[10px]"></i> ₱0.00
@@ -487,7 +507,7 @@
                         </td>
 
                         <!-- Method -->
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-700 font-medium">
+                        <td class="px-4 py-4 whitespace-nowrap text-slate-700 font-medium">
                             <span class="inline-flex items-center gap-1">
                                 @if($remittance->payment_method === 'Cash')
                                     <i class="bi bi-cash text-emerald-500"></i>
@@ -501,7 +521,7 @@
                         </td>
 
                         <!-- Status Badge -->
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-4 py-4 whitespace-nowrap">
                             @if($remittance->status === 'confirmed')
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     <i class="bi bi-patch-check-fill mr-1 text-[10px]"></i> Confirmed
@@ -518,8 +538,12 @@
                         </td>
 
                         <!-- Actions -->
-                        <td class="px-6 py-4 whitespace-nowrap text-center space-x-1.5">
-                            <button type="button" onclick="openRemittanceModal({{ $remittance->id }})" class="p-1.5 text-sky-600 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-lg transition" title="View Breakdown">
+                        <td class="px-5 py-4 whitespace-nowrap text-center space-x-1.5">
+                            <button type="button" onclick="toggleBreakdownRow({{ $remittance->id }})" class="p-1.5 text-slate-600 hover:text-sky-700 bg-slate-100 hover:bg-sky-50 rounded-lg transition" title="Inspect Products Breakdown">
+                                <i class="bi bi-receipt-cutoff text-sm"></i>
+                            </button>
+
+                            <button type="button" onclick="openRemittanceModal({{ $remittance->id }})" class="p-1.5 text-sky-600 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-lg transition" title="Full Audit View">
                                 <i class="bi bi-eye text-sm"></i>
                             </button>
 
@@ -540,9 +564,185 @@
                             @endif
                         </td>
                     </tr>
+
+                    <!-- Expandable Itemized Products Breakdown Drawer -->
+                    <tr id="breakdown-row-{{ $remittance->id }}" class="hidden bg-slate-50/60 border-y border-slate-200/90 transition-all">
+                        <td colspan="11" class="p-4 sm:p-6">
+                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
+                                <!-- Top Reconciliation Summary Strip -->
+                                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-4 border-b border-slate-100">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-base shrink-0">
+                                            <i class="bi bi-receipt-cutoff"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-xs font-black text-slate-900 tracking-tight flex items-center gap-2">
+                                                <span>Itemized Receipt &amp; Product Breakdown</span>
+                                                <span class="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded text-[11px]">{{ $remittance->reference_no }}</span>
+                                            </h4>
+                                            <p class="text-[11px] text-slate-500 mt-0.5">
+                                                Rider: <strong class="text-slate-800 font-semibold">{{ $remittance->rider?->name ?? 'Unknown Rider' }}</strong> &bull; Handover: {{ $remittance->created_at->format('M d, Y • h:i A') }} &bull; Audited By: {{ $remittance->admin?->name ?? 'Admin' }}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4 Financial Reconciliation Metrics -->
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <div class="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total Sales Value</span>
+                                            <span class="text-xs font-black text-slate-900 block mt-0.5">₱{{ number_format($totalSalesValue, 2) }}</span>
+                                        </div>
+                                        <div class="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Expected COD</span>
+                                            <span class="text-xs font-bold text-slate-700 block mt-0.5">₱{{ number_format($remittance->expected_amount, 2) }}</span>
+                                        </div>
+                                        <div class="px-3 py-2 bg-sky-50/70 rounded-xl border border-sky-100">
+                                            <span class="text-[9px] font-bold text-sky-700 uppercase tracking-wider block">Actual Turned In</span>
+                                            <span class="text-xs font-black text-sky-900 block mt-0.5">₱{{ number_format($remittance->actual_amount, 2) }}</span>
+                                        </div>
+                                        <div class="px-3 py-2 rounded-xl border {{ $remittance->variance == 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : ($remittance->variance < 0 ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-sky-50 border-sky-200 text-sky-800') }}">
+                                            <span class="text-[9px] font-bold uppercase tracking-wider block">Calculated Variance</span>
+                                            <span class="text-xs font-black block mt-0.5">
+                                                @if($remittance->variance == 0)
+                                                    ₱0.00 (Balanced)
+                                                @elseif($remittance->variance < 0)
+                                                    -₱{{ number_format(abs($remittance->variance), 2) }} (Shortage)
+                                                @else
+                                                    +₱{{ number_format($remittance->variance, 2) }} (Overage)
+                                                @endif
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Remarks if present -->
+                                @if($remittance->notes)
+                                <div class="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start space-x-2">
+                                    <i class="bi bi-chat-left-quote text-amber-600 mt-0.5 text-xs shrink-0"></i>
+                                    <div>
+                                        <span class="font-bold text-[10px] uppercase tracking-wider text-amber-800">Admin Remarks:</span>
+                                        <span class="italic text-amber-950 ml-1">{{ $remittance->notes }}</span>
+                                    </div>
+                                </div>
+                                @endif
+
+                                <!-- Product Breakdown Grouped by Order -->
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
+                                            <i class="bi bi-box-seam text-sky-600"></i>
+                                            <span>Delivered Products Breakdown ({{ $remittance->orders->count() }} {{ Str::plural('Order', $remittance->orders->count()) }})</span>
+                                        </h5>
+                                        <span class="text-[11px] font-semibold text-slate-500">
+                                            Total Units: {{ $remittance->orders->sum(fn($o) => $o->orderItems->sum('quantity')) }} pcs
+                                        </span>
+                                    </div>
+
+                                    @forelse($remittance->orders as $order)
+                                    <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/40">
+                                        <!-- Order Sub-Header -->
+                                        <div class="px-4 py-2.5 bg-slate-100/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="font-black text-xs font-mono text-slate-900">{{ $order->order_number }}</span>
+                                                <span class="text-slate-300">&bull;</span>
+                                                <span class="text-xs font-bold text-slate-700">
+                                                    <i class="bi bi-person text-slate-400 mr-0.5"></i> {{ $order->customer?->name ?? 'Customer' }}
+                                                </span>
+                                                @if($order->delivery_address)
+                                                <span class="text-slate-300 hidden sm:inline">&bull;</span>
+                                                <span class="text-[11px] text-slate-500 hidden sm:inline truncate max-w-xs">
+                                                    <i class="bi bi-geo-alt text-slate-400 mr-0.5"></i> {{ $order->delivery_address }}
+                                                </span>
+                                                @endif
+                                            </div>
+                                            <div class="flex items-center space-x-3 text-xs">
+                                                <span class="text-slate-500 text-[11px]">Subtotal: <strong class="text-slate-800 font-bold">₱{{ number_format($order->subtotal, 2) }}</strong></span>
+                                                @if($order->delivery_fee > 0)
+                                                <span class="text-slate-500 text-[11px]">Fee: <strong class="text-slate-800 font-bold">₱{{ number_format($order->delivery_fee, 2) }}</strong></span>
+                                                @endif
+                                                <span class="text-slate-800 font-black bg-white px-2 py-0.5 rounded border border-slate-200 text-xs">
+                                                    Total Sales: ₱{{ number_format($order->total_amount, 2) }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Itemized Products Table -->
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full divide-y divide-slate-100 text-left text-xs bg-white">
+                                                <thead class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                    <tr>
+                                                        <th class="px-4 py-2">Product Name</th>
+                                                        <th class="px-4 py-2">Size / Variant</th>
+                                                        <th class="px-4 py-2 text-center">Delivered Qty</th>
+                                                        <th class="px-4 py-2 text-right">Individual Unit Value</th>
+                                                        <th class="px-4 py-2 text-right">Item Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-slate-100">
+                                                    @forelse($order->orderItems as $item)
+                                                    <tr class="hover:bg-slate-50/60 transition-colors">
+                                                        <td class="px-4 py-2.5 font-bold text-slate-900">
+                                                            <div class="flex items-center space-x-2">
+                                                                @if($item->product?->image)
+                                                                    <img src="{{ asset('storage/' . $item->product->image) }}" class="w-6 h-6 rounded-md object-cover border border-slate-200" alt="{{ $item->product->product_name }}">
+                                                                @else
+                                                                    <div class="w-6 h-6 rounded-md bg-slate-100 text-slate-400 flex items-center justify-center text-[10px]">
+                                                                        <i class="bi bi-box"></i>
+                                                                    </div>
+                                                                @endif
+                                                                <div>
+                                                                    <span>{{ $item->product?->product_name ?? 'Delivered Product' }}</span>
+                                                                    @if($item->product?->milk_type)
+                                                                        <span class="text-[10px] text-slate-400 font-normal block">{{ $item->product->milk_type }}</span>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-4 py-2.5 text-slate-600">
+                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                                                                {{ $item->product?->size ?? 'Standard' }}
+                                                            </span>
+                                                        </td>
+                                                        <td class="px-4 py-2.5 text-center font-black text-slate-900">
+                                                            {{ $item->quantity }}
+                                                        </td>
+                                                        <td class="px-4 py-2.5 text-right font-semibold text-slate-600">
+                                                            ₱{{ number_format($item->price, 2) }}
+                                                        </td>
+                                                        <td class="px-4 py-2.5 text-right font-black text-slate-900">
+                                                            ₱{{ number_format($item->subtotal, 2) }}
+                                                        </td>
+                                                    </tr>
+                                                    @empty
+                                                    <tr>
+                                                        <td colspan="5" class="px-4 py-3 text-center text-slate-400 italic">
+                                                            No product items registered for this order.
+                                                        </td>
+                                                    </tr>
+                                                    @endforelse
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    @empty
+                                    <div class="py-4 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
+                                        No attached orders recorded for this remittance.
+                                    </div>
+                                    @endforelse
+                                </div>
+
+                                <!-- Bottom Close Drawer Toggle -->
+                                <div class="pt-2 flex justify-end">
+                                    <button type="button" onclick="toggleBreakdownRow({{ $remittance->id }})" class="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition">
+                                        <i class="bi bi-chevron-up mr-1"></i> Collapse Breakdown
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-12 text-center">
+                        <td colspan="11" class="px-6 py-12 text-center">
                             <div class="flex flex-col items-center justify-center space-y-2">
                                 <i class="bi bi-journal-x text-4xl text-slate-300"></i>
                                 <p class="text-sm font-semibold text-slate-800">No Remittance Records Found</p>
@@ -659,12 +859,12 @@
 
 <!-- Modal: Remittance Detail Breakdown -->
 <div id="remittanceDetailModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+    <div class="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all my-8">
         <!-- Modal Header -->
         <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
             <div class="flex items-center space-x-2">
-                <i class="bi bi-receipt text-sky-400 text-lg"></i>
-                <h3 class="text-sm font-black tracking-tight" id="modalRefTitle">Remittance Details</h3>
+                <i class="bi bi-receipt-cutoff text-sky-400 text-lg"></i>
+                <h3 class="text-sm font-black tracking-tight" id="modalRefTitle">Remittance Details &amp; Product Receipt</h3>
             </div>
             <button type="button" onclick="closeRemittanceModal()" class="text-slate-400 hover:text-white transition p-1">
                 <i class="bi bi-x-lg text-lg"></i>
@@ -672,7 +872,7 @@
         </div>
 
         <!-- Modal Body -->
-        <div class="p-6 space-y-5">
+        <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
             <!-- Top Summary Grid -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -687,7 +887,7 @@
                 </div>
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status</span>
-                    <span id="modalStatusBadge" class="mt-1 inline-block">-</span>
+                    <div id="modalStatusBadge" class="mt-1">-</div>
                 </div>
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Method</span>
@@ -696,17 +896,21 @@
             </div>
 
             <!-- Reconciliation Financial Banner -->
-            <div class="bg-slate-900 text-white rounded-xl p-4 grid grid-cols-3 gap-2 text-center">
+            <div class="bg-slate-900 text-white rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Sales Value</span>
+                    <span id="modalTotalSales" class="text-lg font-black text-slate-100 block mt-0.5">₱0.00</span>
+                </div>
                 <div>
                     <span class="text-[10px] uppercase font-bold text-slate-400 block">Expected COD</span>
                     <span id="modalExpected" class="text-lg font-black text-slate-200 block mt-0.5">₱0.00</span>
                 </div>
                 <div>
-                    <span class="text-[10px] uppercase font-bold text-sky-400 block">Actual Remitted</span>
+                    <span class="text-[10px] uppercase font-bold text-sky-400 block">Actual Turned In</span>
                     <span id="modalActual" class="text-lg font-black text-white block mt-0.5">₱0.00</span>
                 </div>
                 <div>
-                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Variance</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Calculated Variance</span>
                     <span id="modalVariance" class="text-lg font-black block mt-0.5">₱0.00</span>
                 </div>
             </div>
@@ -717,25 +921,16 @@
                 <p id="modalNotesText" class="italic whitespace-pre-line leading-relaxed"></p>
             </div>
 
-            <!-- Attached Orders Breakdown -->
+            <!-- Attached Orders & Itemized Products Breakdown -->
             <div>
-                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center justify-between">
-                    <span>Attached Orders (<span id="modalOrdersCount">0</span>)</span>
-                </h4>
-                <div class="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
-                    <table class="min-w-full divide-y divide-slate-100 text-xs">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th class="px-4 py-2 text-left font-bold text-slate-500">Order No.</th>
-                                <th class="px-4 py-2 text-left font-bold text-slate-500">Customer</th>
-                                <th class="px-4 py-2 text-left font-bold text-slate-500">Address</th>
-                                <th class="px-4 py-2 text-right font-bold text-slate-500">Amount (₱)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modalOrdersList" class="divide-y divide-slate-100 bg-white">
-                            <!-- Injected by JS -->
-                        </tbody>
-                    </table>
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="bi bi-box-seam text-sky-600"></i>
+                        <span>Itemized Orders &amp; Delivered Products (<span id="modalOrdersCount">0</span>)</span>
+                    </h4>
+                </div>
+                <div id="modalOrdersContainer" class="space-y-3">
+                    <!-- Populated dynamically via JS -->
                 </div>
             </div>
         </div>
@@ -1049,6 +1244,25 @@
         });
     });
 
+    // Toggle Expandable Itemized Products Breakdown Row
+    window.toggleBreakdownRow = function (remittanceId) {
+        const row = document.getElementById(`breakdown-row-${remittanceId}`);
+        const chevron = document.getElementById(`chevron-${remittanceId}`);
+        const btn = document.getElementById(`btn-toggle-${remittanceId}`);
+        if (!row) return;
+
+        const isHidden = row.classList.contains('hidden');
+        if (isHidden) {
+            row.classList.remove('hidden');
+            if (chevron) chevron.classList.add('rotate-180');
+            if (btn) btn.setAttribute('aria-expanded', 'true');
+        } else {
+            row.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    };
+
     // Remittance Detail Modal
     window.openRemittanceModal = function (remittanceId) {
         fetch(`/admin/remittances/${remittanceId}`)
@@ -1068,14 +1282,16 @@
                 // Status Badge
                 const badgeContainer = document.getElementById('modalStatusBadge');
                 if (rem.status === 'confirmed') {
-                    badgeContainer.innerHTML = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Confirmed</span>';
+                    badgeContainer.innerHTML = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Confirmed</span>';
                 } else if (rem.status === 'pending_verification') {
-                    badgeContainer.innerHTML = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pending Verification</span>';
+                    badgeContainer.innerHTML = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pending Verification</span>';
                 } else {
-                    badgeContainer.innerHTML = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Rejected</span>';
+                    badgeContainer.innerHTML = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Rejected</span>';
                 }
 
-                // Numbers
+                // Financial Numbers
+                const totalSales = Number(rem.total_order_sales_value || 0);
+                document.getElementById('modalTotalSales').textContent = `₱${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
                 document.getElementById('modalExpected').textContent = `₱${Number(rem.expected_amount).toLocaleString('en-US', {minimumFractionDigits: 2})}`;
                 document.getElementById('modalActual').textContent = `₱${Number(rem.actual_amount).toLocaleString('en-US', {minimumFractionDigits: 2})}`;
 
@@ -1100,20 +1316,84 @@
                     notesSection.classList.add('hidden');
                 }
 
-                // Orders List
-                const ordersTable = document.getElementById('modalOrdersList');
-                ordersTable.innerHTML = '';
-                rem.orders.forEach(o => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-50';
-                    tr.innerHTML = `
-                        <td class="px-4 py-2 font-mono font-bold text-slate-900">${o.order_number}</td>
-                        <td class="px-4 py-2 text-slate-700 font-medium">${o.customer_name}</td>
-                        <td class="px-4 py-2 text-slate-500">${o.delivery_address}</td>
-                        <td class="px-4 py-2 text-right font-black text-slate-900">₱${Number(o.amount).toFixed(2)}</td>
+                // Render Attached Orders with Itemized Products Breakdown
+                const ordersContainer = document.getElementById('modalOrdersContainer');
+                ordersContainer.innerHTML = '';
+
+                if (!rem.orders || rem.orders.length === 0) {
+                    ordersContainer.innerHTML = `
+                        <div class="py-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
+                            No attached orders found for this remittance record.
+                        </div>
                     `;
-                    ordersTable.appendChild(tr);
-                });
+                } else {
+                    rem.orders.forEach(o => {
+                        const orderCard = document.createElement('div');
+                        orderCard.className = 'border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50';
+
+                        let itemsRowsHtml = '';
+                        if (o.items && o.items.length > 0) {
+                            itemsRowsHtml = o.items.map(item => `
+                                <tr class="hover:bg-slate-50/70">
+                                    <td class="px-3.5 py-2 font-bold text-slate-900">
+                                        ${item.product_name}
+                                        ${item.milk_type ? `<span class="text-[10px] text-slate-400 font-normal block">${item.milk_type}</span>` : ''}
+                                    </td>
+                                    <td class="px-3.5 py-2 text-slate-600">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                                            ${item.size || 'Standard'}
+                                        </span>
+                                    </td>
+                                    <td class="px-3.5 py-2 text-center font-black text-slate-900">${item.quantity}</td>
+                                    <td class="px-3.5 py-2 text-right text-slate-600 font-semibold">₱${Number(item.unit_price).toFixed(2)}</td>
+                                    <td class="px-3.5 py-2 text-right font-black text-slate-900">₱${Number(item.subtotal).toFixed(2)}</td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            itemsRowsHtml = `
+                                <tr>
+                                    <td colspan="5" class="px-3.5 py-2 text-center text-slate-400 italic">No products registered for this order.</td>
+                                </tr>
+                            `;
+                        }
+
+                        orderCard.innerHTML = `
+                            <div class="px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-mono font-bold text-slate-900">${o.order_number}</span>
+                                    <span class="text-slate-300">&bull;</span>
+                                    <span class="font-semibold text-slate-700">${o.customer_name}</span>
+                                    <span class="text-slate-300 hidden sm:inline">&bull;</span>
+                                    <span class="text-[11px] text-slate-400 hidden sm:inline truncate max-w-xs">${o.delivery_address}</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-slate-500 text-[11px]">Subtotal: <strong class="text-slate-700 font-bold">₱${Number(o.subtotal).toFixed(2)}</strong></span>
+                                    ${o.delivery_fee > 0 ? `<span class="text-slate-500 text-[11px]">Fee: <strong class="text-slate-700 font-bold">₱${Number(o.delivery_fee).toFixed(2)}</strong></span>` : ''}
+                                    <span class="font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs">
+                                        Sales: ₱${Number(o.total_sales_value || o.amount).toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-slate-100 text-left text-xs bg-white">
+                                    <thead class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <tr>
+                                            <th class="px-3.5 py-1.5">Product</th>
+                                            <th class="px-3.5 py-1.5">Size</th>
+                                            <th class="px-3.5 py-1.5 text-center">Delivered Qty</th>
+                                            <th class="px-3.5 py-1.5 text-right">Unit Value</th>
+                                            <th class="px-3.5 py-1.5 text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-xs">
+                                        ${itemsRowsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                        ordersContainer.appendChild(orderCard);
+                    });
+                }
 
                 document.getElementById('remittanceDetailModal').classList.remove('hidden');
             })

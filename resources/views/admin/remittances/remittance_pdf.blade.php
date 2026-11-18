@@ -214,25 +214,34 @@
     </div>
 
     <!-- Summary KPI Cards -->
+    @php
+        $totalSalesValueSum = (float) $remittances->sum(function($r) {
+            return $r->orders->sum('total_amount');
+        });
+    @endphp
     <table class="summary-grid">
         <tr>
-            <td class="summary-box sky" style="width: 20%;">
+            <td class="summary-box sky" style="width: 16%;">
                 <div class="summary-title">Total Remittances</div>
                 <div class="summary-val">{{ $remittances->count() }} records</div>
             </td>
-            <td class="summary-box" style="width: 20%;">
+            <td class="summary-box" style="width: 16%;">
                 <div class="summary-title">Orders Handled</div>
                 <div class="summary-val">{{ $totalOrders }} orders</div>
             </td>
-            <td class="summary-box sky" style="width: 20%;">
+            <td class="summary-box" style="width: 18%;">
+                <div class="summary-title">Total Order Sales</div>
+                <div class="summary-val">PHP {{ number_format($totalSalesValueSum, 2) }}</div>
+            </td>
+            <td class="summary-box sky" style="width: 17%;">
                 <div class="summary-title">Expected Cash (COD)</div>
                 <div class="summary-val">PHP {{ number_format($totalExpected, 2) }}</div>
             </td>
-            <td class="summary-box" style="width: 20%;">
+            <td class="summary-box" style="width: 17%;">
                 <div class="summary-title">Actual Cash Remitted</div>
                 <div class="summary-val">PHP {{ number_format($totalActual, 2) }}</div>
             </td>
-            <td class="summary-box {{ $totalVariance < 0 ? 'rose' : ($totalVariance > 0 ? 'sky' : '') }}" style="width: 20%;">
+            <td class="summary-box {{ $totalVariance < 0 ? 'rose' : ($totalVariance > 0 ? 'sky' : '') }}" style="width: 16%;">
                 <div class="summary-title">Net Variance</div>
                 <div class="summary-val" style="color: {{ $totalVariance < 0 ? '#dc2626' : ($totalVariance > 0 ? '#0284c7' : '#16a34a') }};">
                     {{ $totalVariance > 0 ? '+' : '' }}PHP {{ number_format($totalVariance, 2) }}
@@ -245,20 +254,23 @@
     <table class="report-table">
         <thead>
             <tr>
-                <th style="width: 90px;">Reference No</th>
-                <th style="width: 100px;">Date &amp; Time</th>
-                <th>Delivery Rider</th>
-                <th style="text-align: center; width: 45px;">Orders</th>
-                <th style="text-align: right; width: 80px;">Expected</th>
-                <th style="text-align: right; width: 80px;">Remitted</th>
-                <th style="text-align: right; width: 75px;">Variance</th>
-                <th style="width: 65px;">Method</th>
-                <th style="text-align: center; width: 75px;">Status</th>
-                <th style="width: 75px;">Recorded By</th>
+                <th style="width: 75px;">Reference</th>
+                <th style="width: 80px;">Date &amp; Time</th>
+                <th style="width: 95px;">Delivery Rider</th>
+                <th>Delivered Products Breakdown (Itemized Receipts)</th>
+                <th style="text-align: right; width: 65px;">Sales Value</th>
+                <th style="text-align: right; width: 65px;">Expected</th>
+                <th style="text-align: right; width: 65px;">Remitted</th>
+                <th style="text-align: right; width: 60px;">Variance</th>
+                <th style="text-align: center; width: 55px;">Status</th>
+                <th style="width: 65px;">Admin</th>
             </tr>
         </thead>
         <tbody>
             @forelse($remittances as $remittance)
+            @php
+                $remSalesValue = (float) $remittance->orders->sum('total_amount');
+            @endphp
             <tr>
                 <td style="font-weight: bold; font-family: monospace;">{{ $remittance->reference_no }}</td>
                 <td>{{ $remittance->created_at ? $remittance->created_at->format('M d, Y h:i A') : 'N/A' }}</td>
@@ -268,7 +280,27 @@
                         <br><span style="color: #64748b; font-size: 8px;">{{ $remittance->rider->phone }}</span>
                     @endif
                 </td>
-                <td style="text-align: center;">{{ $remittance->orders_count }}</td>
+                <td style="font-size: 8.5px; line-height: 1.3;">
+                    @forelse($remittance->orders as $order)
+                        <div style="margin-bottom: 3px;">
+                            <strong style="color: #0369a1;">#{{ $order->order_number }}</strong>
+                            <span style="color: #64748b;">({{ $order->customer?->name ?? 'Customer' }}):</span>
+                            @php
+                                $itemStrings = $order->orderItems->map(function($i) {
+                                    $pName = $i->product?->product_name ?? 'Item';
+                                    $size = $i->product?->size ? " [{$i->product->size}]" : '';
+                                    return "{$i->quantity}x {$pName}{$size} @ PHP " . number_format($i->price, 2);
+                                })->implode(', ');
+                            @endphp
+                            <span>{{ $itemStrings ?: 'No items recorded' }}</span>
+                        </div>
+                    @empty
+                        <span style="color: #94a3b8; font-style: italic;">No attached orders</span>
+                    @endforelse
+                </td>
+                <td style="text-align: right; font-weight: bold; color: #0f172a;">
+                    PHP {{ number_format($remSalesValue, 2) }}
+                </td>
                 <td style="text-align: right; font-weight: bold; color: #475569;">
                     PHP {{ number_format($remittance->expected_amount, 2) }}
                 </td>
@@ -284,7 +316,6 @@
                         <span class="variance-overage">+PHP {{ number_format($remittance->variance, 2) }}</span>
                     @endif
                 </td>
-                <td>{{ $remittance->payment_method }}</td>
                 <td style="text-align: center;">
                     @if($remittance->status === 'confirmed')
                         <span class="status-badge status-confirmed">Confirmed</span>
@@ -307,14 +338,14 @@
         @if($remittances->isNotEmpty())
         <tfoot>
             <tr class="totals-row">
-                <td colspan="3" style="text-align: right;">Total Summary ({{ $remittances->count() }} Remittances):</td>
-                <td style="text-align: center;">{{ $totalOrders }}</td>
+                <td colspan="4" style="text-align: right;">Total Summary ({{ $remittances->count() }} Remittances &bull; {{ $totalOrders }} Orders):</td>
+                <td style="text-align: right;">PHP {{ number_format($totalSalesValueSum, 2) }}</td>
                 <td style="text-align: right;">PHP {{ number_format($totalExpected, 2) }}</td>
                 <td style="text-align: right;">PHP {{ number_format($totalActual, 2) }}</td>
                 <td style="text-align: right; color: {{ $totalVariance < 0 ? '#dc2626' : ($totalVariance > 0 ? '#0284c7' : '#16a34a') }};">
                     {{ $totalVariance > 0 ? '+' : '' }}PHP {{ number_format($totalVariance, 2) }}
                 </td>
-                <td colspan="3"></td>
+                <td colspan="2"></td>
             </tr>
         </tfoot>
         @endif

@@ -48,11 +48,12 @@ return [
     ],
 
     'sms' => [
-        'provider' => env('SMS_PROVIDER', 'semaphore'), // 'semaphore' or 'philsms'
+        'provider' => env('SMS_PROVIDER', 'semaphore'), // 'semaphore', 'philsms', or 'iprogsms'
         'semaphore_api_key' => env('SEMAPHORE_API_KEY'),
         'semaphore_sender_name' => env('SEMAPHORE_SENDER_NAME', 'DairyBox'),
         'philsms_api_token' => env('PHILSMS_API_TOKEN'),
         'philsms_sender_id' => env('PHILSMS_SENDER_ID', 'PhilSMS'),
+        'iprogsms_api_token' => env('IPROGSMS_API_TOKEN'),
     ],
 
 ];

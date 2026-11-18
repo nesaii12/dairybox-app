@@ -154,8 +154,12 @@ class RiderRemittanceController extends Controller
         $start = $dates['start'];
         $end = $dates['end'];
 
-        $historyQuery = RiderRemittance::with(['rider', 'admin', 'orders'])
-            ->latest('id');
+        $historyQuery = RiderRemittance::with([
+            'rider',
+            'admin',
+            'orders.customer',
+            'orders.orderItems.product'
+        ])->latest('id');
 
         if ($request->filled('date')) {
             $historyQuery->whereDate('created_at', $request->date);
@@ -434,7 +438,7 @@ class RiderRemittanceController extends Controller
      */
     public function show(RiderRemittance $remittance)
     {
-        $remittance->load(['rider', 'admin', 'orders.customer', 'ledgerEntry']);
+        $remittance->load(['rider', 'admin', 'orders.customer', 'orders.orderItems.product', 'ledgerEntry']);
 
         return response()->json([
             'success' => true,
@@ -446,6 +450,7 @@ class RiderRemittanceController extends Controller
                 'admin_name' => $remittance->admin?->name ?? 'Admin',
                 'status' => $remittance->status,
                 'orders_count' => $remittance->orders_count,
+                'total_order_sales_value' => (float) $remittance->orders->sum('total_amount'),
                 'expected_amount' => (float) $remittance->expected_amount,
                 'actual_amount' => (float) $remittance->actual_amount,
                 'variance' => (float) $remittance->variance,
@@ -459,8 +464,21 @@ class RiderRemittanceController extends Controller
                         'order_number' => $order->order_number,
                         'customer_name' => $order->customer?->name ?? 'Guest Customer',
                         'delivery_address' => $order->delivery_address ?? 'N/A',
+                        'total_sales_value' => (float) $order->total_amount,
+                        'subtotal' => (float) $order->subtotal,
+                        'delivery_fee' => (float) $order->delivery_fee,
                         'amount' => (float) ($order->pivot->amount ?? $order->total_amount),
                         'order_status' => $order->order_status,
+                        'items' => $order->orderItems->map(function ($item) {
+                            return [
+                                'product_name' => $item->product?->product_name ?? 'Product',
+                                'size' => $item->product?->size ?? 'Standard',
+                                'milk_type' => $item->product?->milk_type ?? '',
+                                'quantity' => (int) $item->quantity,
+                                'unit_price' => (float) $item->price,
+                                'subtotal' => (float) $item->subtotal,
+                            ];
+                        }),
                     ];
                 }),
             ],

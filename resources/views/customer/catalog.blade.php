@@ -42,18 +42,28 @@
         <input type="hidden" name="category_id" id="category_id_input" value="{{ request('category_id') }}">
         
         <!-- Category Pill Buttons -->
-        <div class="flex flex-wrap gap-2 items-center">
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar flex-nowrap sm:flex-wrap">
             <!-- All Pill -->
             <button type="button" data-category-id="" onclick="selectCategory('', this)" 
-                class="category-pill px-4 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer {{ !request('category_id') ? 'bg-sky-600 border-sky-600 text-white font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' }}">
+                class="category-pill shrink-0 px-4 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer {{ !request('category_id') ? 'bg-sky-600 border-sky-600 text-white font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' }}">
                 All
             </button>
             <!-- Dynamic Category Pills from DB -->
             @foreach($categories as $cat)
-                <button type="button" data-category-id="{{ $cat->id }}" onclick="selectCategory('{{ $cat->id }}', this)" 
-                    class="category-pill px-4 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer {{ request('category_id') == $cat->id ? 'bg-sky-600 border-sky-600 text-white font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' }}">
-                    {{ $cat->category_name }}
-                </button>
+                @php
+                    $isCatAvailable = !isset($availableCategoryIds) || in_array($cat->id, $availableCategoryIds);
+                @endphp
+                @if($isCatAvailable)
+                    <button type="button" data-category-id="{{ $cat->id }}" onclick="selectCategory('{{ $cat->id }}', this)" 
+                        class="category-pill shrink-0 px-4 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer {{ request('category_id') == $cat->id ? 'bg-sky-600 border-sky-600 text-white font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' }}">
+                        {{ $cat->category_name }}
+                    </button>
+                @else
+                    <button type="button" disabled aria-disabled="true" title="{{ $cat->category_name }} is currently unavailable"
+                        class="shrink-0 px-4 py-2 rounded-full text-xs font-semibold border bg-slate-100 border-slate-200/80 text-slate-400 line-through opacity-55 cursor-not-allowed select-none">
+                        {{ $cat->category_name }}
+                    </button>
+                @endif
             @endforeach
         </div>
     </form>

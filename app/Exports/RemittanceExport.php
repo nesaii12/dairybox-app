@@ -32,6 +32,18 @@ class RemittanceExport implements FromCollection, WithHeadings, WithMapping, Sho
 
         $orderNumbers = $remittance->orders->pluck('order_number')->implode(', ');
 
+        $productsBreakdown = $remittance->orders->map(function ($order) {
+            $itemsList = $order->orderItems->map(function ($item) {
+                $pName = $item->product?->product_name ?? 'Delivered Product';
+                $size = $item->product?->size ? " ({$item->product->size})" : '';
+                return "{$item->quantity}x {$pName}{$size} @ ₱" . number_format($item->price, 2);
+            })->implode('; ');
+
+            return "Order #{$order->order_number}: " . ($itemsList ?: 'No items');
+        })->implode(' | ');
+
+        $totalSalesValue = (float) $remittance->orders->sum('total_amount');
+
         return [
             $remittance->reference_no,
             $remittance->created_at ? $remittance->created_at->format('Y-m-d h:i A') : 'N/A',
@@ -39,6 +51,8 @@ class RemittanceExport implements FromCollection, WithHeadings, WithMapping, Sho
             $remittance->rider?->phone ?? 'N/A',
             $remittance->orders_count,
             $orderNumbers ?: 'N/A',
+            $productsBreakdown ?: 'N/A',
+            number_format($totalSalesValue, 2, '.', ''),
             number_format($remittance->expected_amount, 2, '.', ''),
             number_format($remittance->actual_amount, 2, '.', ''),
             number_format($remittance->variance, 2, '.', ''),
@@ -59,6 +73,8 @@ class RemittanceExport implements FromCollection, WithHeadings, WithMapping, Sho
             'Rider Phone',
             'Orders Attached Count',
             'Order Numbers / Batches',
+            'Delivered Products Breakdown (Name, Size, Qty, Unit Price)',
+            'Total Order Sales Value (PHP)',
             'Expected COD (PHP)',
             'Actual Remitted (PHP)',
             'Variance (PHP)',

@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/webhooks/xendit',
             'webhooks/xendit',
+            'register/phone-otp/send',
+            'register/phone-otp/verify',
         ]);
 
         $middleware->alias([

@@ -20,9 +20,12 @@
                     'Ready for Pickup' => 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
                     'Out for Delivery' => 'bg-purple-50 text-purple-700 border-purple-100/50',
                     'Delivered' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+                    'Delivered - Pending Remittance' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+                    'Paid & Remitted' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
                     'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100/50',
                 ];
-                $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
+                $displayStatus = in_array($order->order_status, ['Delivered - Pending Remittance', 'Paid & Remitted']) ? 'Delivered' : $order->order_status;
+                $color = $statusColors[$displayStatus] ?? 'bg-slate-50 text-slate-600';
             @endphp
             <div id="mobile-order-{{ $order->id }}" class="p-4 space-y-3 hover:bg-slate-50/50 transition-colors record-highlight-target">
                 <div class="flex items-center justify-between">
@@ -32,7 +35,7 @@
                     </div>
                     <div class="text-right">
                         <span class="order-status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border {{ $color }} shadow-2xs">
-                            {{ $order->order_status }}
+                            {{ $displayStatus }}
                         </span>
                         @if($order->isPaid())
                             <span class="text-[9px] text-emerald-600 font-bold block mt-0.5"><i class="bi bi-check-circle-fill text-[8px] mr-0.5"></i> Paid</span>
@@ -68,7 +71,7 @@
                         @endif
                     </span>
                     <div class="flex items-center gap-1.5">
-                        @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup']))
+                        @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup', 'Delivered - Pending Remittance', 'Paid & Remitted']))
                             <a href="{{ route('customer.orders.show', $order->id) }}#review-products" class="inline-flex items-center space-x-1 py-1.5 px-2.5 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all border border-amber-200/80 shadow-2xs">
                                 <i class="bi bi-star-fill text-amber-400 text-[10px]"></i>
                                 <span>Rate</span>
@@ -141,12 +144,15 @@
                                 'Ready for Pickup' => 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
                                 'Out for Delivery' => 'bg-purple-50 text-purple-700 border-purple-100/50',
                                 'Delivered' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+                                'Delivered - Pending Remittance' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+                                'Paid & Remitted' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
                                 'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100/50',
                             ];
-                            $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
+                            $displayStatus = in_array($order->order_status, ['Delivered - Pending Remittance', 'Paid & Remitted']) ? 'Delivered' : $order->order_status;
+                            $color = $statusColors[$displayStatus] ?? 'bg-slate-50 text-slate-600';
                         @endphp
                         <span class="order-status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border {{ $color }} shadow-2xs">
-                            {{ $order->order_status }}
+                            {{ $displayStatus }}
                         </span>
                         @if($order->isPaid())
                             <span class="text-[9px] text-emerald-600 font-bold block mt-1"><i class="bi bi-check-circle-fill text-[8px] mr-0.5"></i> Paid</span>
@@ -156,7 +162,7 @@
                     </td>
                     <td class="py-4 px-6 text-center">
                         <div class="inline-flex items-center justify-center gap-2">
-                            @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup']))
+                            @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup', 'Delivered - Pending Remittance', 'Paid & Remitted']))
                                 <a href="{{ route('customer.orders.show', $order->id) }}#review-products" class="inline-flex items-center space-x-1.5 py-1.5 px-3 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all border border-amber-200/80 shadow-2xs hover:shadow-xs cursor-pointer">
                                     <i class="bi bi-star-fill text-amber-400 text-[10px]"></i>
                                     <span>Rate & Feedback</span>

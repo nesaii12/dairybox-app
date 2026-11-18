@@ -80,67 +80,67 @@
                 </div>
 
                 <div>
-                    <label for="email" class="block text-sm font-semibold text-slate-700">Email Address</label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-envelope text-slate-400 text-sm"></i>
-                        </div>
-                        <input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}"
-                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
-                            placeholder="john@example.com">
-                    </div>
-                    @error('email')
-                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
                     <div class="flex items-center justify-between">
-                        <label for="phone" class="block text-sm font-semibold text-slate-700">Phone Number</label>
-                        <span id="phone-verified-badge" class="hidden items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <label for="email" class="block text-sm font-semibold text-slate-700">Email Address</label>
+                        <span id="email-verified-badge" class="hidden items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <i class="bi bi-patch-check-fill text-emerald-600"></i> Verified
                         </span>
                     </div>
                     <div class="mt-1 flex gap-2">
                         <div class="relative flex-1 rounded-md shadow-sm">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="bi bi-telephone text-slate-400 text-sm"></i>
+                                <i class="bi bi-envelope text-slate-400 text-sm"></i>
                             </div>
-                            <input id="phone" name="phone" type="tel" inputmode="numeric" maxlength="13" required value="{{ old('phone') }}"
+                            <input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}"
                                 class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
-                                placeholder="09171234567">
+                                placeholder="yourname@gmail.com">
                         </div>
-                        <button type="button" id="send-phone-otp-btn"
+                        <button type="button" id="send-email-otp-btn"
                             class="px-3.5 py-2.5 rounded-xl text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
-                            <i class="bi bi-chat-dots-fill text-sky-600"></i>
-                            <span id="send-phone-otp-label">Send Code</span>
+                            <i class="bi bi-envelope-paper-fill text-sky-600"></i>
+                            <span id="send-email-otp-label">Send Code</span>
                         </button>
                     </div>
-                    @error('phone')
+                    @error('email')
                         <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
                     @enderror
-                    <p id="phone-otp-feedback" class="hidden mt-1.5 text-xs font-medium"></p>
+                    <p id="email-otp-feedback" class="hidden mt-1.5 text-xs font-medium"></p>
 
-                    <!-- SMS OTP Verification Input Box -->
-                    <div id="phone-otp-box" class="hidden mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-                        <label for="phone_otp" class="block text-xs font-semibold text-slate-700">
-                            Enter 6-Digit SMS Verification Code
+                    <!-- Email OTP Verification Input Box -->
+                    <div id="email-otp-box" class="hidden mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                        <label for="email_otp" class="block text-xs font-semibold text-slate-700">
+                            Enter 6-Digit Email Verification Code
                         </label>
                         <div class="flex gap-2">
                             <div class="relative flex-1">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i class="bi bi-shield-lock text-slate-400 text-sm"></i>
                                 </div>
-                                <input id="phone_otp" name="phone_otp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                                <input id="email_otp" name="email_otp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
                                     class="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 tracking-widest font-bold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
                                     placeholder="000000">
                             </div>
-                            <button type="button" id="verify-phone-otp-btn"
+                            <button type="button" id="verify-email-otp-btn"
                                 class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 transition-all whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                 Verify Code
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <div>
+                    <label for="phone" class="block text-sm font-semibold text-slate-700">Phone Number</label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="bi bi-telephone text-slate-400 text-sm"></i>
+                        </div>
+                        <input id="phone" name="phone" type="tel" inputmode="numeric" maxlength="13" required value="{{ old('phone') }}"
+                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            placeholder="09171234567">
+                    </div>
+                    @error('phone')
+                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div>
@@ -311,22 +311,22 @@
                 confirmInput.addEventListener('input', checkMatch);
             }
 
-            // Phone SMS OTP Verification
-            const phoneInput = document.getElementById('phone');
-            const sendOtpBtn = document.getElementById('send-phone-otp-btn');
-            const sendOtpLabel = document.getElementById('send-phone-otp-label');
-            const otpBox = document.getElementById('phone-otp-box');
-            const otpInput = document.getElementById('phone_otp');
-            const verifyOtpBtn = document.getElementById('verify-phone-otp-btn');
-            const feedbackEl = document.getElementById('phone-otp-feedback');
-            const verifiedBadge = document.getElementById('phone-verified-badge');
-            const registerForm = phoneInput ? phoneInput.closest('form') : null;
-            const csrfToken = document.querySelector('input[name="_token"]')?.value;
+            // Email (Gmail) OTP Verification
+            const emailInput = document.getElementById('email');
+            const sendOtpBtn = document.getElementById('send-email-otp-btn');
+            const sendOtpLabel = document.getElementById('send-email-otp-label');
+            const otpBox = document.getElementById('email-otp-box');
+            const otpInput = document.getElementById('email_otp');
+            const verifyOtpBtn = document.getElementById('verify-email-otp-btn');
+            const feedbackEl = document.getElementById('email-otp-feedback');
+            const verifiedBadge = document.getElementById('email-verified-badge');
+            const registerForm = emailInput ? emailInput.closest('form') : null;
+            const csrfToken = document.querySelector('input[name="_token"]')?.value || '';
 
-            let verifiedPhone = null;
+            let verifiedEmail = null;
             let cooldownTimer = null;
 
-            function showPhoneFeedback(msg, type = 'info') {
+            function showEmailFeedback(msg, type = 'info') {
                 if (!feedbackEl) return;
                 feedbackEl.classList.remove('hidden', 'text-emerald-600', 'text-rose-600', 'text-sky-600');
                 if (type === 'success') {
@@ -350,7 +350,7 @@
                     if (remaining <= 0) {
                         clearInterval(cooldownTimer);
                         cooldownTimer = null;
-                        if (verifiedPhone !== phoneInput.value.trim()) {
+                        if (verifiedEmail !== emailInput.value.trim().toLowerCase()) {
                             sendOtpBtn.disabled = false;
                             sendOtpLabel.textContent = 'Resend Code';
                         }
@@ -360,10 +360,10 @@
                 }, 1000);
             }
 
-            if (phoneInput) {
-                phoneInput.addEventListener('input', () => {
-                    if (verifiedPhone && phoneInput.value.trim() !== verifiedPhone) {
-                        verifiedPhone = null;
+            if (emailInput) {
+                emailInput.addEventListener('input', () => {
+                    if (verifiedEmail && emailInput.value.trim().toLowerCase() !== verifiedEmail) {
+                        verifiedEmail = null;
                         verifiedBadge.classList.add('hidden');
                         verifiedBadge.classList.remove('inline-flex');
                         sendOtpBtn.classList.remove('hidden');
@@ -376,10 +376,10 @@
 
             if (sendOtpBtn) {
                 sendOtpBtn.addEventListener('click', async () => {
-                    const phone = phoneInput.value.trim();
-                    if (!phone) {
-                        showPhoneFeedback('Please enter your phone number first.', 'error');
-                        phoneInput.focus();
+                    const email = emailInput.value.trim();
+                    if (!email) {
+                        showEmailFeedback('Please enter your email address first.', 'error');
+                        emailInput.focus();
                         return;
                     }
 
@@ -387,26 +387,27 @@
                     sendOtpLabel.textContent = 'Sending...';
 
                     try {
-                        const res = await fetch("{{ route('register.phone.sendOtp') }}", {
+                        const res = await fetch('/register/email-otp/send', {
                             method: 'POST',
+                            credentials: 'same-origin',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
                                 'X-CSRF-TOKEN': csrfToken,
                             },
-                            body: JSON.stringify({ phone }),
+                            body: JSON.stringify({ _token: csrfToken, email }),
                         });
                         const data = await res.json();
 
                         if (res.ok && data.success) {
-                            phoneInput.value = data.phone || phone;
+                            emailInput.value = data.email || email;
                             otpBox.classList.remove('hidden');
                             otpInput.value = '';
                             otpInput.focus();
-                            showPhoneFeedback(data.message, 'info');
+                            showEmailFeedback(data.message, 'info');
                             startCooldown(data.cooldown || 60);
                         } else {
-                            showPhoneFeedback(data.message || 'Unable to send SMS code.', 'error');
+                            showEmailFeedback(data.message || 'Unable to send email verification code.', 'error');
                             if (data.cooldown) {
                                 otpBox.classList.remove('hidden');
                                 startCooldown(data.cooldown);
@@ -416,7 +417,7 @@
                             }
                         }
                     } catch (err) {
-                        showPhoneFeedback('Network error while sending SMS code. Please try again.', 'error');
+                        showEmailFeedback('Network error while sending verification email. Please try again.', 'error');
                         sendOtpBtn.disabled = false;
                         sendOtpLabel.textContent = 'Send Code';
                     }
@@ -425,11 +426,11 @@
 
             if (verifyOtpBtn) {
                 verifyOtpBtn.addEventListener('click', async () => {
-                    const phone = phoneInput.value.trim();
+                    const email = emailInput.value.trim();
                     const code = otpInput.value.trim();
 
                     if (code.length !== 6) {
-                        showPhoneFeedback('Please enter the 6-digit SMS code sent to your phone.', 'error');
+                        showEmailFeedback('Please enter the 6-digit verification code sent to your email.', 'error');
                         otpInput.focus();
                         return;
                     }
@@ -438,30 +439,31 @@
                     verifyOtpBtn.textContent = 'Verifying...';
 
                     try {
-                        const res = await fetch("{{ route('register.phone.verifyOtp') }}", {
+                        const res = await fetch('/register/email-otp/verify', {
                             method: 'POST',
+                            credentials: 'same-origin',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
                                 'X-CSRF-TOKEN': csrfToken,
                             },
-                            body: JSON.stringify({ phone, code }),
+                            body: JSON.stringify({ _token: csrfToken, email, code }),
                         });
                         const data = await res.json();
 
                         if (res.ok && data.success) {
-                            verifiedPhone = data.phone || phone;
-                            phoneInput.value = verifiedPhone;
+                            verifiedEmail = (data.email || email).toLowerCase();
+                            emailInput.value = verifiedEmail;
                             otpBox.classList.add('hidden');
                             sendOtpBtn.classList.add('hidden');
                             verifiedBadge.classList.remove('hidden');
                             verifiedBadge.classList.add('inline-flex');
-                            showPhoneFeedback('Phone number verified via SMS.', 'success');
+                            showEmailFeedback('Email address verified.', 'success');
                         } else {
-                            showPhoneFeedback(data.message || 'Invalid verification code.', 'error');
+                            showEmailFeedback(data.message || 'Invalid verification code.', 'error');
                         }
                     } catch (err) {
-                        showPhoneFeedback('Network error while verifying code. Please try again.', 'error');
+                        showEmailFeedback('Network error while verifying code. Please try again.', 'error');
                     } finally {
                         verifyOtpBtn.disabled = false;
                         verifyOtpBtn.textContent = 'Verify Code';
@@ -472,10 +474,10 @@
             if (registerForm) {
                 registerForm.addEventListener('submit', (e) => {
                     const hasTypedCode = otpInput && otpInput.value.trim().length === 6;
-                    if (!verifiedPhone && !hasTypedCode) {
+                    if (!verifiedEmail && !hasTypedCode) {
                         e.preventDefault();
-                        showPhoneFeedback('Please click "Send Code" and verify your phone number via SMS before registering.', 'error');
-                        phoneInput.focus();
+                        showEmailFeedback('Please click "Send Code" and verify your email address before registering.', 'error');
+                        emailInput.focus();
                     }
                 });
             }

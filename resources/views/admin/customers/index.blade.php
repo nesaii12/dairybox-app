@@ -132,10 +132,19 @@
                     </td>
                     <!-- Actions -->
                     <td class="px-6 py-4 whitespace-nowrap text-right font-medium">
-                        <a href="{{ route('admin.customers.show', $client->id) }}" class="inline-flex items-center space-x-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:text-sky-600 border border-slate-200 hover:border-slate-300 transition-all shadow-2xs cursor-pointer">
-                            <span>View Profile</span>
-                            <i class="bi bi-chevron-right text-[10px]"></i>
-                        </a>
+                        <div class="inline-flex items-center space-x-1.5">
+                            <a href="{{ route('admin.customers.show', $client->id) }}" class="inline-flex items-center space-x-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:text-sky-600 border border-slate-200 hover:border-slate-300 transition-all shadow-2xs cursor-pointer">
+                                <span>View Profile</span>
+                                <i class="bi bi-chevron-right text-[10px]"></i>
+                            </a>
+                            <form action="{{ route('admin.customers.destroy', $client->id) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to permanently delete customer \'{{ addslashes($client->name) }}\'? This action cannot be undone.')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="w-8 h-8 inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-200 bg-white transition-all shadow-2xs cursor-pointer" title="Delete Customer">
+                                    <i class="bi bi-trash text-xs"></i>
+                                </button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 @empty

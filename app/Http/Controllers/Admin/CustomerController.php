@@ -120,4 +120,26 @@ class CustomerController extends Controller
         return redirect()->back(fallback: route('admin.customers.index'))
             ->with('success', "Ordering privileges for {$customer->name} have been restored.");
     }
+
+    public function destroy(Request $request, User $customer)
+    {
+        if ($customer->role !== 'customer') {
+            abort(404);
+        }
+
+        $customerName = $customer->name;
+        $customerId = $customer->id;
+
+        $customer->delete();
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'CUSTOMER_DELETED',
+            'details' => "Permanently deleted customer account {$customerName} (#{$customerId})",
+            'ip_address' => $request->ip(),
+        ]);
+
+        return redirect()->route('admin.customers.index')
+            ->with('success', "Customer account '{$customerName}' has been permanently deleted.");
+    }
 }

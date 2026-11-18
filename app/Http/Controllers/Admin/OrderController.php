@@ -84,6 +84,15 @@ class OrderController extends Controller
                         'delivery_status' => 'Out for Delivery',
                     ]
                 );
+
+                // Notify assigned rider
+                AppNotification::create([
+                    'user_id' => $order->rider_id,
+                    'title' => 'Order Out for Delivery',
+                    'message' => "Order {$order->order_number} is out for delivery to {$order->delivery_address}.",
+                    'link' => route('rider.orders.show', $order->id),
+                    'is_read' => false,
+                ]);
             }
 
             // If cancelled, return the inventory back using FIFO additions
@@ -215,7 +224,7 @@ class OrderController extends Controller
                 'user_id' => $rider->id,
                 'title' => 'New Delivery Assigned',
                 'message' => "You have been assigned to deliver order {$order->order_number} to {$order->delivery_address}.",
-                'link' => route('rider.dashboard'),
+                'link' => route('rider.orders.show', $order->id),
                 'is_read' => false,
             ]);
 

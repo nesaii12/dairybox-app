@@ -180,6 +180,8 @@ Route::middleware('auth')->get('/notifications/{notification}/go', [\App\Http\Co
 // Rider Routes (Role: rider)
 Route::middleware(['auth', 'role:rider'])->prefix('rider')->name('rider.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\Rider\RiderController::class, 'index'])->name('dashboard');
+    Route::get('/api/live-check', [\App\Http\Controllers\Rider\RiderController::class, 'liveCheck'])->name('api.liveCheck');
+    Route::get('/orders/{order}', [\App\Http\Controllers\Rider\RiderController::class, 'showOrder'])->name('orders.show');
     Route::post('/deliveries/{delivery}/mark-arrived', [\App\Http\Controllers\Rider\RiderController::class, 'markArrived'])->name('deliveries.markArrived');
     Route::post('/deliveries/{delivery}/update-status', [\App\Http\Controllers\Rider\RiderController::class, 'updateStatus'])->name('deliveries.updateStatus');
     Route::get('/history', [\App\Http\Controllers\Rider\RiderController::class, 'history'])->name('history');

@@ -88,6 +88,17 @@ class OrderController extends Controller
                 ]);
             }
 
+            // Notification for assigned rider if delivery was in progress
+            if ($order->rider_id) {
+                AppNotification::create([
+                    'user_id' => $order->rider_id,
+                    'title' => 'Assigned Delivery Cancelled',
+                    'message' => "Order {$order->order_number} assigned to you was cancelled by customer {$order->customer->name}. Reason: {$reason}",
+                    'link' => route('rider.dashboard'),
+                    'is_read' => false,
+                ]);
+            }
+
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'action' => 'ORDER_CANCELLED_BY_CUSTOMER',

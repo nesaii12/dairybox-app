@@ -8,6 +8,11 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-butter-50: #fffdf5;
+    --color-butter-100: #fefce8;
+    --color-butter-200: #fef9c3;
+    --color-butter-300: #fef08a;
+    --color-butter-400: #facc15;
 }
 
 /* ========================================================
@@ -194,5 +199,49 @@ tr.record-highlight-active td > div {
 .toast-exit {
     animation: toastSlideOut 0.3s cubic-bezier(0.7, 0, 0.84, 0) forwards;
 }
+
+/* ========================================================
+   MOBILE & TOUCH-OPTIMIZED ENHANCEMENTS
+   ======================================================== */
+
+/* Prevent iOS auto-zoom on input focus */
+@media (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Native-feel touch manipulation without double-tap delay */
+button, a, input, select, textarea {
+    touch-action: manipulation;
+}
+
+/* Smooth momentum scrolling on mobile devices */
+.overflow-x-auto,
+.overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area insets for notched devices */
+.pb-safe {
+    padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+    padding-top: max(0.625rem, env(safe-area-inset-top, 0px));
+}
+
+/* Utility to hide scrollbars while maintaining scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
 
 

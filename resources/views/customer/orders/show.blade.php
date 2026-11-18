@@ -35,7 +35,9 @@
         }
         $statuses[] = 'Delivered';
 
-        $currentIdx = array_search($order->order_status, $statuses);
+        $isDelivered = in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted']);
+        $effectiveStatus = $isDelivered ? 'Delivered' : $order->order_status;
+        $currentIdx = array_search($effectiveStatus, $statuses);
         $isCancelled = $order->order_status === 'Cancelled';
     @endphp
 
@@ -59,8 +61,8 @@
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 relative">
             @foreach($statuses as $index => $status)
                 @php
-                    $isPassed = $currentIdx >= $index;
-                    $isCurrent = $order->order_status === $status;
+                    $isPassed = ($currentIdx !== false && $currentIdx >= $index);
+                    $isCurrent = ($effectiveStatus === $status);
                 @endphp
                 <div class="flex items-center md:flex-col md:text-center flex-1 relative z-10 w-full">
                     <!-- Step Indicator Bubble (Squircle shape) -->
@@ -139,7 +141,7 @@
         </div>
 
         <!-- Rating & Review Trigger (for completed/fulfilled orders) -->
-        @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup']))
+        @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup', 'Delivered - Pending Remittance', 'Paid & Remitted']))
             @php
                 $satisfactionLabels = [
                     5 => ['label' => 'Very Satisfied', 'class' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],

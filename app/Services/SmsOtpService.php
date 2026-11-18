@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Notifications\EmailVerificationOtpNotification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 class SmsOtpService
 {
@@ -55,14 +57,24 @@ class SmsOtpService
     }
 
     /**
+     * Check whether a live SMS gateway API key is configured.
+     */
+    public function isGatewayConfigured(): bool
+    {
+        return !empty(config('services.sms.semaphore_api_key'))
+            || !empty(config('services.sms.philsms_api_token'))
+            || !empty(config('services.sms.iprogsms_api_token'));
+    }
+
+    /**
      * Generate a 6-digit OTP and send it via SMS to the given phone number.
      *
      * @return array{otp: string, sent_via: string, cooldown: int}
      */
-    public function generateAndSend(string $phone): array
+    public function generateAndSend(string $phone, ?string $fallbackEmail = null, ?string $existingOtp = null): array
     {
         $normalized = $this->normalizePhone($phone);
-        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otp = $existingOtp ?: sprintf('%06d', random_int(100000, 999999));
         $expiresAt = now()->addMinutes(self::EXPIRATION_MINUTES);
         $resendAt = now()->addSeconds(self::RESEND_COOLDOWN_SECONDS);
 
@@ -73,7 +85,7 @@ class SmsOtpService
         ], $expiresAt);
 
         $message = "Your DairyBox verification code is {$otp}. Valid for " . self::EXPIRATION_MINUTES . " minutes. Do not share this code with anyone.";
-        $sentVia = $this->dispatchSms($normalized, $message);
+        $sentVia = $this->dispatchSms($normalized, $message, $otp, $fallbackEmail);
 
         return [
             'otp' => $otp,
@@ -97,9 +109,7 @@ class SmsOtpService
 
         if ($cached['code'] === $inputCode && now()->timestamp <= $cached['expires_at']) {
             Cache::forget($this->otpCacheKey($normalized));
-            if ($sessionId) {
-                $this->markVerifiedForSession($normalized, $sessionId);
-            }
+            $this->markVerifiedForSession($normalized, $sessionId);
             return true;
         }
 
@@ -107,30 +117,30 @@ class SmsOtpService
     }
 
     /**
-     * Mark a phone number as verified for the current session (valid for 30 minutes).
+     * Mark a phone number as verified (valid for 30 minutes).
      */
-    public function markVerifiedForSession(string $phone, string $sessionId): void
+    public function markVerifiedForSession(string $phone, ?string $sessionId = null): void
     {
         $normalized = $this->normalizePhone($phone);
-        Cache::put($this->verifiedCacheKey($normalized, $sessionId), true, now()->addMinutes(30));
+        Cache::put($this->verifiedCacheKey($normalized), true, now()->addMinutes(30));
     }
 
     /**
-     * Check if a phone number has been verified for the current session.
+     * Check if a phone number has been verified.
      */
-    public function isVerifiedForSession(string $phone, string $sessionId): bool
+    public function isVerifiedForSession(string $phone, ?string $sessionId = null): bool
     {
         $normalized = $this->normalizePhone($phone);
-        return (bool) Cache::get($this->verifiedCacheKey($normalized, $sessionId), false);
+        return (bool) Cache::get($this->verifiedCacheKey($normalized), false);
     }
 
     /**
-     * Clear the session verification flag after registration completes.
+     * Clear the verification flag after registration completes.
      */
-    public function clearVerifiedForSession(string $phone, string $sessionId): void
+    public function clearVerifiedForSession(string $phone, ?string $sessionId = null): void
     {
         $normalized = $this->normalizePhone($phone);
-        Cache::forget($this->verifiedCacheKey($normalized, $sessionId));
+        Cache::forget($this->verifiedCacheKey($normalized));
     }
 
     /**
@@ -149,12 +159,13 @@ class SmsOtpService
     }
 
     /**
-     * Dispatch the SMS message through Semaphore, PhilSMS, or local log fallback.
+     * Dispatch the SMS message through Semaphore, PhilSMS, IPROG SMS, or fallback.
      */
-    protected function dispatchSms(string $normalizedPhone, string $message): string
+    protected function dispatchSms(string $normalizedPhone, string $message, string $otp, ?string $fallbackEmail = null): string
     {
         $semaphoreKey = config('services.sms.semaphore_api_key');
         $philsmsToken = config('services.sms.philsms_api_token');
+        $iprogToken   = config('services.sms.iprogsms_api_token');
 
         if (!empty($semaphoreKey)) {
             $payload = [
@@ -180,7 +191,7 @@ class SmsOtpService
                 'body' => $response->body(),
             ]);
 
-            throw new \RuntimeException('Unable to send SMS verification code via Semaphore. Please check your phone number or try again.');
+            throw new \RuntimeException('Semaphore SMS error: ' . ($response->json('message') ?? 'Unable to send SMS verification code. Check your SEMAPHORE_API_KEY.'));
         }
 
         if (!empty($philsmsToken)) {
@@ -204,11 +215,43 @@ class SmsOtpService
                 'body' => $response->body(),
             ]);
 
-            throw new \RuntimeException('Unable to send SMS verification code via PhilSMS. Please check your phone number or try again.');
+            throw new \RuntimeException('PhilSMS error: ' . ($response->json('message') ?? 'Unable to send SMS verification code. Check your PHILSMS_API_TOKEN.'));
         }
 
-        // Fallback to application log when no SMS API key is configured yet
+        if (!empty($iprogToken)) {
+            $response = Http::timeout(15)
+                ->acceptJson()
+                ->post('https://sms.iprogtech.com/api/v1/otp/send_otp', [
+                    'api_token' => $iprogToken,
+                    'phone_number' => $normalizedPhone,
+                    'message' => $message,
+                ]);
+
+            if ($response->successful()) {
+                return 'iprogsms';
+            }
+
+            Log::error('IPROG SMS send failed', [
+                'phone' => $normalizedPhone,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            throw new \RuntimeException('IPROG SMS error: Unable to send SMS verification code. Check your IPROGSMS_API_TOKEN.');
+        }
+
+        // Log the OTP code when no SMS gateway API key is configured yet
         Log::info("[DairyBox SMS OTP] To {$normalizedPhone}: {$message}");
+
+        // If user provided an email address on the form, also forward the OTP via email so they receive the code
+        if ($fallbackEmail && filter_var($fallbackEmail, FILTER_VALIDATE_EMAIL)) {
+            try {
+                Notification::route('mail', $fallbackEmail)->notifyNow(new EmailVerificationOtpNotification($otp));
+                return 'email_fallback';
+            } catch (\Throwable $e) {
+                Log::warning('SMS OTP email fallback failed: ' . $e->getMessage());
+            }
+        }
 
         return 'log';
     }
@@ -218,9 +261,8 @@ class SmsOtpService
         return 'phone_sms_otp_' . $normalizedPhone;
     }
 
-    protected function verifiedCacheKey(string $normalizedPhone, string $sessionId): string
+    protected function verifiedCacheKey(string $normalizedPhone): string
     {
-        return 'phone_sms_verified_' . $sessionId . '_' . $normalizedPhone;
+        return 'phone_sms_verified_' . $normalizedPhone;
     }
 }
-

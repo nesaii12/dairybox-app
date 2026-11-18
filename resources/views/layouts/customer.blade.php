@@ -2,7 +2,7 @@
 <html lang="en" class="h-full bg-white">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @auth
     <meta name="user-id" content="{{ auth()->id() }}">
@@ -24,7 +24,7 @@
     <style>
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: #ffffff; /* White background */
+            background-color: #faf8f2;
         }
         .font-serif {
             font-family: 'Playfair Display', Georgia, serif;
@@ -127,13 +127,13 @@
 <body class="h-full flex flex-col text-slate-800 antialiased">
 
     <!-- Top Navigation Bar -->
-    <nav class="bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100/80">
+    <nav class="bg-[#fffdf8]/90 backdrop-blur-md sticky top-0 z-40 border-b border-amber-200/50 shadow-2xs">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-8">
                     <a href="{{ url('/') }}" class="flex items-center space-x-2.5 hover:opacity-90 transition-opacity">
-                        <div class="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center p-1 border border-sky-100 shadow-xs">
+                        <div class="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center p-1 border border-amber-100 shadow-xs">
                             <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox" class="w-full h-full object-contain">
                         </div>
                         <span class="text-xl font-bold tracking-tight text-slate-900">
@@ -143,15 +143,15 @@
 
                     <!-- Desktop Navigation Links -->
                     <div class="hidden md:flex space-x-1.5">
-                        <a href="{{ url('/') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->is('/') ? 'font-bold bg-slate-100 text-slate-900' : 'font-semibold text-slate-600 hover:text-slate-900' }}">
+                        <a href="{{ url('/') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->is('/') ? 'font-bold bg-amber-100/70 text-amber-950 border border-amber-200/60 shadow-2xs' : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-amber-50/50' }}">
                             Home
                         </a>
-                        <a href="{{ route('customer.catalog') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'font-bold bg-slate-100 text-slate-900' : 'font-semibold text-slate-600 hover:text-slate-900' }}">
+                        <a href="{{ route('customer.catalog') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'font-bold bg-amber-100/70 text-amber-950 border border-amber-200/60 shadow-2xs' : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-amber-50/50' }}">
                             Shop
                         </a>
                         @auth
                             @if(auth()->user()->role === 'customer')
-                                <a href="{{ route('customer.orders.index') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.orders.*') ? 'font-bold bg-slate-100 text-slate-900' : 'font-semibold text-slate-600 hover:text-slate-900' }}">
+                                <a href="{{ route('customer.orders.index') }}" class="px-4 py-2 rounded-full text-xs transition-all {{ request()->routeIs('customer.orders.*') ? 'font-bold bg-amber-100/70 text-amber-950 border border-amber-200/60 shadow-2xs' : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-amber-50/50' }}">
                                     My Orders
                                 </a>
                             @endif
@@ -164,8 +164,8 @@
                     $notifCount = 0;
                     $allNotifications = collect();
                     if (auth()->check()) {
-                        $cart = \App\Models\Cart::where('customer_id', auth()->id())->first();
-                        $cartItemCount = $cart ? $cart->cartItems()->sum('quantity') : 0;
+                        $cartIds = \App\Models\Cart::where('customer_id', auth()->id())->pluck('id');
+                        $cartItemCount = $cartIds->isNotEmpty() ? (int) \App\Models\CartItem::whereIn('cart_id', $cartIds)->sum('quantity') : 0;
                         $notifCount = \App\Models\AppNotification::where('user_id', auth()->id())->where('is_read', false)->count();
                         $allNotifications = \App\Models\AppNotification::where('user_id', auth()->id())
                             ->orderBy('created_at', 'desc')
@@ -190,7 +190,7 @@
                                 </button>
 
                                 <!-- Notifications Dropdown -->
-                                <div id="notificationsModal" class="absolute right-0 mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
+                                <div id="notificationsModal" class="absolute right-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
                                     <!-- Header -->
                                     <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                                         <div>
@@ -293,7 +293,7 @@
                             </button>
 
                             <!-- Dropdown Menu -->
-                            <div id="customerUserDropdownMenu" class="absolute right-0 mt-2 w-64 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all">
+                            <div id="customerUserDropdownMenu" class="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all">
                                 <!-- Dropdown Header -->
                                 <div class="p-4 bg-slate-50/70 border-b border-slate-100 flex items-center space-x-3">
                                     <div class="w-10 h-10 rounded-full bg-sky-50 text-sky-700 font-bold border border-sky-200 flex items-center justify-center text-xs tracking-wider shadow-2xs flex-shrink-0">
@@ -357,30 +357,6 @@
                     @endauth
                 </div>
             </div>
-            
-            <!-- Mobile Navigation Links (Bottom Navbar style on mobile for better touch access) -->
-            <div class="md:hidden flex items-center justify-around py-2 border-t border-slate-100 bg-white">
-                <a href="{{ url('/') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->is('/') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                    <i class="bi bi-house text-lg"></i>
-                    <span>Home</span>
-                </a>
-                <a href="{{ route('customer.catalog') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                    <i class="bi bi-shop text-lg"></i>
-                    <span>Shop</span>
-                </a>
-                @auth
-                    @if(auth()->user()->role === 'customer')
-                        <a href="{{ route('customer.orders.index') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->routeIs('customer.orders.*') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                            <i class="bi bi-clock-history text-lg"></i>
-                            <span>Orders</span>
-                        </a>
-                        <a href="{{ route('customer.settings.index') }}" class="flex flex-col items-center space-y-0.5 text-xs font-semibold {{ request()->routeIs('customer.settings.*') ? 'text-[#0ea5e9]' : 'text-slate-500' }}">
-                            <i class="bi bi-person-gear text-lg"></i>
-                            <span>Settings</span>
-                        </a>
-                    @endif
-                @endauth
-            </div>
         </div>
     </nav>
 
@@ -396,7 +372,7 @@
     @endauth
 
     <!-- Main Container -->
-    <main class="flex-grow py-8 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+    <main class="flex-grow py-6 sm:py-8 pb-24 md:pb-8 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8">
         
         <!-- Alert message flashes using SweetAlert2 -->
         @if(session('success'))
@@ -439,7 +415,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-transparent mt-auto py-8 border-t border-slate-100/60">
+    <footer class="bg-transparent mt-auto py-8 pb-28 md:pb-8 border-t border-slate-100/60">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <!-- Footer Logo -->
             <div class="flex items-center space-x-2.5">
@@ -454,6 +430,63 @@
             <p class="text-xs text-slate-500 font-medium">&copy; {{ date('Y') }} DairyBox. Farm-fresh dairy, delivered.</p>
         </div>
     </footer>
+
+    <!-- Customer Mobile Bottom Navigation Bar -->
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-safe select-none">
+        <div class="flex items-center justify-around px-2 py-1.5">
+            <a href="{{ url('/') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->is('/') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                <i class="bi {{ request()->is('/') ? 'bi-house-fill' : 'bi-house' }} text-lg leading-none mb-1"></i>
+                <span class="text-[10px] tracking-tight">Home</span>
+            </a>
+
+            <a href="{{ route('customer.catalog') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                <i class="bi {{ request()->routeIs('customer.catalog') || request()->routeIs('customer.product') ? 'bi-shop-window' : 'bi-shop' }} text-lg leading-none mb-1"></i>
+                <span class="text-[10px] tracking-tight">Shop</span>
+            </a>
+
+            @auth
+                @if(auth()->user()->role === 'customer')
+                    <a href="{{ route('customer.orders.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('customer.orders.*') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                        <i class="bi {{ request()->routeIs('customer.orders.*') ? 'bi-clock-history' : 'bi-clock' }} text-lg leading-none mb-1"></i>
+                        <span class="text-[10px] tracking-tight">Orders</span>
+                    </a>
+                @endif
+            @endauth
+
+            <!-- Shopping Cart with Live Badge Counter -->
+            <a href="{{ route('customer.cart.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all relative {{ request()->routeIs('customer.cart.*') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                <i class="bi {{ request()->routeIs('customer.cart.*') ? 'bi-cart-fill' : 'bi-cart3' }} text-lg leading-none mb-1"></i>
+                <span class="text-[10px] tracking-tight">Cart</span>
+                <span class="cart-nav-badge absolute top-0.5 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#0ea5e9] text-[9px] font-bold text-white ring-2 ring-white {{ $cartItemCount > 0 ? '' : 'hidden' }}">
+                    {{ $cartItemCount }}
+                </span>
+            </a>
+
+            @auth
+                @if(auth()->user()->role === 'customer')
+                    <a href="{{ route('customer.settings.index') }}" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all {{ request()->routeIs('customer.settings.*') ? 'text-[#0ea5e9] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium' }}">
+                        <i class="bi {{ request()->routeIs('customer.settings.*') ? 'bi-person-fill-gear' : 'bi-person-gear' }} text-lg leading-none mb-1"></i>
+                        <span class="text-[10px] tracking-tight">Account</span>
+                    </a>
+                @elseif(auth()->user()->role === 'admin')
+                    <a href="{{ route('admin.dashboard') }}" class="flex flex-col items-center py-1 px-3 rounded-xl text-sky-600 font-medium">
+                        <i class="bi bi-grid-fill text-lg leading-none mb-1"></i>
+                        <span class="text-[10px] tracking-tight">Admin</span>
+                    </a>
+                @elseif(auth()->user()->role === 'rider')
+                    <a href="{{ route('rider.dashboard') }}" class="flex flex-col items-center py-1 px-3 rounded-xl text-emerald-600 font-medium">
+                        <i class="bi bi-bicycle text-lg leading-none mb-1"></i>
+                        <span class="text-[10px] tracking-tight">Rider</span>
+                    </a>
+                @endif
+            @else
+                <a href="{{ route('login') }}" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-500 hover:text-sky-600 font-medium">
+                    <i class="bi bi-person text-lg leading-none mb-1"></i>
+                    <span class="text-[10px] tracking-tight">Sign In</span>
+                </a>
+            @endauth
+        </div>
+    </nav>
 
     @if(auth()->check())
     <!-- Toggle Script -->

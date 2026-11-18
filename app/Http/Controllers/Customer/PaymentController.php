@@ -64,6 +64,23 @@ class PaymentController extends Controller
                     ]);
                 }
 
+                // Notify Riders if order is for delivery
+                if ($order->order_type === 'Delivery') {
+                    $targetRiders = $order->rider_id 
+                        ? User::where('id', $order->rider_id)->get() 
+                        : User::where('role', 'rider')->where('status', 'active')->get();
+
+                    foreach ($targetRiders as $rider) {
+                        AppNotification::create([
+                            'user_id' => $rider->id,
+                            'title' => 'Customer Order Paid Online',
+                            'message' => "Order {$order->order_number} for delivery to {$order->delivery_address} was paid online via {$paymentChannel} (₱" . number_format($order->total_amount, 2) . ").",
+                            'link' => route('rider.dashboard'),
+                            'is_read' => false,
+                        ]);
+                    }
+                }
+
                 AuditLog::create([
                     'user_id' => auth()->id(),
                     'action' => 'PAYMENT_RECEIVED_XENDIT',

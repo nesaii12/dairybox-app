@@ -11,10 +11,10 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
     <!-- Left Panel: Product Media -->
-    <div class="bg-white rounded-2xl border border-slate-200/80 p-6 flex flex-col items-center justify-center shadow-sm">
-        <div class="w-full h-80 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100/50 flex items-center justify-center shadow-inner mb-6">
+    <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 flex flex-col justify-between shadow-sm">
+        <div class="w-full aspect-square max-h-[520px] rounded-2xl overflow-hidden bg-slate-50 border border-slate-100/70 flex items-center justify-center shadow-inner mb-6">
             @if($product->image)
-                <img src="{{ asset('storage/' . $product->image) }}" id="productMainImage" alt="{{ $product->product_name }}" class="h-full w-full object-cover product-main-img">
+                <img src="{{ asset('storage/' . $product->image) }}" id="productMainImage" alt="{{ $product->product_name }}" class="h-full w-full object-contain product-main-img">
             @else
                 <i class="bi bi-image text-slate-300 text-6xl"></i>
             @endif
@@ -41,6 +41,31 @@
 
     <!-- Right Panel: Buying Panel -->
     <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col justify-between">
+        @php
+            $isExpiredProd = $product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
+            $prodHasStock = !$isExpiredProd && $product->stock > 0;
+            $variants = isset($siblingVariants) ? $siblingVariants : collect([$product]);
+            $availableVariants = $variants->filter(function ($v) {
+                $vExp = $v->expiration_date && \Carbon\Carbon::parse($v->expiration_date)->startOfDay()->lt(now()->startOfDay());
+                return !$vExp && $v->stock > 0;
+            });
+
+            $allowedMilks = $prodHasStock ? $product->available_milk_types : [];
+            $allowedSizes = $prodHasStock ? $product->available_sizes : [];
+            foreach ($availableVariants as $av) {
+                $allowedMilks = array_values(array_unique(array_merge($allowedMilks, $av->available_milk_types)));
+                $allowedSizes = array_values(array_unique(array_merge($allowedSizes, $av->available_sizes)));
+            }
+
+            $defaultMilk = in_array($product->milk_type, $allowedMilks) ? $product->milk_type : ($allowedMilks[0] ?? $product->milk_type);
+            $defaultSize = in_array($product->size, $allowedSizes) ? $product->size : ($allowedSizes[0] ?? $product->size);
+
+            $milkOptions = [
+                'Carabao' => 'Carabao Milk',
+                'Cow' => "Cow's Milk",
+            ];
+            $sizeOptions = ['Small', 'Medium', 'Large'];
+        @endphp
         <div>
             <!-- Breadcrumbs / Meta -->
             <div class="flex items-center justify-between">
@@ -71,32 +96,6 @@
             </div>
 
             <!-- Order Customization: Milk Type & Size -->
-            @php
-                $isExpiredProd = $product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
-                $prodHasStock = !$isExpiredProd && $product->stock > 0;
-                $variants = isset($siblingVariants) ? $siblingVariants : collect([$product]);
-                $availableVariants = $variants->filter(function ($v) {
-                    $vExp = $v->expiration_date && \Carbon\Carbon::parse($v->expiration_date)->startOfDay()->lt(now()->startOfDay());
-                    return !$vExp && $v->stock > 0;
-                });
-
-                $allowedMilks = $prodHasStock ? $product->available_milk_types : [];
-                $allowedSizes = $prodHasStock ? $product->available_sizes : [];
-                foreach ($availableVariants as $av) {
-                    $allowedMilks = array_values(array_unique(array_merge($allowedMilks, $av->available_milk_types)));
-                    $allowedSizes = array_values(array_unique(array_merge($allowedSizes, $av->available_sizes)));
-                }
-
-                $defaultMilk = in_array($product->milk_type, $allowedMilks) ? $product->milk_type : ($allowedMilks[0] ?? $product->milk_type);
-                $defaultSize = in_array($product->size, $allowedSizes) ? $product->size : ($allowedSizes[0] ?? $product->size);
-
-                $milkOptions = [
-                    'Carabao' => 'Carabao Milk',
-                    'Cow' => "Cow's Milk",
-                ];
-                $sizeOptions = ['Small', 'Medium', 'Large'];
-            @endphp
-
             <div class="mt-6 pt-6 border-t border-slate-100 space-y-4">
                 <!-- Milk Type Selector -->
                 <div>

@@ -102,17 +102,19 @@ class InventoryService
     public static function addStock(int $productId, int $quantity, ?string $expirationDate = null, string $remarks = 'Stock In', ?string $manufacturingDate = null): void
     {
         DB::transaction(function () use ($productId, $quantity, $expirationDate, $remarks, $manufacturingDate) {
+            $product = Product::findOrFail($productId);
+            $resolvedMfgDate = $manufacturingDate ?? $product->manufacturing_date?->toDateString();
+
             Inventory::create([
                 'product_id' => $productId,
                 'stock_in' => $quantity,
                 'stock_out' => 0,
                 'remaining_stock' => $quantity,
-                'manufacturing_date' => $manufacturingDate,
-                'expiration_date' => $expirationDate,
+                'manufacturing_date' => $resolvedMfgDate,
+                'expiration_date' => $expirationDate ?? $product->expiration_date?->toDateString(),
                 'remarks' => $remarks,
             ]);
 
-            $product = Product::findOrFail($productId);
             $product->stock += $quantity;
 
             if ($manufacturingDate) {

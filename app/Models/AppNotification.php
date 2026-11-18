@@ -263,7 +263,7 @@ class AppNotification extends Model
             }
             return route('admin.orders.show', ['order' => $order->id, 'highlight' => 'order-' . $order->id]);
         } elseif ($role === 'rider') {
-            return route('rider.dashboard', ['highlight' => 'order-' . $order->id]);
+            return route('rider.orders.show', ['order' => $order->id]);
         }
 
         // Default for customer: their individual order tracking screen

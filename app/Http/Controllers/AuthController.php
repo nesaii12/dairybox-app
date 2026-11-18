@@ -77,6 +77,74 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
+    public function sendEmailOtp(Request $request, OtpService $otpService)
+    {
+        $rawEmail = (string) $request->input('email', '');
+        $normalizedEmail = $otpService->normalizeEmail($rawEmail);
+
+        if (!filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter a valid email address (e.g., yourname@gmail.com).',
+            ], 422);
+        }
+
+        if (User::where('email', $normalizedEmail)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This email address is already registered. Please log in or use a different email.',
+            ], 422);
+        }
+
+        $cooldown = $otpService->getRegistrationEmailCooldownSeconds($normalizedEmail);
+        if ($cooldown > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Please wait {$cooldown} seconds before requesting another verification code.",
+                'cooldown' => $cooldown,
+            ], 429);
+        }
+
+        try {
+            $result = $otpService->generateAndSendForRegistrationEmail($normalizedEmail);
+
+            return response()->json([
+                'success' => true,
+                'email' => $normalizedEmail,
+                'cooldown' => $result['cooldown'],
+                'message' => "A 6-digit verification code has been sent to {$normalizedEmail}. Please check your Gmail inbox or spam folder.",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send verification email. Please check your email address and try again.',
+            ], 500);
+        }
+    }
+
+    public function verifyEmailOtp(Request $request, OtpService $otpService)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'code'  => 'required|string|size:6',
+        ]);
+
+        $normalizedEmail = $otpService->normalizeEmail($request->email);
+
+        if ($otpService->verifyRegistrationEmail($normalizedEmail, $request->code)) {
+            return response()->json([
+                'success' => true,
+                'email' => $normalizedEmail,
+                'message' => 'Email address verified successfully.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid or expired email verification code. Please check the code and try again.',
+        ], 422);
+    }
+
     public function sendPhoneOtp(Request $request, SmsOtpService $smsOtpService)
     {
         $rawPhone = (string) $request->input('phone', '');
@@ -106,14 +174,22 @@ class AuthController extends Controller
         }
 
         try {
-            $result = $smsOtpService->generateAndSend($normalizedPhone);
+            $fallbackEmail = $request->input('email');
+            $result = $smsOtpService->generateAndSend($normalizedPhone, $fallbackEmail);
+
+            $message = "A 6-digit SMS verification code has been sent to {$normalizedPhone}.";
+            if ($result['sent_via'] === 'email_fallback') {
+                $message = "Verification code sent to {$normalizedPhone} (and forwarded to {$fallbackEmail} while SMS gateway key is not configured in .env).";
+            } elseif ($result['sent_via'] === 'log') {
+                $message = "SMS gateway API key is not set in .env yet — check storage/logs/laravel.log for code or enter your Email Address above to receive the code.";
+            }
 
             return response()->json([
                 'success' => true,
                 'phone' => $normalizedPhone,
                 'cooldown' => $result['cooldown'],
                 'sent_via' => $result['sent_via'],
-                'message' => "A 6-digit SMS verification code has been sent to {$normalizedPhone}.",
+                'message' => $message,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -149,7 +225,11 @@ class AuthController extends Controller
     public function register(Request $request, OtpService $otpService, SmsOtpService $smsOtpService)
     {
         $normalizedPhone = $smsOtpService->normalizePhone((string) $request->input('phone', ''));
-        $request->merge(['phone' => $normalizedPhone]);
+        $normalizedEmail = $otpService->normalizeEmail((string) $request->input('email', ''));
+        $request->merge([
+            'phone' => $normalizedPhone,
+            'email' => $normalizedEmail,
+        ]);
 
         $validator = Validator::make($request->all(), [
             'name'     => 'required|string|max:255',
@@ -161,16 +241,15 @@ class AuthController extends Controller
             'phone.unique' => 'This phone number is already registered. Please use a different phone number.',
         ]);
 
-        $sessionId = $request->session()->getId();
-        $isPhoneVerified = $smsOtpService->isVerifiedForSession($normalizedPhone, $sessionId);
+        $isEmailVerified = $otpService->isRegistrationEmailVerified($normalizedEmail);
 
-        if (!$isPhoneVerified && $request->filled('phone_otp')) {
-            $isPhoneVerified = $smsOtpService->verify($normalizedPhone, (string) $request->input('phone_otp'), $sessionId);
+        if (!$isEmailVerified && $request->filled('email_otp')) {
+            $isEmailVerified = $otpService->verifyRegistrationEmail($normalizedEmail, (string) $request->input('email_otp'));
         }
 
-        $validator->after(function ($validator) use ($isPhoneVerified) {
-            if (!$isPhoneVerified) {
-                $validator->errors()->add('phone', 'Please verify your phone number via SMS code before creating your account.');
+        $validator->after(function ($validator) use ($isEmailVerified) {
+            if (!$isEmailVerified) {
+                $validator->errors()->add('email', 'Please verify your email address with the 6-digit code sent to your Gmail before creating your account.');
             }
         });
 
@@ -180,25 +259,23 @@ class AuthController extends Controller
 
         $user = User::create([
             'name' => $request->name,
-            'email' => $request->email,
+            'email' => $normalizedEmail,
             'password' => Hash::make($request->password),
             'phone' => $normalizedPhone,
             'role' => 'customer',
             'status' => 'active',
         ]);
 
-        $smsOtpService->clearVerifiedForSession($normalizedPhone, $sessionId);
+        $user->forceFill([
+            'email_verified_at' => now(),
+        ])->save();
 
-        // Generate and send 6-digit OTP code to the newly created user's email
-        $otpService->generateAndSend($user);
+        $otpService->clearRegistrationEmailVerified($normalizedEmail);
 
-        // Store pending user in session for OTP verification
-        session([
-            'pending_otp_user_id' => $user->id,
-            'pending_otp_email' => $user->email,
-        ]);
+        Auth::login($user);
+        $request->session()->regenerate();
 
-        return redirect()->route('otp.verify')->with('success', 'Verification code sent to ' . $user->email . '. Please enter the 6-digit code to activate your account.');
+        return redirect()->route('customer.catalog')->with('success', 'Email verified and account created successfully! Welcome to DairyBox.');
     }
 
     /**

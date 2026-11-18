@@ -25,6 +25,18 @@ class NotificationClickController extends Controller
 
         $targetUrl = $notification->target_url;
 
+        // If authenticated user is a rider and notification points to an order (e.g. /customer/orders/{id}, /admin/orders/{id}, or /rider/orders/{id})
+        if (auth()->user()->role === 'rider') {
+            if (preg_match('#/(admin|customer|rider)/orders/(\d+)#', $targetUrl, $matches)) {
+                $orderId = (int) $matches[2];
+                $order = Order::find($orderId);
+                if ($order && ($order->rider_id === auth()->id() || ($order->order_type === 'Delivery' && is_null($order->rider_id)))) {
+                    return redirect()->route('rider.orders.show', $order->id);
+                }
+                return redirect()->route('rider.dashboard')->with('info', "Viewing active delivery queue.");
+            }
+        }
+
         // If target URL points to a specific order show page: /admin/orders/{id} or /customer/orders/{id}
         if (preg_match('#/(admin|customer)/orders/(\d+)#', $targetUrl, $matches)) {
             $rolePrefix = $matches[1];

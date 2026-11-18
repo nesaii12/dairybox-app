@@ -98,6 +98,25 @@
             </form>
         </div>
         @endif
+
+        <!-- Delete Customer Card -->
+        <div class="bg-white rounded-2xl border border-rose-100 shadow-sm p-6 relative overflow-hidden">
+            <h3 class="text-sm font-bold text-slate-950 mb-1 flex items-center space-x-2 text-rose-700">
+                <i class="bi bi-trash"></i>
+                <span>Delete Customer Account</span>
+            </h3>
+            <p class="text-[11px] text-slate-500 mb-4 leading-relaxed">
+                Permanently delete this customer account and all associated order history. This action cannot be reversed.
+            </p>
+            <form action="{{ route('admin.customers.destroy', $customer->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to permanently delete customer \'{{ addslashes($customer->name) }}\'? This action cannot be undone.');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all shadow-2xs cursor-pointer">
+                    <i class="bi bi-trash"></i>
+                    <span>Delete Customer Permanently</span>
+                </button>
+            </form>
+        </div>
     </div>
 
     <!-- Right Column: Purchase History & Product Reviews (Columns 2-3) -->

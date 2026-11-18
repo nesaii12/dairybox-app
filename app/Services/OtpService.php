@@ -39,6 +39,14 @@ class OtpService
 
         $user->notifyNow(new EmailVerificationOtpNotification($otp));
 
+        if (!empty($user->phone)) {
+            try {
+                app(SmsOtpService::class)->generateAndSend($user->phone, null, $otp);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('SMS OTP dispatch during account verification failed: ' . $e->getMessage());
+            }
+        }
+
         return $otp;
     }
 
@@ -108,5 +116,105 @@ class OtpService
     protected function cacheKey(User $user): string
     {
         return 'email_otp_' . $user->id;
+    }
+
+    /**
+     * Normalize an email address for pre-registration OTP caching.
+     */
+    public function normalizeEmail(string $email): string
+    {
+        return strtolower(trim($email));
+    }
+
+    /**
+     * Generate and send a 6-digit verification code to an email address before registration.
+     *
+     * @return array{otp: string, cooldown: int}
+     */
+    public function generateAndSendForRegistrationEmail(string $email): array
+    {
+        $normalized = $this->normalizeEmail($email);
+        $otp = sprintf('%06d', random_int(100000, 999999));
+        $expiresAt = now()->addMinutes(self::EXPIRATION_MINUTES);
+        $resendAt = now()->addSeconds(self::RESEND_COOLDOWN_SECONDS);
+
+        Cache::put($this->registrationOtpCacheKey($normalized), [
+            'code' => $otp,
+            'expires_at' => $expiresAt->timestamp,
+            'resend_at' => $resendAt->timestamp,
+        ], $expiresAt);
+
+        \Illuminate\Support\Facades\Notification::route('mail', $normalized)
+            ->notifyNow(new EmailVerificationOtpNotification($otp));
+
+        return [
+            'otp' => $otp,
+            'cooldown' => self::RESEND_COOLDOWN_SECONDS,
+        ];
+    }
+
+    /**
+     * Verify the 6-digit OTP code for a pre-registration email address.
+     */
+    public function verifyRegistrationEmail(string $email, string $inputCode): bool
+    {
+        $normalized = $this->normalizeEmail($email);
+        $inputCode = trim(preg_replace('/\s+/', '', $inputCode));
+
+        $cached = Cache::get($this->registrationOtpCacheKey($normalized));
+        if (!$cached || !isset($cached['code'], $cached['expires_at'])) {
+            return false;
+        }
+
+        if ($cached['code'] === $inputCode && now()->timestamp <= $cached['expires_at']) {
+            Cache::forget($this->registrationOtpCacheKey($normalized));
+            Cache::put($this->registrationVerifiedCacheKey($normalized), true, now()->addMinutes(30));
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a pre-registration email address has been verified.
+     */
+    public function isRegistrationEmailVerified(string $email): bool
+    {
+        $normalized = $this->normalizeEmail($email);
+        return (bool) Cache::get($this->registrationVerifiedCacheKey($normalized), false);
+    }
+
+    /**
+     * Clear the verified flag for a pre-registration email after account creation.
+     */
+    public function clearRegistrationEmailVerified(string $email): void
+    {
+        $normalized = $this->normalizeEmail($email);
+        Cache::forget($this->registrationVerifiedCacheKey($normalized));
+    }
+
+    /**
+     * Get remaining cooldown seconds before another verification email can be sent.
+     */
+    public function getRegistrationEmailCooldownSeconds(string $email): int
+    {
+        $normalized = $this->normalizeEmail($email);
+        $cached = Cache::get($this->registrationOtpCacheKey($normalized));
+
+        if ($cached && isset($cached['resend_at'])) {
+            return max(0, $cached['resend_at'] - now()->timestamp);
+        }
+
+        return 0;
+    }
+
+    protected function registrationOtpCacheKey(string $normalizedEmail): string
+    {
+        return 'reg_email_otp_' . sha1($normalizedEmail);
+    }
+
+    protected function registrationVerifiedCacheKey(string $normalizedEmail): string
+    {
+        return 'reg_email_verified_' . sha1($normalizedEmail);
     }
 }

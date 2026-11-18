@@ -1,27 +1,31 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-<meta charset="utf-8">
-<script src="mermaid.min.js"></script>
-<style>
-  body {
-    background-color: #ffffff;
-    margin: 0;
-    padding: 30px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    display: inline-block;
-  }
-  .mermaid {
-    display: inline-block;
-  }
-  svg {
-    max-width: none !important;
-  }
-</style>
+  <meta charset="utf-8">
+  <script src="mermaid.min.js"></script>
+  <style>
+    body {
+      background-color: #ffffff;
+      margin: 0;
+      padding: 30px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      display: inline-block;
+    }
+
+    .mermaid {
+      display: inline-block;
+    }
+
+    svg {
+      max-width: none !important;
+    }
+  </style>
 </head>
+
 <body>
-<div id="container" class="mermaid">
-flowchart TD
+  <div id="container" class="mermaid">
+    flowchart TD
     classDef entity fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B,font-weight:bold;
     classDef process fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20,font-weight:bold;
     classDef store fill:#FFF8E1,stroke:#FFA000,stroke-width:2px,color:#E65100,font-weight:bold;
@@ -32,19 +36,19 @@ flowchart TD
     Customer["Customer"]:::entity
 
     P41(("4.1: Fleet Rider
-Assignment & Dispatch")):::process
+    Assignment & Dispatch")):::process
     P42(("4.2: Location Arrival
-& Customer Alert")):::process
+    & Customer Alert")):::process
     P43(("4.3: Delivery Completion
-& Incident Processing")):::process
+    & Incident Processing")):::process
 
     D1[("D1: users
-(Customer Status)")]:::store
+    (Customer Status)")]:::store
     D3[("D3: inventories
-(FIFO Batch Restock)")]:::store
+    (FIFO Batch Restock)")]:::store
     D5[("D5: orders")]:::store
     D6[("D6: deliveries
-(Tracking Registry)")]:::store
+    (Tracking Registry)")]:::store
     D7[("D7: sales")]:::store
     D11[("D11: notifications")]:::store
 
@@ -54,6 +58,7 @@ Assignment & Dispatch")):::process
     P41 -->|"Create Delivery Tracking Record"| D6
     P41 -->|"Dispatch Push Alert"| D11
     D6 -->|"Poll Active Deliveries Queue"| Rider
+    D1 -->|"View Customer Details & Contact Specs"| Rider
 
     %% Step 2: Arrival
     Rider -->|"2. Record Arrival at Customer Location"| P42
@@ -74,18 +79,19 @@ Assignment & Dispatch")):::process
     Admin -->|"4. Review Incident & Confirm 3-Day Suspension"| P43
     P43 -->|"Apply Account Ban (restricted_until = +3 days)"| D1
     P43 -->|"Notify Customer of Ordering Privilege Suspension"| D11
-</div>
-<script>
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis'
-    }
-  });
-</script>
+  </div>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default',
+      securityLevel: 'loose',
+      flowchart: {
+        useMaxWidth: false,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+  </script>
 </body>
+
 </html>

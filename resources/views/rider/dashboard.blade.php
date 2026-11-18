@@ -16,6 +16,56 @@
     </div>
 </div>
 
+@if(isset($pendingDispatchCount) && $pendingDispatchCount > 0)
+    <!-- Incoming Customer Delivery Notice -->
+    <div class="mb-5 bg-gradient-to-r from-sky-50/90 to-blue-50/80 border border-sky-200/80 rounded-2xl p-3.5 shadow-2xs text-xs text-sky-950">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <span class="w-8 h-8 rounded-xl bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-sm text-sm">
+                    <i class="bi bi-box-seam"></i>
+                </span>
+                <div>
+                    <p class="font-bold text-[11px] leading-tight text-sky-950">Incoming Customer Orders ({{ $pendingDispatchCount }})</p>
+                    <p class="text-[10px] text-sky-700 mt-0.5">{{ $pendingDispatchCount }} {{ \Illuminate\Support\Str::plural('order', $pendingDispatchCount) }} placed and pending fleet dispatch.</p>
+                </div>
+            </div>
+            @if(isset($pendingOrders) && $pendingOrders->count() > 0)
+                <button type="button" onclick="document.getElementById('pendingOrdersDrawer').classList.toggle('hidden')" class="text-[9px] font-bold bg-white/90 hover:bg-white border border-sky-200 text-sky-800 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 shadow-2xs transition cursor-pointer flex items-center gap-1">
+                    <span>View ({{ $pendingOrders->count() }})</span>
+                    <i class="bi bi-chevron-down text-[8px]"></i>
+                </button>
+            @else
+                <span class="text-[9px] font-bold bg-white/80 border border-sky-200 text-sky-800 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs">
+                    In Queue
+                </span>
+            @endif
+        </div>
+
+        @if(isset($pendingOrders) && $pendingOrders->count() > 0)
+            <!-- Expandable Incoming Orders Details -->
+            <div id="pendingOrdersDrawer" class="hidden mt-3 pt-3 border-t border-sky-200/60 space-y-2">
+                @foreach($pendingOrders as $po)
+                    <div class="bg-white/90 rounded-xl p-2.5 border border-sky-100 flex items-center justify-between text-[11px] gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-mono font-bold text-slate-800">{{ $po->order_number }}</span>
+                                <span class="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.25 rounded font-semibold">{{ $po->order_status }}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 truncate mt-0.5">
+                                <span class="font-semibold text-slate-700">{{ $po->customer->name }}</span> &bull; {{ $po->delivery_address }}
+                            </p>
+                        </div>
+                        <button type="button" onclick="fetchAndShowCustomerDetails({{ $po->id }})" class="shrink-0 text-[10px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-1 rounded-lg transition cursor-pointer flex items-center gap-1">
+                            <i class="bi bi-person-lines-fill"></i>
+                            <span>Details</span>
+                        </button>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+@endif
+
 <div class="space-y-5">
     @forelse($deliveries as $delivery)
         @php
@@ -51,43 +101,85 @@
             </div>
 
             <!-- Customer & Delivery Specs -->
-            <div class="space-y-3.5 mb-5 text-[11px] text-slate-600">
-                <!-- Customer Name -->
-                <div class="flex items-start space-x-3">
-                    <div class="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-100">
-                        <i class="bi bi-person text-xs"></i>
+            <div class="space-y-3.5 mb-4 text-[11px] text-slate-600">
+                <!-- Customer Name & Details Trigger -->
+                <div class="flex items-center justify-between p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                    <div class="flex items-center space-x-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-sky-400 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0 uppercase">
+                            {{ strtoupper(substr($customer->name, 0, 1)) }}
+                        </div>
+                        <div class="min-w-0">
+                            <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Client Name</span>
+                            <span class="text-xs font-bold text-slate-900 truncate block">{{ $customer->name }}</span>
+                        </div>
                     </div>
-                    <div class="flex-1">
-                        <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Client Name</span>
-                        <span class="text-xs font-semibold text-slate-800">{{ $customer->name }}</span>
-                    </div>
+                    <button type="button" onclick="showDeliveryCustomerDetails({{ $delivery->id }})" class="shrink-0 text-[10px] font-bold text-sky-700 bg-white hover:bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-xl shadow-2xs transition cursor-pointer flex items-center gap-1">
+                        <i class="bi bi-person-lines-fill text-sky-600"></i>
+                        <span>Customer Details</span>
+                    </button>
                 </div>
 
-                <!-- Contact Phone -->
-                <div class="flex items-start space-x-3">
-                    <div class="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-100">
-                        <i class="bi bi-telephone text-xs"></i>
+                <!-- Contact Phone & Quick Actions -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-start space-x-2.5 min-w-0">
+                        <div class="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-100">
+                            <i class="bi bi-telephone text-xs"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Contact Phone</span>
+                            <span class="text-xs font-semibold text-slate-800 select-all">{{ $customer->phone ?? 'N/A' }}</span>
+                        </div>
                     </div>
-                    <div class="flex-1">
-                        <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Contact Phone</span>
-                        <a href="tel:{{ $customer->phone }}" class="text-xs font-semibold text-sky-600 hover:text-sky-700 hover:underline select-all">{{ $customer->phone ?? 'N/A' }}</a>
-                    </div>
+                    @if($customer->phone)
+                        <div class="flex items-center space-x-1.5 shrink-0">
+                            <a href="tel:{{ $customer->phone }}" class="p-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="Call Customer">
+                                <i class="bi bi-telephone-fill text-[10px]"></i>
+                                <span class="text-[9px]">Call</span>
+                            </a>
+                            <a href="sms:{{ $customer->phone }}" class="p-1.5 px-2 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg border border-sky-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="SMS Customer">
+                                <i class="bi bi-chat-dots-fill text-[10px]"></i>
+                                <span class="text-[9px]">SMS</span>
+                            </a>
+                        </div>
+                    @endif
                 </div>
 
-                <!-- Destination Address -->
-                <div class="flex items-start space-x-3">
-                    <div class="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-100">
-                        <i class="bi bi-geo-alt text-xs"></i>
+                <!-- Destination Address & Directions -->
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-start space-x-2.5 min-w-0 flex-1">
+                        <div class="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-100">
+                            <i class="bi bi-geo-alt text-xs"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Delivery Destination</span>
+                            <span class="text-xs font-semibold text-slate-700 leading-relaxed block break-words">{{ $order->delivery_address }}</span>
+                        </div>
                     </div>
-                    <div class="flex-1">
-                        <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Delivery Destination</span>
-                        <span class="text-xs font-semibold text-slate-700 leading-relaxed">{{ $order->delivery_address }}</span>
-                    </div>
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode($order->delivery_address) }}" target="_blank" rel="noopener noreferrer"
+                       class="p-1.5 px-2 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg border border-sky-200 text-xs font-bold transition flex items-center gap-1 shrink-0 shadow-2xs" title="Open Google Maps">
+                        <i class="bi bi-map-fill text-[10px]"></i>
+                        <span class="text-[9px]">Maps</span>
+                    </a>
                 </div>
+
+                <!-- Schedule Window -->
+                @if($order->schedule_date)
+                    <div class="flex items-center space-x-2.5 text-[10px] text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100">
+                        <i class="bi bi-clock-history text-sky-500"></i>
+                        <span>Scheduled: <strong class="text-slate-700">{{ $order->schedule_date->format('M d, Y') }}</strong> &bull; {{ $order->schedule_time ? \Carbon\Carbon::parse($order->schedule_time)->format('h:i A') : 'Flexible Window' }}</span>
+                    </div>
+                @endif
                 
                 <!-- Package Contents details -->
-                <div class="p-3 bg-slate-50 rounded-2xl mt-4 space-y-2 border border-slate-100">
-                    <span class="block text-[8px] text-slate-400 font-black uppercase tracking-widest border-b border-slate-100 pb-1.5 mb-1.5"><i class="bi bi-box-seam mr-1 text-slate-400"></i> Package Contents</span>
+                <div class="p-3 bg-slate-50 rounded-2xl mt-3 space-y-2 border border-slate-100">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
+                        <span class="text-[8px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1">
+                            <i class="bi bi-box-seam text-slate-400"></i> Package Contents ({{ $order->orderItems->count() }})
+                        </span>
+                        <button type="button" onclick="showDeliveryCustomerDetails({{ $delivery->id }})" class="text-[9px] font-bold text-sky-600 hover:underline">
+                            View details &rarr;
+                        </button>
+                    </div>
                     @foreach($order->orderItems as $item)
                         <div class="flex items-center justify-between text-[10px] text-slate-500">
                             <span class="truncate pr-4">{{ $item->product->product_name }} ({{ $item->product->size }})</span>
@@ -303,6 +395,60 @@
 
     function closeRiderCancellationModal() {
         document.getElementById('riderCancellationModal').classList.add('hidden');
+    }
+
+    // Active deliveries data map for instantaneous customer details modal rendering
+    const deliveryDataMap = {
+        @foreach($deliveries as $delivery)
+        {{ $delivery->id }}: {
+            order: {
+                id: {{ $delivery->order->id }},
+                order_number: @js($delivery->order->order_number),
+                order_status: @js($delivery->order->order_status),
+                order_type: @js($delivery->order->order_type),
+                payment_method: @js($delivery->order->payment_method),
+                payment_status: @js($delivery->order->payment_status),
+                is_paid: {{ $delivery->order->isPaid() ? 'true' : 'false' }},
+                delivery_address: @js($delivery->order->delivery_address),
+                schedule_date: @js($delivery->order->schedule_date ? $delivery->order->schedule_date->format('M d, Y') : null),
+                schedule_time: @js($delivery->order->schedule_time ? \Carbon\Carbon::parse($delivery->order->schedule_time)->format('h:i A') : 'Flexible Window'),
+                subtotal: @js(number_format($delivery->order->subtotal, 2)),
+                delivery_fee: @js(number_format($delivery->order->delivery_fee, 2)),
+                total_amount: @js(number_format($delivery->order->total_amount, 2)),
+                created_at: @js($delivery->order->created_at->format('M d, Y h:i A')),
+                items: [
+                    @foreach($delivery->order->orderItems as $item)
+                    {
+                        name: @js($item->product ? $item->product->product_name : 'Dairy Product'),
+                        size: @js($item->product ? $item->product->size : null),
+                        quantity: {{ $item->quantity }},
+                        price: @js(number_format($item->unit_price, 2)),
+                        subtotal: @js(number_format($item->subtotal, 2)),
+                    },
+                    @endforeach
+                ]
+            },
+            customer: {
+                id: {{ $delivery->order->customer->id }},
+                name: @js($delivery->order->customer->name),
+                phone: @js($delivery->order->customer->phone),
+                email: @js($delivery->order->customer->email),
+                avatar: @js($delivery->order->customer->avatar),
+                member_since: @js($delivery->order->customer->created_at->format('M Y')),
+                completed_orders_count: {{ $delivery->order->customer->orders()->whereIn('order_status', ['Delivered', 'Paid & Remitted'])->count() }},
+                status: @js($delivery->order->customer->status ?? 'active'),
+            }
+        },
+        @endforeach
+    };
+
+    function showDeliveryCustomerDetails(deliveryId) {
+        const data = deliveryDataMap[deliveryId];
+        if (data && window.renderCustomerDetailsModal) {
+            window.renderCustomerDetailsModal(data.order, data.customer);
+        } else if (data) {
+            window.location.href = `/rider/orders/${data.order.id}`;
+        }
     }
 </script>
 @endsection
