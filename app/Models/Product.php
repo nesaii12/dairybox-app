@@ -205,14 +205,75 @@ class Product extends Model
         return $this->milk_type ? [$this->milk_type] : ['Cow'];
     }
 
+    /**
+     * Resolve dynamic price based on the selected size.
+     * Pricing rules:
+     * - Milks (Strawberry, Fresh Milk, Mango, Milk Cheese, Pastillas, Pandan, Choco, Ube): Small 30, Medium 50, Large 70
+     * - Ice Cream & Yogurt (Vanilla Ice Cream, Fresh Yogurt): Small 25, Medium 35, Large 50
+     * - Any other product: Small automatically 30, else base product price.
+     */
+    public function getPriceForSize(?string $size = null): float
+    {
+        $normalizedSize = ucfirst(strtolower(trim($size ?? $this->size ?? 'Medium')));
+        if ($normalizedSize === 'Mid') {
+            $normalizedSize = 'Medium';
+        }
+
+        $name = strtolower(trim($this->product_name));
+        $categoryName = $this->category ? strtolower(trim($this->category->category_name)) : '';
+
+        // 1. Vanilla Ice-cream & Fresh Yogurt: Small 25, Medium 35, Large 50
+        if (
+            str_contains($name, 'ice cream') || 
+            str_contains($name, 'ice-cream') || 
+            str_contains($name, 'yogurt') || 
+            in_array($categoryName, ['ice cream', 'yogurt'])
+        ) {
+            return match ($normalizedSize) {
+                'Small' => 25.00,
+                'Large' => 50.00,
+                default => 35.00, // Medium / Mid
+            };
+        }
+
+        // 2. All Milks (Pasteurized Milk drinks, Fresh Milk, etc.): Small 30, Medium 50, Large 70
+        if (str_contains($name, 'milk') || $categoryName === 'milk') {
+            return match ($normalizedSize) {
+                'Small' => 30.00,
+                'Large' => 70.00,
+                default => 50.00, // Medium / Mid
+            };
+        }
+
+        // 3. Fallback for any product: if customer chooses Small, automatically fixed as 30
+        return match ($normalizedSize) {
+            'Small' => 30.00,
+            default => (float) $this->price,
+        };
+    }
+
     public function getAvailableSizesAttribute(): array
     {
+        $name = strtolower(trim($this->product_name));
+        $categoryName = $this->category ? strtolower(trim($this->category->category_name)) : '';
+
+        // Products with standard tiered sizing (Milks, Ice Cream, Yogurt) support Small, Medium, Large
+        if (
+            str_contains($name, 'milk') || 
+            str_contains($name, 'ice') || 
+            str_contains($name, 'yogurt') || 
+            in_array($categoryName, ['milk', 'ice cream', 'yogurt'])
+        ) {
+            return ['Small', 'Medium', 'Large'];
+        }
+
         $store = static::getAllOptionsStore();
         $saved = $store['products'][(string) $this->id]['sizes'] ?? null;
-        if (!empty($saved) && is_array($saved)) {
+        if (!empty($saved) && is_array($saved) && count($saved) > 0) {
             return $saved;
         }
-        return $this->size ? [$this->size] : ['Medium'];
+
+        return $this->size ? [$this->size] : ['Small', 'Medium', 'Large'];
     }
 
     public static function saveCartItemCustomization(int $cartItemId, string $milkType, string $size): void

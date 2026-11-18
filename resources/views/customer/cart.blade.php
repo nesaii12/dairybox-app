@@ -143,7 +143,7 @@
                             <div class="flex items-center justify-between sm:justify-start gap-5 sm:gap-8 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-50">
                                 <div class="text-left sm:text-right">
                                     <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Unit Price</span>
-                                    <span class="text-sm font-bold text-slate-900">₱{{ number_format($item->product->price, 2) }}</span>
+                                    <span class="text-sm font-bold text-slate-900">₱{{ number_format($item->unit_price, 2) }}</span>
                                     @if($item->product->stock <= 0)
                                         <span class="block text-[9px] font-bold text-rose-600">Out of stock</span>
                                     @elseif($item->product->stock <= 5)

@@ -451,6 +451,7 @@
                                                         data-card-option="size"
                                                         data-product-id="{{ $product->id }}"
                                                         data-value="{{ $sOpt }}"
+                                                        data-price="{{ $product->getPriceForSize($sOpt) }}"
                                                         class="card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer {{ $isCurrSize ? 'font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs' : 'font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600' }}">{{ $sOpt }}</button>
                                                 @else
                                                     <button type="button" disabled aria-disabled="true" title="{{ $sOpt }} unavailable" class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200/70 line-through opacity-55 cursor-not-allowed select-none">{{ $sOpt }}</button>
@@ -461,7 +462,7 @@
                                 </div>
 
                                 <div class="flex items-center justify-between pt-2 border-t border-slate-50">
-                                    <span class="text-sm font-bold text-sky-600">₱{{ number_format($product->price, 2) }}</span>
+                                    <span class="card-product-price text-sm font-bold text-sky-600">₱{{ number_format($product->getPriceForSize($defaultCardSize), 2) }}</span>
                                     
                                     @auth
                                         @if(auth()->user()->role === 'customer' && !$outOfStock)

@@ -22,6 +22,19 @@ class CartItem extends Model
     }
 
     /**
+     * Get the dynamic unit price for this cart item based on customized size.
+     */
+    public function getUnitPriceAttribute(): float
+    {
+        if ($this->quantity > 0 && (float) $this->subtotal > 0) {
+            return (float) $this->subtotal / $this->quantity;
+        }
+
+        $custom = Product::getCartItemCustomization($this->id, $this->product);
+        return $this->product ? $this->product->getPriceForSize($custom['size'] ?? 'Medium') : 0.00;
+    }
+
+    /**
      * Get the cart this item belongs to.
      */
     public function cart(): BelongsTo

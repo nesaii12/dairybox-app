@@ -262,7 +262,7 @@
                                     <div class="min-w-0">
                                         <span class="font-bold text-slate-900 block truncate">{{ $item->product->product_name }}</span>
                                         <span class="block text-[10px] text-slate-500 font-medium truncate">
-                                            ₱{{ number_format($item->product->price, 2) }} &times; <strong class="text-slate-800">{{ $item->quantity }}</strong>
+                                            ₱{{ number_format($item->unit_price, 2) }} &times; <strong class="text-slate-800">{{ $item->quantity }}</strong>
                                         </span>
                                     </div>
                                 </div>

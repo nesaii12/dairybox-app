@@ -126,6 +126,7 @@
                                         data-card-option="size"
                                         data-product-id="{{ $product->id }}"
                                         data-value="{{ $sOpt }}"
+                                        data-price="{{ $product->getPriceForSize($sOpt) }}"
                                         class="card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer {{ $isCurrSize ? 'font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs' : 'font-semibold bg-white text-slate-700 border border-slate-200 hover:border-sky-400 hover:text-sky-600' }}">
                                         {{ $sOpt }}
                                     </button>
@@ -156,7 +157,7 @@
                 <!-- Price & Add-To-Cart Action -->
                 <div class="flex items-center justify-between pt-2 border-t border-slate-50">
                     <div>
-                        <span class="text-sm font-bold text-sky-600">₱{{ number_format($product->price, 2) }}</span>
+                        <span class="card-product-price text-sm font-bold text-sky-600">₱{{ number_format($product->getPriceForSize($defaultCardSize), 2) }}</span>
                         @if($isExpired)
                             <span class="block text-[10px] text-rose-500 font-semibold">Out of Stock</span>
                         @elseif(!$outOfStock)

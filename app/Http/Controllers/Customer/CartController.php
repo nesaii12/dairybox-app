@@ -53,9 +53,11 @@ class CartController extends Controller
                     $pName = $freshProduct ? $freshProduct->product_name : 'An item';
                     $adjustedItems[] = "{$pName} lacks verified expiration date info and cannot be checked out.";
                 } elseif ($freshStock > 0 && $item->quantity > $freshStock) {
+                    $custom = Product::getCartItemCustomization($item->id, $item->product);
+                    $unitPrice = $item->product ? $item->product->getPriceForSize($custom['size'] ?? 'Medium') : (float) $item->product->price;
                     $item->update([
                         'quantity' => $freshStock,
-                        'subtotal' => $item->product->price * $freshStock,
+                        'subtotal' => $unitPrice * $freshStock,
                     ]);
                     $adjustedItems[] = "{$item->product->product_name} quantity was adjusted to the maximum available stock ({$freshStock}).";
                 }
@@ -209,11 +211,13 @@ class CartController extends Controller
             $selectedSize = $product->available_sizes[0] ?? $product->size;
         }
 
+        $unitPrice = $product->getPriceForSize($selectedSize);
+
         $cartItem = CartItem::create([
             'cart_id' => $targetBatch->id,
             'product_id' => $product->id,
             'quantity' => $qty,
-            'subtotal' => $product->price * $qty,
+            'subtotal' => $unitPrice * $qty,
         ]);
 
         Product::saveCartItemCustomization($cartItem->id, $selectedMilk, $selectedSize);
@@ -276,9 +280,12 @@ class CartController extends Controller
             return redirect()->back()->with('error', $msg);
         }
 
+        $custom = Product::getCartItemCustomization($item->id, $product);
+        $unitPrice = $product->getPriceForSize($custom['size'] ?? 'Medium');
+
         $item->update([
             'quantity' => $qty,
-            'subtotal' => $product->price * $qty,
+            'subtotal' => $unitPrice * $qty,
         ]);
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -519,16 +526,18 @@ class CartController extends Controller
                     throw new \Exception("'{$product->product_name}' has expired and cannot be ordered. Please remove it from your cart.");
                 }
 
+                $itemCust = Product::getCartItemCustomization($item->id, $item->product);
+                $unitPrice = $item->quantity > 0 ? ((float) $item->subtotal / $item->quantity) : $product->getPriceForSize($itemCust['size'] ?? 'Medium');
+
                 // Create Order Item
                 $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
-                    'price' => $item->product->price,
+                    'price' => $unitPrice,
                     'subtotal' => $item->subtotal,
                 ]);
 
-                $itemCust = Product::getCartItemCustomization($item->id, $item->product);
                 Product::saveOrderItemCustomization($orderItem->id, $itemCust['milk_type'], $itemCust['size']);
 
                 // Deduct stock using FIFO logic!
@@ -598,7 +607,7 @@ class CartController extends Controller
                         'user_id' => $rider->id,
                         'title' => 'New Customer Delivery Order',
                         'message' => "New delivery order {$orderNumber} placed by " . auth()->user()->name . " to {$order->delivery_address} (₱" . number_format($totalAmount, 2) . ").",
-                        'link' => route('rider.dashboard'),
+                        'link' => route('rider.orders.show', $order->id),
                         'is_read' => false,
                     ]);
                 }

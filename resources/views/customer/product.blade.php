@@ -62,7 +62,7 @@
 
             <!-- Title & Price -->
             <h2 class="text-2xl font-black text-slate-900 mt-4 leading-tight font-serif">{{ $product->product_name }}</h2>
-            <div class="mt-2 text-2xl font-black text-slate-950">₱{{ number_format($product->price, 2) }}</div>
+            <div id="productDetailPrice" class="mt-2 text-2xl font-black text-slate-950">₱{{ number_format($product->getPriceForSize($defaultSize), 2) }}</div>
 
             <!-- Description -->
             <div class="mt-6 border-t border-slate-100 pt-6">
@@ -145,17 +145,20 @@
                             @php
                                 $isSizeAvailable = in_array($sizeOption, $allowedSizes);
                                 $isCurrentSize = ($defaultSize === $sizeOption) && $isSizeAvailable;
+                                $optionPrice = $product->getPriceForSize($sizeOption);
                             @endphp
 
                             @if($isSizeAvailable)
                                 <button type="button"
                                     data-size="{{ $sizeOption }}"
+                                    data-price="{{ $optionPrice }}"
                                     onclick="selectDetailSize(this)"
                                     class="detail-size-btn px-3 py-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer {{ $isCurrentSize ? 'border-2 border-sky-600 bg-sky-50/70 text-sky-900 shadow-2xs' : 'border border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50/30 text-slate-700 hover:text-sky-700' }}">
                                     <span class="flex items-center gap-1">
                                         <i class="bi bi-check-circle-fill text-sky-600 text-[11px] detail-check-icon {{ $isCurrentSize ? '' : 'hidden' }}"></i>
                                         <span>{{ $sizeOption }}</span>
                                     </span>
+                                    <span class="text-[10px] font-bold text-sky-700 mt-0.5">₱{{ number_format($optionPrice, 2) }}</span>
                                     <span class="detail-status-tag text-[9px] font-bold mt-0.5 {{ $isCurrentSize ? 'text-sky-600' : 'text-emerald-600' }}">{{ $isCurrentSize ? 'Selected' : 'Available' }}</span>
                                 </button>
                             @else
@@ -526,10 +529,16 @@
 
     function selectDetailSize(btn) {
         const size = btn.getAttribute('data-size');
+        const price = btn.getAttribute('data-price');
         const input = document.getElementById('detail_size_input');
         const labelEl = document.getElementById('selectedSizeLabel');
+        const priceEl = document.getElementById('productDetailPrice');
+
         if (input) input.value = size;
         if (labelEl) labelEl.textContent = size;
+        if (priceEl && price) {
+            priceEl.textContent = '₱' + parseFloat(price).toFixed(2);
+        }
 
         document.querySelectorAll('.detail-size-btn').forEach(b => {
             b.className = 'detail-size-btn px-3 py-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer border border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50/30 text-slate-700 hover:text-sky-700';

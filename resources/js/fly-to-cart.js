@@ -32,6 +32,12 @@ function initFlyToCart() {
             optionBtn.className = 'card-size-pill px-2 py-0.5 rounded-md text-[10px] transition-all cursor-pointer font-bold bg-sky-600 text-white border border-sky-600 shadow-2xs';
             const sizeInput = card.querySelector('.card-selected-size');
             if (sizeInput) sizeInput.value = value;
+
+            const price = optionBtn.getAttribute('data-price');
+            const priceEl = card.querySelector('.card-product-price');
+            if (price && priceEl) {
+                priceEl.textContent = '₱' + parseFloat(price).toFixed(2);
+            }
         }
     });
 
