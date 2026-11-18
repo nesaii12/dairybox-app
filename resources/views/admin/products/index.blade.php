@@ -33,17 +33,17 @@
     <!-- Table -->
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-100">
-            <thead class="bg-slate-50">
+            <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
                 <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Product</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Category</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attributes</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Price</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Current Stock</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacture Date</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Expiry Info</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                    <th scope="col" class="px-3.5 py-3 text-left">Product</th>
+                    <th scope="col" class="px-3 py-3 text-left">Category</th>
+                    <th scope="col" class="px-3 py-3 text-left">Attributes</th>
+                    <th scope="col" class="px-3 py-3 text-left">Price</th>
+                    <th scope="col" class="px-3 py-3 text-left">Current Stock</th>
+                    <th scope="col" class="px-3 py-3 text-left">Manufacture Date</th>
+                    <th scope="col" class="px-3 py-3 text-left">Expiry Info</th>
+                    <th scope="col" class="px-3 py-3 text-center">Status</th>
+                    <th scope="col" class="px-3 py-3 text-center sticky right-0 bg-slate-50 z-20 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] border-l border-slate-100/80">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white">
@@ -66,134 +66,138 @@
                         }
                     }
                 @endphp
-                <tr id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name . ' (' . $product->size . ')') }}" class="hover:bg-slate-50/50 transition-colors record-highlight-target">
+                <tr id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name . ' (' . $product->size . ')') }}" class="group hover:bg-slate-50/50 transition-colors record-highlight-target">
                     <!-- Product details -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center space-x-3">
-                            <div class="h-10 w-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-100 flex items-center justify-center flex-shrink-0">
+                    <td class="px-3.5 py-3">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="h-9 w-9 rounded-lg bg-slate-100 overflow-hidden border border-slate-100 flex items-center justify-center flex-shrink-0">
                                 @if($product->image)
                                     <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->product_name }}" class="h-full w-full object-cover">
                                 @else
-                                    <i class="bi bi-image text-slate-400 text-lg"></i>
+                                    <i class="bi bi-image text-slate-400 text-base"></i>
                                 @endif
                             </div>
-                            <div>
-                                <div class="text-sm font-bold text-slate-900">{{ $product->product_name }}</div>
-                                <div class="text-xs text-slate-500 max-w-[200px] truncate" title="{{ $product->description }}">{{ $product->description }}</div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold text-slate-900 leading-tight truncate max-w-[130px] sm:max-w-[170px]">{{ $product->product_name }}</div>
+                                @if($product->description)
+                                    <div class="text-[10px] text-slate-400 max-w-[130px] sm:max-w-[170px] truncate" title="{{ $product->description }}">{{ $product->description }}</div>
+                                @endif
                             </div>
                         </div>
                     </td>
                     <!-- Category -->
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                        {{ $product->category->category_name }}
+                    <td class="px-3 py-3 whitespace-nowrap text-xs font-semibold text-slate-600">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 whitespace-nowrap">
+                            {{ $product->category->category_name }}
+                        </span>
                     </td>
                     <!-- Attributes -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex flex-col space-y-1">
-                            @if($product->flavor)
-                                <span class="inline-flex items-center w-max px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-100">
-                                    <i class="bi bi-tag-fill mr-1 text-[9px] text-sky-500"></i> {{ $product->flavor }}
-                                </span>
-                            @endif
-                            <div class="flex flex-wrap gap-1">
+                    <td class="px-3 py-3">
+                        <div class="flex flex-col gap-0.5">
+                            <div class="flex flex-wrap items-center gap-1">
+                                @if($product->flavor)
+                                    <span class="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-100 whitespace-nowrap">
+                                        <i class="bi bi-tag-fill mr-0.5 text-[8px] text-sky-500"></i> {{ $product->flavor }}
+                                    </span>
+                                @endif
                                 @foreach($product->available_milk_types as $mType)
-                                    <span class="inline-flex items-center w-max px-2 py-0.5 rounded-md text-[10px] font-bold {{ $mType == 'Carabao' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800' }}">
+                                    <span class="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-semibold {{ $mType == 'Carabao' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' }} whitespace-nowrap">
                                         {{ $mType }} Milk
                                     </span>
                                 @endforeach
                             </div>
-                            <span class="text-[10px] text-slate-500 font-medium">Size: {{ implode(', ', $product->available_sizes) }}</span>
+                            <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">Size: {{ implode(', ', $product->available_sizes) }}</span>
                         </div>
                     </td>
                     <!-- Price -->
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-950">
+                    <td class="px-3 py-3 whitespace-nowrap text-xs font-bold text-slate-950">
                         ₱{{ number_format($product->price, 2) }}
                     </td>
                     <!-- Current Stock -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex flex-col space-y-1">
-                            <span class="text-sm font-bold {{ $isOutOfStock ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : 'text-slate-900') }}">{{ $product->stock }} units</span>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                        <div class="flex flex-col space-y-0.5">
+                            <span class="text-xs font-bold {{ $isOutOfStock ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : 'text-slate-900') }}">{{ $product->stock }} units</span>
                             @if($isOutOfStock)
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                    <i class="bi bi-x-octagon mr-1"></i> Out of Stock
+                                <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    <i class="bi bi-x-octagon mr-0.5"></i> Out of Stock
                                 </span>
                             @elseif($isLowStock)
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
-                                    <i class="bi bi-exclamation-triangle mr-1"></i> Low Stock
+                                <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                    <i class="bi bi-exclamation-triangle mr-0.5"></i> Low Stock
                                 </span>
                             @else
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                    <i class="bi bi-check2 mr-1"></i> Healthy
+                                <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    <i class="bi bi-check2 mr-0.5"></i> Healthy
                                 </span>
                             @endif
                         </div>
                     </td>
                     <!-- Manufacture Date -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap">
                         @if($product->manufacturing_date)
-                            <div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700">
-                                <i class="bi bi-calendar2-check text-sky-500 text-xs"></i>
+                            <div class="flex items-center space-x-1 text-xs font-medium text-slate-700">
+                                <i class="bi bi-calendar2-check text-sky-500 text-[10px]"></i>
                                 <span>{{ \Carbon\Carbon::parse($product->manufacturing_date)->format('M d, Y') }}</span>
                             </div>
                         @else
-                            <span class="text-xs font-medium text-slate-400">N/A</span>
+                            <span class="text-xs text-slate-400">N/A</span>
                         @endif
                     </td>
                     <!-- Expiry Info -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex flex-col space-y-1">
+                    <td class="px-3 py-3 whitespace-nowrap">
+                        <div class="flex flex-col space-y-0.5">
                             @if($product->expiration_date)
-                                <div class="flex items-center space-x-1.5 text-xs font-bold {{ $isExpired ? 'text-rose-600' : ($isNearExpiration ? 'text-amber-700' : 'text-slate-800') }}">
-                                    <i class="bi bi-clock-history {{ $isExpired ? 'text-rose-500' : ($isNearExpiration ? 'text-amber-500' : 'text-emerald-500') }} text-xs"></i>
+                                <div class="flex items-center space-x-1 text-xs font-bold {{ $isExpired ? 'text-rose-600' : ($isNearExpiration ? 'text-amber-700' : 'text-slate-800') }}">
+                                    <i class="bi bi-clock-history {{ $isExpired ? 'text-rose-500' : ($isNearExpiration ? 'text-amber-500' : 'text-emerald-500') }} text-[10px]"></i>
                                     <span>{{ \Carbon\Carbon::parse($product->expiration_date)->format('M d, Y') }}</span>
                                 </div>
+                                @if($isExpired)
+                                    <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                        <i class="bi bi-x-circle mr-0.5"></i> Expired
+                                    </span>
+                                @elseif($isNearExpiration)
+                                    <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                                        <i class="bi bi-clock mr-0.5"></i> Near Expiry
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                        <i class="bi bi-check-circle mr-0.5"></i> Not Expired
+                                    </span>
+                                @endif
                             @else
-                                <span class="text-xs font-semibold text-slate-400">N/A</span>
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                    <i class="bi bi-tag mr-1 text-[8px]"></i> Unlabelled
-                                </span>
-                            @endif
-                            @if($isExpired)
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
-                                    <i class="bi bi-x-circle mr-1"></i> Expired
-                                </span>
-                            @elseif($isNearExpiration)
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                                    <i class="bi bi-clock mr-1"></i> Near Expiry
-                                </span>
-                            @elseif($isNotExpired)
-                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                    <i class="bi bi-check-circle mr-1"></i> Not Expired
+                                <span class="text-xs text-slate-400">N/A</span>
+                                <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <i class="bi bi-tag mr-0.5 text-[7px]"></i> Unlabelled
                                 </span>
                             @endif
                         </div>
                     </td>
                     <!-- Status -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap text-center">
                         @if(empty($product->expiration_date))
-                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Missing Expiration Date — Blocked from Active status until expiry is provided">
-                                <i class="bi bi-slash-circle text-[10px]"></i> Inactive
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Missing Expiration Date — Blocked from Active status until expiry is provided">
+                                <i class="bi bi-slash-circle text-[9px]"></i> Inactive
                             </span>
                         @elseif($product->stock == 0)
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200">
-                                <i class="bi bi-dash-circle text-[10px]"></i> Inactive
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-400 border border-slate-200">
+                                <i class="bi bi-dash-circle text-[9px]"></i> Inactive
                             </span>
                         @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold {{ $product->status == 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-100' }}">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $product->status == 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-100' }}">
                                 {{ ucfirst($product->status) }}
                             </span>
                         @endif
                     </td>
                     <!-- Actions -->
-                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <div class="flex items-center justify-center space-x-2.5">
+                    <td class="px-3 py-3 whitespace-nowrap text-center text-xs font-medium sticky right-0 bg-white group-hover:bg-slate-50/90 transition-colors z-10 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] border-l border-slate-100/80">
+                        <div class="flex items-center justify-center space-x-1">
                             <!-- Show/QR code -->
                             <a href="{{ route('admin.products.show', $product->id) }}" class="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all" title="View Details & QR Code">
-                                <i class="bi bi-qr-code text-lg"></i>
+                                <i class="bi bi-qr-code text-base"></i>
                             </a>
                              <!-- Edit -->
                              <button onclick="toggleEditProductModal({{ $product->id }})" class="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all cursor-pointer" title="Edit Product">
-                                 <i class="bi bi-pencil-square text-lg"></i>
+                                 <i class="bi bi-pencil-square text-base"></i>
                              </button>
 
                              <!-- Edit Product Modal -->
@@ -406,8 +410,8 @@
                             <form action="{{ route('admin.products.destroy', $product->id) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this product? This will also remove inventory history.');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Delete Product">
-                                    <i class="bi bi-trash3 text-lg"></i>
+                                <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="Delete Product">
+                                    <i class="bi bi-trash3 text-base"></i>
                                 </button>
                             </form>
                         </div>
