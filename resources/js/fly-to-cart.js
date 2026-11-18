@@ -7,6 +7,26 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initFlyToCart() {
+    // Delegated click handler to navigate to product details when clicking anywhere on the product card container
+    document.addEventListener('click', (e) => {
+        const card = e.target.closest('[data-product-url]');
+        if (!card) return;
+
+        // Skip interactive controls, buttons, forms, inputs, links, and option groups
+        if (e.target.closest('button, input, form, a, select, textarea, .catalog-qty-stepper, .card-milk-pill, .card-size-pill, .add-to-cart-btn, [data-card-milk-group], [data-card-size-group]')) {
+            return;
+        }
+
+        const url = card.getAttribute('data-product-url');
+        if (url) {
+            if (e.ctrlKey || e.metaKey) {
+                window.open(url, '_blank');
+            } else {
+                window.location.href = url;
+            }
+        }
+    });
+
     // Delegated click handlers for product card Milk Type & Size customization pills
     document.addEventListener('click', (e) => {
         const optionBtn = e.target.closest('button[data-card-option]');

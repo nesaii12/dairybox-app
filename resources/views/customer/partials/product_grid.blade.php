@@ -8,9 +8,9 @@
             $inCart     = isset($cartQuantities) ? ($cartQuantities[$product->id] ?? 0) : 0;
             $maxInCart  = ($inCart >= $product->stock) && !$outOfStock;
         @endphp
-        <div id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name) }}" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300 record-highlight-target">
+        <div id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name) }}" data-product-url="{{ route('customer.product', $product->id) }}" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300 record-highlight-target cursor-pointer">
             <!-- Image Wrapper -->
-            <div class="aspect-square bg-slate-50 relative flex items-center justify-center overflow-hidden border-b border-slate-50">
+            <a href="{{ route('customer.product', $product->id) }}" class="aspect-square bg-slate-50 relative flex items-center justify-center overflow-hidden border-b border-slate-50 block cursor-pointer">
                 @if($product->image)
                     <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->product_name }}" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300">
                 @else
@@ -28,22 +28,22 @@
 
                 <!-- Stock indicator badges -->
                 @if($outOfStock)
-                    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center">
+                    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center pointer-events-none">
                         <span class="bg-rose-600 text-white text-[10px] px-3 py-1.5 rounded-full font-bold shadow-md uppercase tracking-wider">
                             {{ $isExpired ? 'Out of Stock' : 'Sold Out' }}
                         </span>
                     </div>
                 @elseif($isLowStock)
-                    <span class="absolute top-4 left-4 bg-amber-100/90 backdrop-blur border border-amber-200/50 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs">Only {{ $product->stock }} left</span>
+                    <span class="absolute top-4 left-4 bg-amber-100/90 backdrop-blur border border-amber-200/50 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs pointer-events-none">Only {{ $product->stock }} left</span>
                 @endif
 
                 @if($product->flavor)
-                    <span class="absolute top-4 right-4 bg-white/95 backdrop-blur border border-slate-200/80 text-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs flex items-center space-x-1">
+                    <span class="absolute top-4 right-4 bg-white/95 backdrop-blur border border-slate-200/80 text-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs flex items-center space-x-1 pointer-events-none">
                         <i class="bi bi-tag-fill text-[9px] text-sky-500"></i>
                         <span>{{ $product->flavor }}</span>
                     </span>
                 @endif
-            </div>
+            </a>
 
             <!-- Product Information -->
             @php

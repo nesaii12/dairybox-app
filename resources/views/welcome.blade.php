@@ -354,9 +354,9 @@
                         @php
                             $outOfStock = $product->stock <= 0;
                         @endphp
-                        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                        <div data-product-url="{{ route('customer.product', $product->id) }}" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer">
                             <!-- Image / Illustration Container -->
-                            <div class="aspect-square bg-slate-50 relative flex items-center justify-center overflow-hidden border-b border-slate-50">
+                            <a href="{{ route('customer.product', $product->id) }}" class="aspect-square bg-slate-50 relative flex items-center justify-center overflow-hidden border-b border-slate-50 block cursor-pointer">
                                 @if($product->image)
                                     <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->product_name }}" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300">
                                 @else
@@ -374,11 +374,11 @@
 
                                 <!-- Stock status label overlay -->
                                 @if($outOfStock)
-                                    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center">
+                                    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center pointer-events-none">
                                         <span class="bg-rose-600 text-white text-[10px] px-3 py-1.5 rounded-full font-bold shadow-md uppercase tracking-wider">Sold Out</span>
                                     </div>
                                 @endif
-                            </div>
+                            </a>
 
                             <!-- Details -->
                             @php
