@@ -17,14 +17,98 @@ class RiderController extends Controller
 {
     public function index()
     {
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        if (auth()->user()->role !== 'rider') {
+            if (auth()->user()->role === 'admin') {
+                return redirect()->route('admin.dashboard');
+            }
+            return redirect()->route('customer.catalog');
+        }
+
+        $riderId = auth()->id();
+
+        // Auto-heal / synchronize any active orders assigned to this rider where Delivery row is missing
+        $assignedOrders = Order::where('rider_id', $riderId)
+            ->where('order_type', 'Delivery')
+            ->whereIn('order_status', ['Out for Delivery', 'Preparing', 'Confirmed'])
+            ->get();
+
+        foreach ($assignedOrders as $ao) {
+            Delivery::firstOrCreate(
+                ['order_id' => $ao->id],
+                [
+                    'rider_id' => $riderId,
+                    'delivery_status' => 'Out for Delivery',
+                ]
+            );
+        }
+
         // Fetch active deliveries for the current rider
         $deliveries = Delivery::with(['order.customer', 'order.orderItems.product'])
-            ->where('rider_id', auth()->id())
-            ->where('delivery_status', 'Out for Delivery')
+            ->where('rider_id', $riderId)
+            ->whereIn('delivery_status', ['Out for Delivery', 'Assigned'])
             ->orderBy('created_at', 'asc')
             ->get();
 
-        return view('rider.dashboard', compact('deliveries'));
+        // Count of pending unassigned delivery orders waiting for fleet dispatch
+        $pendingDispatchCount = Order::where('order_type', 'Delivery')
+            ->whereNull('rider_id')
+            ->whereIn('order_status', ['Pending', 'Confirmed', 'Preparing'])
+            ->count();
+
+        // Also fetch pending unassigned delivery orders so rider can view incoming customer orders
+        $pendingOrders = Order::with(['customer', 'orderItems.product'])
+            ->where('order_type', 'Delivery')
+            ->whereNull('rider_id')
+            ->whereIn('order_status', ['Pending', 'Confirmed', 'Preparing'])
+            ->latest()
+            ->take(5)
+            ->get();
+
+        return view('rider.dashboard', compact('deliveries', 'pendingDispatchCount', 'pendingOrders'));
+    }
+
+    /**
+     * Real-time live polling endpoint for rider notifications and queue updates.
+     */
+    public function liveCheck(Request $request)
+    {
+        $riderId = auth()->id();
+
+        $unreadCount = AppNotification::where('user_id', $riderId)
+            ->where('is_read', false)
+            ->count();
+
+        $latestNotif = AppNotification::where('user_id', $riderId)
+            ->latest('id')
+            ->first();
+
+        $activeDeliveriesCount = Delivery::where('rider_id', $riderId)
+            ->whereIn('delivery_status', ['Out for Delivery', 'Assigned'])
+            ->count();
+
+        $pendingDispatchCount = Order::where('order_type', 'Delivery')
+            ->whereNull('rider_id')
+            ->whereIn('order_status', ['Pending', 'Confirmed', 'Preparing'])
+            ->count();
+
+        return response()->json([
+            'unread_count' => $unreadCount,
+            'active_deliveries_count' => $activeDeliveriesCount,
+            'pending_dispatch_count' => $pendingDispatchCount,
+            'latest_notif' => $latestNotif ? [
+                'id' => $latestNotif->id,
+                'title' => $latestNotif->title,
+                'message' => $latestNotif->message,
+                'link' => route('notifications.readAndRedirect', $latestNotif->id),
+                'is_read' => (bool) $latestNotif->is_read,
+                'time' => $latestNotif->created_at->diffForHumans(),
+                'timestamp' => $latestNotif->created_at->timestamp,
+            ] : null,
+        ]);
     }
 
     public function markArrived(Request $request, Delivery $delivery)
@@ -201,12 +285,91 @@ class RiderController extends Controller
 
     public function history()
     {
-        $deliveries = Delivery::with(['order.customer'])
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        if (auth()->user()->role !== 'rider') {
+            if (auth()->user()->role === 'admin') {
+                return redirect()->route('admin.dashboard');
+            }
+            return redirect()->route('customer.catalog');
+        }
+
+        $deliveries = Delivery::with(['order.customer', 'order.orderItems.product'])
             ->where('rider_id', auth()->id())
             ->where('delivery_status', '!=', 'Out for Delivery')
             ->orderBy('updated_at', 'desc')
             ->paginate(15);
 
         return view('rider.history', compact('deliveries'));
+    }
+
+    /**
+     * Display order & customer details for the rider.
+     */
+    public function showOrder(Request $request, Order $order)
+    {
+        $riderId = auth()->id();
+
+        // Security check: Rider can only view Delivery orders assigned to them or unassigned delivery orders in the fleet
+        if ($order->order_type !== 'Delivery' || ($order->rider_id && $order->rider_id !== $riderId)) {
+            abort(403, 'Unauthorized access to this order record.');
+        }
+
+        $order->load(['customer', 'orderItems.product', 'delivery', 'rider']);
+
+        $customer = $order->customer;
+        $completedOrdersCount = $customer->orders()
+            ->whereIn('order_status', ['Delivered', 'Paid & Remitted'])
+            ->count();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'order' => [
+                    'id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'order_status' => $order->order_status,
+                    'order_type' => $order->order_type,
+                    'payment_method' => $order->payment_method,
+                    'payment_status' => $order->payment_status,
+                    'is_paid' => $order->isPaid(),
+                    'delivery_address' => $order->delivery_address,
+                    'schedule_date' => $order->schedule_date ? $order->schedule_date->format('M d, Y') : null,
+                    'schedule_time' => $order->schedule_time ? \Carbon\Carbon::parse($order->schedule_time)->format('h:i A') : 'Flexible Window',
+                    'subtotal' => number_format($order->subtotal, 2),
+                    'delivery_fee' => number_format($order->delivery_fee, 2),
+                    'total_amount' => number_format($order->total_amount, 2),
+                    'created_at' => $order->created_at->format('M d, Y h:i A'),
+                    'items' => $order->orderItems->map(function ($item) {
+                        return [
+                            'name' => $item->product ? $item->product->product_name : 'Item',
+                            'size' => $item->product ? $item->product->size : null,
+                            'quantity' => $item->quantity,
+                            'price' => number_format($item->unit_price, 2),
+                            'subtotal' => number_format($item->subtotal, 2),
+                        ];
+                    }),
+                    'delivery' => $order->delivery ? [
+                        'id' => $order->delivery->id,
+                        'delivery_status' => $order->delivery->delivery_status,
+                        'arrived_at' => $order->delivery->arrived_at ? $order->delivery->arrived_at->format('h:i A') : null,
+                    ] : null,
+                ],
+                'customer' => [
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'phone' => $customer->phone,
+                    'email' => $customer->email,
+                    'avatar' => $customer->avatar,
+                    'member_since' => $customer->created_at->format('M Y'),
+                    'completed_orders_count' => $completedOrdersCount,
+                    'status' => $customer->status ?? 'active',
+                ],
+            ]);
+        }
+
+        return view('rider.order-details', compact('order', 'customer', 'completedOrdersCount'));
     }
 }
