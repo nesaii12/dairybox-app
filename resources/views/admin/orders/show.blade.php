@@ -218,8 +218,8 @@
                 <div>
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Client Name</span>
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-bold text-slate-900">{{ $order->customer->name }}</span>
-                        @if($order->customer->isRestricted())
+                        <span class="text-sm font-bold text-slate-900">{{ $order->customer?->name ?? 'Walk-in Customer' }}</span>
+                        @if($order->customer && $order->customer->isRestricted())
                             <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                 Restricted (3-Day Ban)
                             </span>
@@ -228,11 +228,11 @@
                 </div>
                 <div>
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Contact Phone</span>
-                    <span class="text-sm font-bold text-slate-900 font-mono">{{ $order->customer->phone ?? 'N/A' }}</span>
+                    <span class="text-sm font-bold text-slate-900 font-mono">{{ $order->customer?->phone ?? 'N/A' }}</span>
                 </div>
                 <div>
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Email Address</span>
-                    <span class="text-xs font-semibold text-slate-800 font-mono">{{ $order->customer->email }}</span>
+                    <span class="text-xs font-semibold text-slate-800 font-mono">{{ $order->customer?->email ?? 'walkin@dairybox.local' }}</span>
                 </div>
                 <div>
                     <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Fulfillment Method</span>

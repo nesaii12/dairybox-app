@@ -127,10 +127,14 @@
                     <i class="bi bi-bag-check-fill text-xl"></i>
                 </div>
             </div>
-            <p class="text-[11px] text-slate-500 mt-3 flex items-center justify-between">
+            <p class="text-[11px] text-slate-500 mt-3 flex items-center justify-between flex-wrap gap-1">
                 <span>{{ $deliveryCount }} Delivery</span>
                 <span class="text-slate-300">&bull;</span>
                 <span>{{ $pickupCount }} Pickup</span>
+                @if(($walkInCount ?? 0) > 0)
+                    <span class="text-slate-300">&bull;</span>
+                    <span class="text-purple-600 font-semibold">{{ $walkInCount }} Walk-in</span>
+                @endif
             </p>
         </div>
 
@@ -416,8 +420,8 @@
                             <td class="py-3.5 px-3 font-bold text-slate-900">#{{ $sale->order->order_number }}</td>
                             <td class="py-3.5 px-3 text-slate-700 font-medium">{{ $sale->order->customer->name ?? 'Guest' }}</td>
                             <td class="py-3.5 px-3">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $sale->order->order_type === 'Delivery' ? 'bg-sky-50 text-sky-700 border border-sky-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100' }}">
-                                    <i class="bi {{ $sale->order->order_type === 'Delivery' ? 'bi-truck' : 'bi-shop' }} mr-1"></i>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $sale->order->order_type === 'Delivery' ? 'bg-sky-50 text-sky-700 border border-sky-100' : ($sale->order->order_type === 'Walk-in' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100') }}">
+                                    <i class="bi {{ $sale->order->order_type === 'Delivery' ? 'bi-truck' : ($sale->order->order_type === 'Walk-in' ? 'bi-person-walking' : 'bi-shop') }} mr-1"></i>
                                     {{ $sale->order->order_type }}
                                 </span>
                             </td>

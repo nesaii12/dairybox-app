@@ -72,6 +72,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/update-status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus'])->name('orders.updateStatus');
     Route::post('/orders/{order}/assign-rider', [\App\Http\Controllers\Admin\OrderController::class, 'assignRider'])->name('orders.assignRider');
+
+    // Walk-in Sales
+    Route::get('/walk-in-sales/create', [\App\Http\Controllers\Admin\WalkInSaleController::class, 'create'])->name('walkInSales.create');
+    Route::post('/walk-in-sales', [\App\Http\Controllers\Admin\WalkInSaleController::class, 'store'])->name('walkInSales.store');
     
     // Customers
     Route::get('/customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');

@@ -132,13 +132,47 @@ class DashboardController extends Controller
         // Total expected revenue from forecasts
         $totalForecastRevenue = $forecastSummary->sum('expected_revenue');
 
+        // Active catalog products & registered customers for Walk-in Sales form
+        $activeProducts = Product::where('status', 'active')
+            ->with('category')
+            ->orderBy('product_name')
+            ->get()
+            ->map(function ($product) {
+                $sizesWithPrices = [];
+                foreach ($product->available_sizes as $size) {
+                    $sizesWithPrices[] = [
+                        'size' => $size,
+                        'price' => (float) $product->getPriceForSize($size),
+                        'formatted_price' => '₱' . number_format($product->getPriceForSize($size), 2),
+                    ];
+                }
+
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'category_name' => $product->category?->category_name ?? '',
+                    'milk_type' => $product->milk_type ?? 'Cow',
+                    'size' => $product->size ?? 'Medium',
+                    'base_price' => (float) $product->price,
+                    'stock' => (int) $product->stock,
+                    'sizes' => $sizesWithPrices,
+                    'sizes_summary' => implode(' | ', array_map(fn($sp) => "{$sp['size']}: {$sp['formatted_price']}", $sizesWithPrices)),
+                ];
+            });
+
+        $customers = User::where('role', 'customer')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
         return view('admin.dashboard', compact(
             'totalSales', 'totalOrders', 'totalCustomers', 'totalProducts',
             'lowStockAlerts', 'nearExpirationAlerts', 'recentOrders',
             'salesLabels', 'salesValues', 'productLabels', 'productValues',
             'targetMonth', 'targetMonthLabel',
             'forecastedCount', 'forecastSummary',
-            'stockoutRiskProducts', 'topDemandProducts', 'totalForecastRevenue'
+            'stockoutRiskProducts', 'topDemandProducts', 'totalForecastRevenue',
+            'activeProducts', 'customers'
         ));
     }
 }

@@ -222,6 +222,11 @@
                     @endif
                 </a>
 
+                <a href="{{ route('admin.walkInSales.create') }}" class="group flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.walkInSales.*') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                    <i class="bi bi-person-walking text-base {{ request()->routeIs('admin.walkInSales.*') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200' }}"></i>
+                    <span>Walk-in Sale</span>
+                </a>
+
                 <div class="pt-5 pb-1.5 px-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Analytics & Users</div>
 
                 <a href="{{ route('admin.customers.index') }}" class="group flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all {{ request()->routeIs('admin.customers.*') ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-950/40' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">

@@ -38,7 +38,7 @@ class ReportController extends Controller
         $orderIds = (clone $salesQuery)->pluck('order_id');
         $totalUnitsSold = (int) OrderItem::whereIn('order_id', $orderIds)->sum('quantity');
 
-        // Fulfillment Breakdown (Delivery vs Pickup)
+        // Fulfillment Breakdown (Delivery vs Pickup vs Walk-in)
         $fulfillmentBreakdown = Order::whereIn('id', $orderIds)
             ->selectRaw('order_type, count(*) as count')
             ->groupBy('order_type')
@@ -46,6 +46,7 @@ class ReportController extends Controller
             ->toArray();
         $deliveryCount = $fulfillmentBreakdown['Delivery'] ?? 0;
         $pickupCount = $fulfillmentBreakdown['Pickup'] ?? 0;
+        $walkInCount = $fulfillmentBreakdown['Walk-in'] ?? 0;
 
         // 2. Sales Trend Timeline Chart
         $diffDays = $dates['start']->diffInDays($dates['end']);
@@ -158,6 +159,7 @@ class ReportController extends Controller
             'totalUnitsSold',
             'deliveryCount',
             'pickupCount',
+            'walkInCount',
             'chartLabels',
             'chartValues',
             'productSales',

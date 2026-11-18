@@ -40,6 +40,7 @@
                     <option value="">All Fulfillment Types</option>
                     <option value="Delivery" {{ request('type') === 'Delivery' ? 'selected' : '' }}>Delivery</option>
                     <option value="Pickup" {{ request('type') === 'Pickup' ? 'selected' : '' }}>Pickup</option>
+                    <option value="Walk-in" {{ request('type') === 'Walk-in' ? 'selected' : '' }}>Walk-in</option>
                 </select>
             </div>
 
@@ -83,14 +84,14 @@
                     <!-- Customer -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                            <span>{{ $order->customer->name }}</span>
-                            @if($order->customer->isRestricted())
+                            <span>{{ $order->customer?->name ?? 'Walk-in Customer' }}</span>
+                            @if($order->customer && $order->customer->isRestricted())
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700" title="Restricted from ordering until {{ $order->customer->restricted_until->format('M d, Y h:i A') }}">
                                     <i class="bi bi-shield-slash-fill mr-0.5"></i> Restricted (3-Day)
                                 </span>
                             @endif
                         </div>
-                        <div class="text-[10px] text-slate-400 font-mono">{{ $order->customer->email }}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">{{ $order->customer?->email ?? 'walkin@dairybox.local' }}</div>
                     </td>
                     <!-- Fulfillment -->
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
@@ -98,6 +99,9 @@
                             @if($order->order_type === 'Delivery')
                                 <i class="bi bi-truck text-sky-500"></i>
                                 <span>Delivery</span>
+                            @elseif($order->order_type === 'Walk-in')
+                                <i class="bi bi-person-walking text-purple-600"></i>
+                                <span class="font-semibold text-purple-700">Walk-in</span>
                             @else
                                 <i class="bi bi-shop text-amber-500"></i>
                                 <span>Pickup</span>
