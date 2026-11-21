@@ -352,7 +352,8 @@
                 <div class="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     @forelse($products as $product)
                         @php
-                            $outOfStock = $product->stock <= 0;
+                            $availStock = $product->available_stock;
+                            $outOfStock = $availStock <= 0;
                         @endphp
                         <div data-product-url="{{ route('customer.product', $product->id) }}" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer">
                             <!-- Image / Illustration Container -->
@@ -466,7 +467,7 @@
                                     
                                     @auth
                                         @if(auth()->user()->role === 'customer' && !$outOfStock)
-                                            <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline-flex items-center gap-1.5 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}">
+                                            <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline-flex items-center gap-1.5 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $availStock }}">
                                                 @csrf
                                                 <input type="hidden" name="milk_type" class="card-selected-milk" value="{{ $defaultCardMilk }}">
                                                 <input type="hidden" name="size" class="card-selected-size" value="{{ $defaultCardSize }}">
@@ -474,7 +475,7 @@
                                                     <button type="button" class="catalog-qty-minus px-2 h-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs" title="Decrease quantity">
                                                         <i class="bi bi-dash pointer-events-none"></i>
                                                     </button>
-                                                    <input type="number" name="quantity" value="1" min="1" max="{{ max(1, $product->stock) }}"
+                                                    <input type="number" name="quantity" value="1" min="1" max="{{ max(1, $availStock) }}"
                                                         class="catalog-qty-input w-7 text-center text-xs font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         aria-label="Quantity">
                                                     <button type="button" class="catalog-qty-plus px-2 h-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs" title="Increase quantity">

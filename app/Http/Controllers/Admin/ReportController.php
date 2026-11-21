@@ -47,6 +47,7 @@ class ReportController extends Controller
         $deliveryCount = $fulfillmentBreakdown['Delivery'] ?? 0;
         $pickupCount = $fulfillmentBreakdown['Pickup'] ?? 0;
         $walkInCount = $fulfillmentBreakdown['Walk-in'] ?? 0;
+        $reservationCount = $fulfillmentBreakdown['Reservation'] ?? 0;
 
         // 2. Sales Trend Timeline Chart
         $diffDays = $dates['start']->diffInDays($dates['end']);
@@ -160,6 +161,7 @@ class ReportController extends Controller
             'deliveryCount',
             'pickupCount',
             'walkInCount',
+            'reservationCount',
             'chartLabels',
             'chartValues',
             'productSales',

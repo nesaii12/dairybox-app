@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Forecast;
 use App\Models\Product;
 use App\Models\Order;
+use App\Models\Reservation;
 use App\Models\User;
 use App\Models\Sale;
 use App\Services\ForecastService;
+use App\Services\InventoryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -77,9 +79,16 @@ class DashboardController extends Controller
         })->toArray();
         $productValues = $topProducts->pluck('total_qty')->toArray();
 
-        // 5. Forecast Summary for Dashboard Widget
-        $targetMonth = Carbon::now()->addMonth()->format('Y-m');
-        $targetMonthLabel = Carbon::now()->addMonth()->format('F Y');
+        // 5. Forecast Summary for Dashboard Widget (Rolling Year-over-Year Baseline)
+        $rollingWindow = ForecastService::getRollingWindow();
+        $targetMonth = $rollingWindow['target_year'] . '-01';
+        $targetMonthLabel = Carbon::createFromFormat('Y-m', $targetMonth)->format('F Y');
+
+        // Automatically ensure forecasts exist for the target forecast month
+        $existingForecastsCount = Forecast::where('forecast_month', $targetMonth)->count();
+        if ($existingForecastsCount === 0) {
+            ForecastService::generateAllProducts($targetMonth);
+        }
 
         // Load all active products with their latest forecast for target month
         $forecastSummary = Product::where('status', 'active')
@@ -154,7 +163,9 @@ class DashboardController extends Controller
                     'milk_type' => $product->milk_type ?? 'Cow',
                     'size' => $product->size ?? 'Medium',
                     'base_price' => (float) $product->price,
-                    'stock' => (int) $product->stock,
+                    'stock' => InventoryService::getAvailableStock($product),
+                    'physical_stock' => (int) $product->stock,
+                    'reserved_stock' => (int) ($product->reserved_stock ?? 0),
                     'sizes' => $sizesWithPrices,
                     'sizes_summary' => implode(' | ', array_map(fn($sp) => "{$sp['size']}: {$sp['formatted_price']}", $sizesWithPrices)),
                 ];
@@ -165,14 +176,33 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        // Upcoming / Active Reservations overview for Dashboard
+        try {
+            $upcomingReservations = Reservation::with('product')
+                ->whereIn('status', [
+                    Reservation::STATUS_PENDING,
+                    Reservation::STATUS_CONFIRMED,
+                    Reservation::STATUS_READY,
+                ])
+                ->orderBy('pickup_date', 'asc')
+                ->take(5)
+                ->get();
+            $totalReservedUnits = (int) Reservation::whereIn('status', Reservation::ALLOCATED_STATUSES)
+                ->sum('allocated_quantity');
+        } catch (\Throwable $e) {
+            $upcomingReservations = collect();
+            $totalReservedUnits = 0;
+        }
+
         return view('admin.dashboard', compact(
             'totalSales', 'totalOrders', 'totalCustomers', 'totalProducts',
             'lowStockAlerts', 'nearExpirationAlerts', 'recentOrders',
             'salesLabels', 'salesValues', 'productLabels', 'productValues',
-            'targetMonth', 'targetMonthLabel',
+            'targetMonth', 'targetMonthLabel', 'rollingWindow',
             'forecastedCount', 'forecastSummary',
             'stockoutRiskProducts', 'topDemandProducts', 'totalForecastRevenue',
-            'activeProducts', 'customers'
+            'activeProducts', 'customers',
+            'upcomingReservations', 'totalReservedUnits'
         ));
     }
 }

@@ -15,7 +15,7 @@ Route::get('/', function () {
             'id' => $p->id,
             'milk_type' => $p->milk_type,
             'size' => $p->size,
-            'available' => !$expired && $p->stock > 0,
+            'available' => !$expired && $p->available_stock > 0,
             'url' => route('customer.product', $p->id),
         ];
     }
@@ -76,6 +76,18 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Walk-in Sales
     Route::get('/walk-in-sales/create', [\App\Http\Controllers\Admin\WalkInSaleController::class, 'create'])->name('walkInSales.create');
     Route::post('/walk-in-sales', [\App\Http\Controllers\Admin\WalkInSaleController::class, 'store'])->name('walkInSales.store');
+
+    // Reservations
+    Route::get('/reservations', [\App\Http\Controllers\Admin\ReservationController::class, 'index'])->name('reservations.index');
+    Route::get('/reservations/create', [\App\Http\Controllers\Admin\ReservationController::class, 'create'])->name('reservations.create');
+    Route::post('/reservations', [\App\Http\Controllers\Admin\ReservationController::class, 'store'])->name('reservations.store');
+    Route::get('/reservations/{reservation}', [\App\Http\Controllers\Admin\ReservationController::class, 'show'])->name('reservations.show');
+    Route::get('/reservations/{reservation}/edit', [\App\Http\Controllers\Admin\ReservationController::class, 'edit'])->name('reservations.edit');
+    Route::put('/reservations/{reservation}', [\App\Http\Controllers\Admin\ReservationController::class, 'update'])->name('reservations.update');
+    Route::post('/reservations/{reservation}/confirm', [\App\Http\Controllers\Admin\ReservationController::class, 'confirm'])->name('reservations.confirm');
+    Route::post('/reservations/{reservation}/ready', [\App\Http\Controllers\Admin\ReservationController::class, 'markReady'])->name('reservations.ready');
+    Route::post('/reservations/{reservation}/complete', [\App\Http\Controllers\Admin\ReservationController::class, 'complete'])->name('reservations.complete');
+    Route::post('/reservations/{reservation}/cancel', [\App\Http\Controllers\Admin\ReservationController::class, 'cancel'])->name('reservations.cancel');
     
     // Customers
     Route::get('/customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');

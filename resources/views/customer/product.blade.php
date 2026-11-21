@@ -43,11 +43,12 @@
     <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col justify-between">
         @php
             $isExpiredProd = $product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
-            $prodHasStock = !$isExpiredProd && $product->stock > 0;
+            $prodAvailStock = $product->available_stock;
+            $prodHasStock = !$isExpiredProd && $prodAvailStock > 0;
             $variants = isset($siblingVariants) ? $siblingVariants : collect([$product]);
             $availableVariants = $variants->filter(function ($v) {
                 $vExp = $v->expiration_date && \Carbon\Carbon::parse($v->expiration_date)->startOfDay()->lt(now()->startOfDay());
-                return !$vExp && $v->stock > 0;
+                return !$vExp && $v->available_stock > 0;
             });
 
             $allowedMilks = $prodHasStock ? $product->available_milk_types : [];
@@ -73,10 +74,10 @@
                     {{ $product->category->category_name }}
                 </span>
                 
-                @if($product->stock > 0 && (!$product->expiration_date || \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->gte(now()->startOfDay())))
+                @if($prodAvailStock > 0 && (!$product->expiration_date || \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->gte(now()->startOfDay())))
                     <span class="inline-flex items-center text-xs font-bold text-emerald-600">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                        {{ $product->stock }} Units Available
+                        {{ $prodAvailStock }} Units Available
                     </span>
                 @else
                     <span class="inline-flex items-center text-xs font-bold text-rose-600">
@@ -212,7 +213,7 @@
                 $cartQty        = $cartItemQuantity ?? 0;
                 $isExpired      = $product->expiration_date &&
                                   \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
-                $effectiveStock = $isExpired ? 0 : $product->stock;
+                $effectiveStock = $isExpired ? 0 : $prodAvailStock;
                 $availableToAdd = $effectiveStock;
                 $allStockInCart = false;
             @endphp
@@ -251,7 +252,7 @@
                                 <span>All Available Units in Cart</span>
                             </div>
                             <p class="text-[11px] leading-relaxed">
-                                You already have all {{ $product->stock }} available unit(s) of this item in your shopping cart.
+                                You already have all {{ $prodAvailStock }} available unit(s) of this item in your shopping cart.
                             </p>
                         </div>
                         <a href="{{ route('customer.cart.index') }}" class="w-full mt-3 py-3 px-4 rounded-xl text-sm font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all text-center flex items-center justify-center space-x-2">
@@ -259,7 +260,7 @@
                             <span>View in Shopping Cart</span>
                         </a>
                     @else
-                        <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="space-y-4 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}" data-in-cart="{{ $cartQty }}">
+                        <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="space-y-4 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $prodAvailStock }}" data-in-cart="{{ $cartQty }}">
                             @csrf
                             <input type="hidden" name="milk_type" id="detail_milk_type_input" value="{{ $defaultMilk }}">
                             <input type="hidden" name="size" id="detail_size_input" value="{{ $defaultSize }}">

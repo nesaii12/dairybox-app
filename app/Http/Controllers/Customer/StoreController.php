@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class StoreController extends Controller
 {
@@ -19,7 +20,7 @@ class StoreController extends Controller
             ->get();
         $availableProducts = $allActiveProducts->filter(function ($p) {
             $expired = $p->expiration_date && \Carbon\Carbon::parse($p->expiration_date)->startOfDay()->lt(now()->startOfDay());
-            return !$expired && $p->stock > 0;
+            return !$expired && $p->available_stock > 0;
         });
 
         // Available category IDs
@@ -30,13 +31,13 @@ class StoreController extends Controller
         foreach ($allActiveProducts as $p) {
             $key = strtolower(trim($p->product_name));
             $expired = $p->expiration_date && \Carbon\Carbon::parse($p->expiration_date)->startOfDay()->lt(now()->startOfDay());
-            $isAvail = !$expired && $p->stock > 0;
+            $isAvail = !$expired && $p->available_stock > 0;
             $productVariantsMap[$key][] = [
                 'id' => $p->id,
                 'milk_type' => $p->milk_type,
                 'size' => $p->size,
                 'price' => (float) $p->price,
-                'stock' => (int) $p->stock,
+                'stock' => (int) $p->available_stock,
                 'available' => $isAvail,
                 'url' => route('customer.product', $p->id),
             ];
@@ -71,11 +72,14 @@ class StoreController extends Controller
         // Priority sorting: 1. Near Expiry, 2. Not Expired, 3. Expired, 4. Out of Stock
         $today = now()->toDateString();
         $sevenDaysOut = now()->addDays(7)->toDateString();
+        $availableStockExpr = Schema::hasColumn('products', 'reserved_stock')
+            ? '(stock - COALESCE(reserved_stock, 0))'
+            : 'stock';
         $query->orderByRaw("
             CASE
-                WHEN stock > 0 AND expiration_date IS NOT NULL AND DATE(expiration_date) >= ? AND DATE(expiration_date) <= ? THEN 1
-                WHEN stock > 0 AND (expiration_date IS NULL OR DATE(expiration_date) > ?) THEN 2
-                WHEN stock > 0 AND expiration_date IS NOT NULL AND DATE(expiration_date) < ? THEN 3
+                WHEN {$availableStockExpr} > 0 AND expiration_date IS NOT NULL AND DATE(expiration_date) >= ? AND DATE(expiration_date) <= ? THEN 1
+                WHEN {$availableStockExpr} > 0 AND (expiration_date IS NULL OR DATE(expiration_date) > ?) THEN 2
+                WHEN {$availableStockExpr} > 0 AND expiration_date IS NOT NULL AND DATE(expiration_date) < ? THEN 3
                 ELSE 4
             END ASC
         ", [$today, $sevenDaysOut, $sevenDaysOut, $today]);

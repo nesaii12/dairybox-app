@@ -44,7 +44,9 @@ class WalkInSaleController extends Controller
                     'milk_type' => $product->milk_type ?? 'Cow',
                     'size' => $product->size ?? 'Medium',
                     'base_price' => (float) $product->price,
-                    'stock' => (int) $product->stock,
+                    'stock' => InventoryService::getAvailableStock($product),
+                    'physical_stock' => (int) $product->stock,
+                    'reserved_stock' => (int) ($product->reserved_stock ?? 0),
                     'sizes' => $sizesWithPrices,
                     'sizes_summary' => implode(' | ', array_map(fn($sp) => "{$sp['size']}: {$sp['formatted_price']}", $sizesWithPrices)),
                 ];
@@ -91,22 +93,28 @@ class WalkInSaleController extends Controller
         }
 
         $productIds = array_keys($aggregatedQuantities);
-        $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
-
-        foreach ($aggregatedQuantities as $pId => $totalRequestedQty) {
-            $product = $products->get($pId);
-            if (!$product) {
-                return redirect()->back()->withInput()->with('error', 'Selected product was not found.');
-            }
-            if ($product->stock < $totalRequestedQty) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', "Insufficient stock for '{$product->product_name}'. Available: {$product->stock}, Total requested: {$totalRequestedQty}.");
-            }
-        }
+        sort($productIds);
 
         try {
             DB::beginTransaction();
+
+            // Lock products in deterministic order and enforce Available Stock = Physical Stock - Reserved Stock
+            $products = Product::whereIn('id', $productIds)
+                ->orderBy('id', 'asc')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($aggregatedQuantities as $pId => $totalRequestedQty) {
+                $product = $products->get($pId);
+                if (!$product) {
+                    throw new \Exception('Selected product was not found.');
+                }
+                $availableStock = InventoryService::getAvailableStock($product);
+                if ($availableStock < $totalRequestedQty) {
+                    throw new \Exception(InventoryService::insufficientStockMessage($product, $availableStock));
+                }
+            }
 
             // 1. Resolve Customer Account
             if (($validated['customer_type'] ?? 'walkin') === 'registered' && !empty($validated['customer_id'])) {
@@ -230,10 +238,10 @@ class WalkInSaleController extends Controller
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Sale recording failed: ' . $e->getMessage(),
+                    'message' => $e->getMessage(),
                 ], 422);
             }
-            return redirect()->back()->withInput()->with('error', 'Sale recording failed: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
     }
 }

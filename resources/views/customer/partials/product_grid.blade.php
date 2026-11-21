@@ -3,10 +3,11 @@
         @php
             $isExpired  = $product->expiration_date &&
                           \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay());
-            $outOfStock = $isExpired || $product->stock <= 0;
+            $availStock = $product->available_stock;
+            $outOfStock = $isExpired || $availStock <= 0;
             $isLowStock = $product->isLowStock() && !$outOfStock;
             $inCart     = isset($cartQuantities) ? ($cartQuantities[$product->id] ?? 0) : 0;
-            $maxInCart  = ($inCart >= $product->stock) && !$outOfStock;
+            $maxInCart  = ($inCart >= $availStock) && !$outOfStock;
         @endphp
         <div id="product-{{ $product->id }}" data-record-id="product-{{ $product->id }}" data-record-name="{{ strtolower($product->product_name) }}" data-product-url="{{ route('customer.product', $product->id) }}" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-1 transition-all duration-300 record-highlight-target cursor-pointer">
             <!-- Image Wrapper -->
@@ -34,7 +35,7 @@
                         </span>
                     </div>
                 @elseif($isLowStock)
-                    <span class="absolute top-4 left-4 bg-amber-100/90 backdrop-blur border border-amber-200/50 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs pointer-events-none">Only {{ $product->stock }} left</span>
+                    <span class="absolute top-4 left-4 bg-amber-100/90 backdrop-blur border border-amber-200/50 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-2xs pointer-events-none">Only {{ $availStock }} left</span>
                 @endif
 
                 @if($product->flavor)
@@ -161,7 +162,7 @@
                         @if($isExpired)
                             <span class="block text-[10px] text-rose-500 font-semibold">Out of Stock</span>
                         @elseif(!$outOfStock)
-                            <span class="block text-[10px] text-slate-400 font-medium">{{ $product->stock }} in stock</span>
+                            <span class="block text-[10px] text-slate-400 font-medium">{{ $availStock }} in stock</span>
                         @endif
                     </div>
                     
@@ -173,9 +174,9 @@
                                 </button>
                             @else
                                 @php
-                                    $availQty = max(1, $product->stock);
+                                    $availQty = max(1, $availStock);
                                 @endphp
-                                <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline-flex items-center gap-1.5 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $product->stock }}" data-in-cart="{{ $inCart }}">
+                                <form action="{{ route('customer.cart.add', $product->id) }}" method="POST" class="inline-flex items-center gap-1.5 add-to-cart-form" data-product-id="{{ $product->id }}" data-product-name="{{ $product->product_name }}" data-stock="{{ $availStock }}" data-in-cart="{{ $inCart }}">
                                     @csrf
                                     <input type="hidden" name="milk_type" class="card-selected-milk" value="{{ $defaultCardMilk }}">
                                     <input type="hidden" name="size" class="card-selected-size" value="{{ $defaultCardSize }}">

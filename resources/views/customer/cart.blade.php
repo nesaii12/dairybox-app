@@ -51,8 +51,9 @@
             @foreach($items as $item)
                 @php
                     $itemCustom = \App\Models\Product::getCartItemCustomization($item->id, $item->product);
+                    $itemAvailStock = $item->product ? $item->product->available_stock : 0;
                     $isExpired = $item->product?->expiration_date && \Carbon\Carbon::parse($item->product->expiration_date)->startOfDay()->lt(now()->startOfDay());
-                    $isOutOfStock = !$item->product || $item->product->stock <= 0;
+                    $isOutOfStock = !$item->product || $itemAvailStock <= 0;
                     $isItemUnavailable = $isExpired || $isOutOfStock || ($item->product?->status !== 'active');
                 @endphp
                 <div class="cart-item-row p-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/40 transition-colors {{ $isItemUnavailable ? 'opacity-70 bg-slate-50/30' : '' }}"
@@ -114,10 +115,10 @@
                                 <span class="block text-[9px] font-bold text-rose-600">Expired</span>
                             @elseif($isOutOfStock)
                                 <span class="block text-[9px] font-bold text-rose-600">Out of stock</span>
-                            @elseif($item->product->stock <= 5)
-                                <span class="block text-[9px] font-bold text-amber-600">Only {{ $item->product->stock }} left</span>
+                            @elseif($itemAvailStock <= 5)
+                                <span class="block text-[9px] font-bold text-amber-600">Only {{ $itemAvailStock }} left</span>
                             @else
-                                <span class="block text-[9px] text-slate-400 font-medium">{{ $item->product->stock }} in stock</span>
+                                <span class="block text-[9px] text-slate-400 font-medium">{{ $itemAvailStock }} in stock</span>
                             @endif
                         </div>
 
@@ -125,16 +126,16 @@
                         <form action="{{ route('customer.cart.update', $item->id) }}" method="POST"
                               class="cart-qty-form flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 w-28 justify-between focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400/20 transition-all"
                               data-item-id="{{ $item->id }}"
-                              data-stock="{{ $item->product->stock }}">
+                              data-stock="{{ $itemAvailStock }}">
                             @csrf
                             <button type="button" class="btn-qty-minus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $item->quantity <= 1 ? 'disabled' : '' }} title="Decrease">
                                 <i class="bi bi-dash pointer-events-none"></i>
                             </button>
-                            <input type="number" name="quantity" value="{{ min($item->quantity, max(1, $item->product->stock)) }}" min="1" max="{{ max(1, $item->product->stock) }}"
+                            <input type="number" name="quantity" value="{{ min($item->quantity, max(1, $itemAvailStock)) }}" min="1" max="{{ max(1, $itemAvailStock) }}"
                                 class="qty-input w-full min-w-0 text-center text-xs font-bold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 autocomplete="off"
                                 title="Enter quantity">
-                            <button type="button" class="btn-qty-plus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $item->product->stock <= $item->quantity ? 'disabled' : '' }} title="Increase">
+                            <button type="button" class="btn-qty-plus px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors flex-shrink-0 cursor-pointer" {{ $itemAvailStock <= $item->quantity ? 'disabled' : '' }} title="Increase">
                                 <i class="bi bi-plus pointer-events-none"></i>
                             </button>
                         </form>

@@ -107,13 +107,22 @@ class InventoryController extends Controller
 
     public function adjust(Request $request)
     {
+        $isStockIn = $request->input('adjustment_type') === 'in';
+
+        $expirationRules = ['exclude_unless:adjustment_type,in', 'required_if:adjustment_type,in', 'nullable', 'date'];
+        if ($isStockIn && $request->filled('manufacturing_date')) {
+            $expirationRules[] = 'after_or_equal:manufacturing_date';
+        }
+
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'adjustment_type' => 'required|in:in,out',
             'quantity' => 'required|integer|min:1',
-            'manufacturing_date' => 'nullable|date|before_or_equal:today',
-            'expiration_date' => 'required_if:adjustment_type,in|nullable|date|after_or_equal:manufacturing_date',
+            'manufacturing_date' => 'exclude_unless:adjustment_type,in|nullable|date|before_or_equal:today',
+            'expiration_date' => $expirationRules,
             'remarks' => 'required|string|max:255',
+        ], [
+            'expiration_date.after_or_equal' => 'Expiration date must be on or after the manufacturing date.',
         ]);
 
         $productId = $request->product_id;
@@ -136,9 +145,10 @@ class InventoryController extends Controller
 
                 return redirect()->route('admin.inventory.index')->with('success', "Stock added successfully for {$product->product_name}.");
             } else {
-                // Check if total stock is sufficient
-                if ($product->stock < $qty) {
-                    return redirect()->back()->with('error', "Insufficient total stock for {$product->product_name}. Available: {$product->stock} units.")
+                // Check if available stock (Physical - Reserved) is sufficient
+                $availableStock = InventoryService::getAvailableStock($product);
+                if ($availableStock < $qty) {
+                    return redirect()->back()->with('error', InventoryService::insufficientStockMessage($product, $availableStock))
                         ->withInput();
                 }
 

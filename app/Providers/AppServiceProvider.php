@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Order;
 use App\Models\Delivery;
+use App\Models\Reservation;
 use App\Models\AppNotification;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -49,6 +50,28 @@ class AppServiceProvider extends ServiceProvider
             }
 
             try {
+                $pendingFleetCash = (float) Order::where('order_type', 'Delivery')
+                    ->whereRaw("LOWER(payment_method) = 'cod'")
+                    ->whereNull('remittance_id')
+                    ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
+                    ->sum('total_amount');
+
+                $pendingRemittanceRidersCount = Order::where('order_type', 'Delivery')
+                    ->whereRaw("LOWER(payment_method) = 'cod'")
+                    ->whereNull('remittance_id')
+                    ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
+                    ->whereNotNull('rider_id')
+                    ->distinct('rider_id')
+                    ->count('rider_id');
+
+                $pendingRemittancesCount = $pendingFleetCash > 0 ? max(1, $pendingRemittanceRidersCount) : 0;
+            } catch (\Throwable $e) {
+                $pendingFleetCash = 0;
+                $pendingRemittanceRidersCount = 0;
+                $pendingRemittancesCount = 0;
+            }
+
+            try {
                 \App\Services\ExpiryNotificationService::checkAndNotify();
             } catch (\Throwable $e) {
                 // Ignore transient check errors
@@ -63,9 +86,23 @@ class AppServiceProvider extends ServiceProvider
                 $adminNotifications = collect();
             }
 
+            try {
+                $activeReservationsCount = Reservation::whereIn('status', [
+                    Reservation::STATUS_PENDING,
+                    Reservation::STATUS_CONFIRMED,
+                    Reservation::STATUS_READY,
+                ])->count();
+            } catch (\Throwable $e) {
+                $activeReservationsCount = 0;
+            }
+
             $view->with([
                 'pendingOrdersCount' => $pendingOrdersCount,
                 'arrivedDeliveriesCount' => $arrivedDeliveriesCount,
+                'pendingFleetCash' => $pendingFleetCash,
+                'pendingRemittanceRidersCount' => $pendingRemittanceRidersCount,
+                'pendingRemittancesCount' => $pendingRemittancesCount,
+                'activeReservationsCount' => $activeReservationsCount,
                 'adminNotifCount' => $adminNotifCount,
                 'adminNotifications' => $adminNotifications,
             ]);

@@ -24,6 +24,10 @@
             <i class="bi bi-plus-circle-fill"></i>
             <span>New Walk-in Sale</span>
         </button>
+        <a href="{{ route('admin.reservations.index') }}" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 border border-sky-600 transition-all shadow-2xs active:scale-95">
+            <i class="bi bi-calendar2-check-fill"></i>
+            <span>Reservations</span>
+        </a>
         <a href="{{ route('admin.orders.index') }}" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold text-amber-950 bg-amber-100 hover:bg-amber-200/80 border border-amber-200 transition-all shadow-2xs active:scale-95">
             <i class="bi bi-cart3"></i>
             <span>Manage Orders</span>
@@ -180,6 +184,10 @@
                             <span class="inline-flex items-center gap-1 font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100 text-[11px]">
                                 <i class="bi bi-person-walking"></i> Walk-in
                             </span>
+                        @elseif($order->order_type === 'Reservation')
+                            <span class="inline-flex items-center gap-1 font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 text-[11px]">
+                                <i class="bi bi-calendar2-check"></i> Reservation
+                            </span>
                         @elseif($order->order_type === 'Delivery')
                             <span class="inline-flex items-center gap-1 font-medium text-sky-700 text-[11px]">
                                 <i class="bi bi-truck"></i> Delivery
@@ -220,6 +228,77 @@
     </div>
 </div>
 
+<!-- Upcoming Reservations Widget -->
+<div class="mt-8 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+            <h3 class="text-sm font-bold text-slate-950 flex items-center gap-2">
+                <i class="bi bi-calendar2-check-fill text-sky-600"></i>
+                <span>Reservation Management</span>
+                @if(($totalReservedUnits ?? 0) > 0)
+                    <span class="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">{{ number_format($totalReservedUnits) }} pcs reserved</span>
+                @endif
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">Active scheduled pickups and stock allocations.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('admin.reservations.create') }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 transition-all">
+                <i class="bi bi-plus-lg"></i>
+                <span>New Reservation</span>
+            </a>
+            <a href="{{ route('admin.reservations.index') }}" class="text-xs text-sky-600 hover:text-sky-700 font-bold px-2 py-1.5">View All</a>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-xs">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Reservation ID</th>
+                    <th class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Customer</th>
+                    <th class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Product</th>
+                    <th class="px-6 py-3 text-center font-bold text-slate-500 uppercase">Qty</th>
+                    <th class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Pickup Date</th>
+                    <th class="px-6 py-3 text-right font-bold text-slate-500 uppercase">Balance</th>
+                    <th class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-center font-bold text-slate-500 uppercase">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 bg-white">
+                @forelse(($upcomingReservations ?? collect()) as $res)
+                    @php
+                        $resStatusColors = [
+                            'Pending' => 'bg-amber-50 text-amber-700',
+                            'Confirmed' => 'bg-sky-50 text-sky-700',
+                            'Ready for Pickup' => 'bg-indigo-50 text-indigo-700',
+                            'Completed' => 'bg-emerald-50 text-emerald-700',
+                            'Cancelled' => 'bg-rose-50 text-rose-600',
+                        ];
+                    @endphp
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-6 py-3.5 font-bold text-slate-900">{{ $res->reservation_code }}</td>
+                        <td class="px-6 py-3.5 font-semibold text-slate-800">{{ $res->customer_name }}</td>
+                        <td class="px-6 py-3.5 text-slate-700">{{ $res->product?->product_name ?? 'N/A' }}</td>
+                        <td class="px-6 py-3.5 text-center font-bold text-slate-900">{{ $res->quantity }} pcs</td>
+                        <td class="px-6 py-3.5 text-slate-600">{{ $res->pickup_date->format('M d, Y') }}</td>
+                        <td class="px-6 py-3.5 text-right font-bold text-slate-900">₱{{ number_format((float) $res->remaining_balance, 2) }}</td>
+                        <td class="px-6 py-3.5">
+                            <span class="inline-flex px-2 py-0.5 rounded-full font-semibold {{ $resStatusColors[$res->status] ?? 'bg-slate-50 text-slate-600' }}">{{ $res->status }}</span>
+                        </td>
+                        <td class="px-6 py-3.5 text-center">
+                            <a href="{{ route('admin.reservations.show', $res->id) }}" class="text-sky-600 hover:text-sky-500 font-bold">Manage</a>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="8" class="px-6 py-8 text-center text-slate-400 italic">No active reservations scheduled.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
 {{-- ===== DEMAND FORECAST SUMMARY SECTION ===== --}}
 <div class="mt-8">
     {{-- Section Header --}}
@@ -230,7 +309,7 @@
                 Demand Forecast Summary
                 <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">{{ $targetMonthLabel }}</span>
             </h2>
-            <p class="text-xs text-slate-500 mt-0.5">Predicted product demand based on historical sales analysis (Linear Regression + Seasonal Indexing).</p>
+            <p class="text-xs text-slate-500 mt-0.5">Predicted product demand based on rolling year-over-year restart ({{ $rollingWindow['basis_label'] }} foundation predicting {{ $rollingWindow['target_label'] }}).</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
             @if($forecastedCount > 0)
@@ -240,6 +319,66 @@
                 <i class="bi bi-cpu"></i>
                 <span>Manage Forecasts</span>
             </a>
+        </div>
+    </div>
+
+    {{-- Rolling Year-over-Year Baseline Information Card --}}
+    <div class="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-500/30 shadow-md relative overflow-hidden">
+        <div class="absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none"></div>
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="space-y-1.5 max-w-3xl">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 uppercase tracking-wider">
+                        <i class="bi bi-arrow-repeat text-indigo-400"></i>
+                        Rolling Year-Over-Year Restart Model
+                    </span>
+                    @if($rollingWindow['is_archived_2025'])
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30 uppercase tracking-wider">
+                            <i class="bi bi-archive-fill"></i>
+                            2025 Historical Data Archived
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30 uppercase tracking-wider">
+                            <i class="bi bi-clock-history"></i>
+                            2025 Data Active (Auto-archives upon 2027 rollover)
+                        </span>
+                    @endif
+                </div>
+                <h3 class="text-sm sm:text-base font-extrabold text-white tracking-tight flex items-center gap-2 flex-wrap">
+                    <span>Forecast Basis:</span>
+                    <span class="text-sky-300 font-black">{{ $rollingWindow['basis_label'] }}</span>
+                    <i class="bi bi-arrow-right text-slate-400 text-xs"></i>
+                    <span>Target Horizon:</span>
+                    <span class="text-emerald-400 font-black">{{ $rollingWindow['target_label'] }}</span>
+                </h3>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    @if($rollingWindow['current_year'] <= 2026)
+                        The forecasting engine uses <strong>2026 Full-Year Sales</strong> as the foundation to predict <strong>2027 Demand</strong>. Once 2027 arrives, the system will automatically archive 2025 historical data and switch its primary forecast basis to <strong>2026 Full-Year Sales</strong> to predict <strong>2028 Demand</strong>.
+                    @else
+                        2025 historical records have been automatically archived. The prediction engine is actively operating with <strong>2026 Full-Year Sales</strong> as its primary baseline to forecast <strong>2028 Demand</strong>.
+                    @endif
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 shrink-0 lg:w-auto w-full">
+                <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-center">
+                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Active Baseline</span>
+                    <span class="text-xs font-black text-sky-300 block mt-0.5">{{ $rollingWindow['basis_year'] }} Full-Year</span>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">Primary Sales Basis</span>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-center">
+                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Prediction Target</span>
+                    <span class="text-xs font-black text-emerald-300 block mt-0.5">{{ $rollingWindow['target_year'] }} Demand</span>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">Forecast Horizon</span>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-center col-span-2 sm:col-span-1">
+                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Archival Lifecycle</span>
+                    <span class="text-xs font-black {{ $rollingWindow['is_archived_2025'] ? 'text-amber-300' : 'text-slate-300' }} block mt-0.5">
+                        {{ $rollingWindow['is_archived_2025'] ? '2025 Archived' : '2025 Rolling' }}
+                    </span>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">{{ $rollingWindow['is_archived_2025'] ? 'Excluded from queries' : 'Auto-archives in 2027' }}</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -284,7 +423,7 @@
                     <span class="text-sm font-black text-slate-900 block mt-1 truncate">
                         ₱{{ number_format($totalForecastRevenue, 2) }}
                     </span>
-                    <span class="text-[10px] text-slate-500 block">Projected for {{ $targetMonthLabel }}</span>
+                    <span class="text-[10px] text-slate-500 block">Projected for {{ $targetMonthLabel }} ({{ $rollingWindow['basis_year'] }} Sales Basis)</span>
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-2xs shrink-0">
                     <i class="bi bi-currency-exchange text-lg"></i>

@@ -50,7 +50,7 @@
             <thead class="bg-slate-50">
                 <tr>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Product</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Overall Stock</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Stock Breakdown</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacture Date</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Expiry Date</th>
                 </tr>
@@ -124,20 +124,32 @@
                         </div>
                     </td>
 
-                    <!-- Overall Stock -->
+                    <!-- Stock Breakdown (Physical / Reserved / Available) -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         @php
                             $displayedStock = ($filter === 'new_stock' && $displayBatch) ? $displayBatch->remaining_stock : $product->stock;
+                            $reservedStock = (int) ($product->reserved_stock ?? 0);
+                            $availableStock = $product->available_stock;
                         @endphp
                         <span class="text-sm font-bold {{ $displayedStock == 0 ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : 'text-slate-900') }}">
-                            {{ $displayedStock }} units
+                            {{ $displayedStock }} physical
                         </span>
+                        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                {{ $availableStock }} available
+                            </span>
+                            @if($reservedStock > 0)
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
+                                    {{ $reservedStock }} reserved
+                                </span>
+                            @endif
+                        </div>
                         @if($product->stock == 0)
-                            <span class="flex items-center gap-1 mt-0.5 w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-400 border border-slate-200">
+                            <span class="flex items-center gap-1 mt-1 w-max px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-400 border border-slate-200">
                                 <i class="bi bi-dash-circle"></i> Inactive
                             </span>
                         @elseif($isLowStock)
-                            <span class="block text-[9px] font-bold text-rose-500">Needs Replenishing</span>
+                            <span class="block text-[9px] font-bold text-rose-500 mt-0.5">Needs Replenishing</span>
                         @endif
                     </td>
 
@@ -240,7 +252,7 @@
             <h3 class="text-lg font-bold text-slate-950 mb-1">Stock Management</h3>
             <p class="text-xs text-slate-500 mb-6">Manually adjust warehouse inventory levels. Stock additions will create new FIFO batches.</p>
             
-            <form action="{{ route('admin.inventory.adjust') }}" method="POST" class="space-y-4">
+            <form id="stockAdjustmentForm" action="{{ route('admin.inventory.adjust') }}" method="POST" class="space-y-4">
                 @csrf
                 <!-- Product Selector -->
                 <div>
@@ -250,10 +262,13 @@
                         <option value="">-- Choose Product --</option>
                         @foreach($productsForForm as $p)
                             <option value="{{ $p->id }}" {{ old('product_id') == $p->id ? 'selected' : '' }}>
-                                {{ $p->product_name }} ({{ $p->size }}) - Stock: {{ $p->stock }}
+                                {{ $p->product_name }} ({{ $p->size }}) - Avail: {{ $p->available_stock }} / Phys: {{ $p->stock }}
                             </option>
                         @endforeach
                     </select>
+                    @error('product_id')
+                        <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Adjustment Type -->
@@ -271,19 +286,41 @@
                     <label for="quantity" class="block text-sm font-semibold text-slate-700">Quantity</label>
                     <input type="number" name="quantity" id="quantity" required min="1" value="{{ old('quantity', 1) }}"
                         class="mt-1.5 block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all">
+                    @error('quantity')
+                        <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Batch Dates (Only for Stock In) -->
+                @php
+                    $initialMfgDate = old('manufacturing_date', date('Y-m-d'));
+                @endphp
                 <div id="dates_container" class="space-y-4">
                     <div>
                         <label for="manufacturing_date" class="block text-sm font-semibold text-slate-700">Manufacturing Date</label>
-                        <input type="date" name="manufacturing_date" id="manufacturing_date" value="{{ old('manufacturing_date', date('Y-m-d')) }}" max="{{ date('Y-m-d') }}"
+                        <input type="date" name="manufacturing_date" id="manufacturing_date" value="{{ $initialMfgDate }}" max="{{ date('Y-m-d') }}"
+                            oninput="syncStockDates()" onchange="syncStockDates()"
                             class="mt-1.5 block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all">
+                        @error('manufacturing_date')
+                            <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                        @enderror
                     </div>
                     <div>
                         <label for="expiration_date" class="block text-sm font-semibold text-slate-700">Expiration Date</label>
                         <input type="date" name="expiration_date" id="expiration_date" value="{{ old('expiration_date') }}"
-                            class="mt-1.5 block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all">
+                            @if($initialMfgDate) min="{{ $initialMfgDate }}" @endif
+                            oninput="syncStockDates()" onchange="syncStockDates()"
+                            class="mt-1.5 block w-full px-3 py-2 {{ $errors->has('expiration_date') ? 'bg-rose-50/40 border-rose-500 text-rose-900 focus:ring-rose-500/20 focus:border-rose-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-sky-500/20 focus:border-sky-500' }} border rounded-xl focus:outline-none focus:ring-2 text-sm transition-all">
+                        <p id="stock_date_error" class="hidden items-start gap-1.5 mt-1.5 text-xs font-semibold text-rose-600" role="alert">
+                            <i class="bi bi-exclamation-circle-fill mt-0.5 shrink-0"></i>
+                            <span id="stock_date_error_text">Expiration date must be on or after the manufacturing date.</span>
+                        </p>
+                        @error('expiration_date')
+                            <p id="stock_date_server_error" class="flex items-start gap-1.5 mt-1.5 text-xs font-semibold text-rose-600" role="alert">
+                                <i class="bi bi-exclamation-circle-fill mt-0.5 shrink-0"></i>
+                                <span>{{ $message }}</span>
+                            </p>
+                        @enderror
                     </div>
                 </div>
 
@@ -292,10 +329,13 @@
                     <label for="remarks" class="block text-sm font-semibold text-slate-700">Remarks / Reason</label>
                     <textarea name="remarks" id="remarks" required rows="2"
                         class="mt-1.5 block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
-                        placeholder="e.g. New delivery batch, damaged stock dump..."></textarea>
+                        placeholder="e.g. New delivery batch, damaged stock dump...">{{ old('remarks') }}</textarea>
+                    @error('remarks')
+                        <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                    @enderror
                 </div>
                 
-                <button type="submit" class="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 transition-all shadow-md shadow-sky-100">
+                <button type="submit" id="stockAdjustmentSubmitBtn" class="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 transition-all shadow-md shadow-sky-100 cursor-pointer">
                     <i class="bi bi-arrow-down-up"></i>
                     <span>Execute Transaction</span>
                 </button>
@@ -352,21 +392,149 @@
 
 @section('scripts')
 <script>
-    function toggleExpiryField() {
+    function formatIsoDate(isoDate) {
+        if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
+        const [year, month, day] = isoDate.split('-').map(Number);
+        const dateObj = new Date(year, month - 1, day);
+        return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function setExpiryErrorState(isInvalid, message = '', clearServerError = true) {
+        const expiryInput = document.getElementById('expiration_date');
+        const errContainer = document.getElementById('stock_date_error');
+        const errText = document.getElementById('stock_date_error_text');
+        const serverErr = document.getElementById('stock_date_server_error');
+        const submitBtn = document.getElementById('stockAdjustmentSubmitBtn');
+
+        if (!expiryInput) return;
+
+        if (isInvalid) {
+            if (serverErr) {
+                serverErr.classList.add('hidden');
+                serverErr.classList.remove('flex');
+            }
+            if (errContainer && errText) {
+                errText.textContent = message;
+                errContainer.classList.remove('hidden');
+                errContainer.classList.add('flex');
+            }
+            expiryInput.classList.remove('bg-slate-50', 'border-slate-200', 'text-slate-900', 'focus:ring-sky-500/20', 'focus:border-sky-500');
+            expiryInput.classList.add('bg-rose-50/40', 'border-rose-500', 'text-rose-900', 'focus:ring-rose-500/20', 'focus:border-rose-500');
+            expiryInput.setCustomValidity(message);
+            expiryInput.setAttribute('aria-invalid', 'true');
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                submitBtn.classList.remove('hover:bg-sky-500', 'cursor-pointer');
+            }
+            return;
+        }
+
+        if (errContainer) {
+            errContainer.classList.add('hidden');
+            errContainer.classList.remove('flex');
+        }
+        if (clearServerError && serverErr) {
+            serverErr.classList.add('hidden');
+            serverErr.classList.remove('flex');
+        }
+
+        const hasVisibleServerError = serverErr && !serverErr.classList.contains('hidden');
+        if (!hasVisibleServerError) {
+            expiryInput.classList.remove('bg-rose-50/40', 'border-rose-500', 'text-rose-900', 'focus:ring-rose-500/20', 'focus:border-rose-500');
+            expiryInput.classList.add('bg-slate-50', 'border-slate-200', 'text-slate-900', 'focus:ring-sky-500/20', 'focus:border-sky-500');
+            expiryInput.removeAttribute('aria-invalid');
+        }
+
+        expiryInput.setCustomValidity('');
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.classList.add('hover:bg-sky-500', 'cursor-pointer');
+        }
+    }
+
+    function syncStockDates(clearServerError = true) {
+        const typeSelect = document.getElementById('adjustment_type');
+        const mfgInput = document.getElementById('manufacturing_date');
+        const expiryInput = document.getElementById('expiration_date');
+
+        if (!mfgInput || !expiryInput) return true;
+
+        if (typeSelect && typeSelect.value === 'out') {
+            setExpiryErrorState(false, '', true);
+            return true;
+        }
+
+        const mfgVal = mfgInput.value;
+        const expVal = expiryInput.value;
+
+        if (mfgVal) {
+            // Directly bind minimum selectable expiration date to the manufacturing date
+            expiryInput.min = mfgVal;
+
+            if (expVal && expVal < mfgVal) {
+                const msg = `Expiration date must be on or after the manufacturing date (${formatIsoDate(mfgVal)}).`;
+                setExpiryErrorState(true, msg, true);
+                return false;
+            }
+        } else {
+            expiryInput.removeAttribute('min');
+        }
+
+        setExpiryErrorState(false, '', clearServerError);
+        return true;
+    }
+
+    function toggleExpiryField(isInitialLoad = false) {
         const typeSelect = document.getElementById('adjustment_type');
         const datesContainer = document.getElementById('dates_container');
+        const mfgInput = document.getElementById('manufacturing_date');
         const expiryInput = document.getElementById('expiration_date');
 
         if (typeSelect.value === 'out') {
             datesContainer.style.display = 'none';
             expiryInput.removeAttribute('required');
+            expiryInput.disabled = true;
+            mfgInput.disabled = true;
+            syncStockDates(true);
         } else {
             datesContainer.style.display = 'block';
+            expiryInput.disabled = false;
+            mfgInput.disabled = false;
             expiryInput.setAttribute('required', 'required');
+            syncStockDates(!isInitialLoad);
         }
     }
 
-    // Run on startup to align view state
-    document.addEventListener('DOMContentLoaded', toggleExpiryField);
+    document.addEventListener('DOMContentLoaded', function () {
+        toggleExpiryField(true);
+
+        const form = document.getElementById('stockAdjustmentForm');
+        const expiryInput = document.getElementById('expiration_date');
+        const mfgInput = document.getElementById('manufacturing_date');
+        const typeSelect = document.getElementById('adjustment_type');
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                if (typeSelect && typeSelect.value === 'in' && !syncStockDates(true)) {
+                    e.preventDefault();
+                    if (expiryInput) expiryInput.focus();
+                }
+            });
+        }
+
+        if (expiryInput) {
+            expiryInput.addEventListener('invalid', function (e) {
+                if (typeSelect && typeSelect.value === 'in' && mfgInput && mfgInput.value && expiryInput.value && expiryInput.value < mfgInput.value) {
+                    e.preventDefault();
+                    syncStockDates(true);
+                    expiryInput.focus();
+                }
+            });
+        }
+    });
 </script>
 @endsection

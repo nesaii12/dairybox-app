@@ -4,36 +4,104 @@ namespace App\Services;
 
 use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\Reservation;
 use Illuminate\Support\Facades\DB;
 
 class InventoryService
 {
     /**
-     * Deduct stock using FIFO logic.
+     * Calculate sellable available stock (Physical Stock - Reserved Stock).
+     */
+    public static function getAvailableStock(Product $product): int
+    {
+        return max(0, (int) $product->stock - (int) ($product->reserved_stock ?? 0));
+    }
+
+    /**
+     * Standardized anti-overselling error message.
+     */
+    public static function insufficientStockMessage(Product $product, ?int $available = null): string
+    {
+        $avail = $available ?? self::getAvailableStock($product);
+        return "Sorry! Only {$avail} pieces of {$product->product_name} are currently available.";
+    }
+
+    /**
+     * Compute total physical stock in active batches whose expiration date is on or after $pickupDate.
+     */
+    public static function getEligibleBatchStockForDate(int $productId, string $pickupDate): int
+    {
+        $hasActiveBatches = Inventory::where('product_id', $productId)
+            ->where('remaining_stock', '>', 0)
+            ->exists();
+
+        if ($hasActiveBatches) {
+            return (int) Inventory::where('product_id', $productId)
+                ->where('remaining_stock', '>', 0)
+                ->whereNotNull('expiration_date')
+                ->whereDate('expiration_date', '>=', $pickupDate)
+                ->sum('remaining_stock');
+        }
+
+        $product = Product::find($productId);
+        if (!$product || !$product->expiration_date) {
+            return 0;
+        }
+
+        return $product->expiration_date->toDateString() >= $pickupDate ? (int) $product->stock : 0;
+    }
+
+    /**
+     * Deduct stock using FIFO logic with row-level locking and anti-overselling checks.
      *
      * Iterates over inventory batches from oldest to newest,
      * reducing remaining_stock until the requested quantity is fulfilled.
      *
-     * @throws \Exception If insufficient stock across all batches.
+     * @throws \Exception If insufficient available stock.
      */
-    public static function deductStock(int $productId, int $quantity, string $remarks = 'Order Deduction'): void
-    {
-        DB::transaction(function () use ($productId, $quantity, $remarks) {
+    public static function deductStock(
+        int $productId,
+        int $quantity,
+        string $remarks = 'Order Deduction',
+        bool $enforceAvailableStock = true,
+        ?string $minExpiryDate = null
+    ): void {
+        DB::transaction(function () use ($productId, $quantity, $remarks, $enforceAvailableStock, $minExpiryDate) {
             $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
 
-            if ($product->stock < $quantity) {
-                throw new \Exception("Insufficient stock for product '{$product->product_name}'. Available: {$product->stock}, Requested: {$quantity}");
+            $availableStock = $enforceAvailableStock
+                ? self::getAvailableStock($product)
+                : (int) $product->stock;
+
+            if ($availableStock < $quantity) {
+                throw new \Exception(self::insufficientStockMessage($product, $availableStock));
             }
 
-            $batches = Inventory::where('product_id', $productId)
-                ->where('remaining_stock', '>', 0)
+            if ((int) $product->stock < $quantity) {
+                throw new \Exception(self::insufficientStockMessage($product, (int) $product->stock));
+            }
+
+            $batchQuery = Inventory::where('product_id', $productId)
+                ->where('remaining_stock', '>', 0);
+
+            if ($minExpiryDate) {
+                // Prioritize non-expired batches valid through the pickup date in FIFO order
+                $batchQuery->orderByRaw(
+                    'CASE WHEN expiration_date IS NOT NULL AND DATE(expiration_date) >= ? THEN 0 ELSE 1 END ASC',
+                    [$minExpiryDate]
+                );
+            }
+
+            $batches = $batchQuery
                 ->orderBy('created_at', 'asc') // Oldest batches first (FIFO)
                 ->lockForUpdate()
                 ->get();
 
             $remaining = $quantity;
             foreach ($batches as $batch) {
-                if ($remaining <= 0) break;
+                if ($remaining <= 0) {
+                    break;
+                }
 
                 $deductedFromBatch = 0;
                 if ($batch->remaining_stock >= $remaining) {
@@ -78,8 +146,8 @@ class InventoryService
                 $remaining = 0;
             }
 
-            // Sync overall product stock
-            $product->stock = max(0, $product->stock - $quantity);
+            // Sync overall physical product stock
+            $product->stock = max(0, (int) $product->stock - $quantity);
 
             // Update nearest expiration date and manufacturing date from remaining batches
             $nearestBatch = Inventory::where('product_id', $productId)
@@ -102,7 +170,7 @@ class InventoryService
     public static function addStock(int $productId, int $quantity, ?string $expirationDate = null, string $remarks = 'Stock In', ?string $manufacturingDate = null): void
     {
         DB::transaction(function () use ($productId, $quantity, $expirationDate, $remarks, $manufacturingDate) {
-            $product = Product::findOrFail($productId);
+            $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
             $resolvedMfgDate = $manufacturingDate ?? $product->manufacturing_date?->toDateString();
 
             Inventory::create([
@@ -139,7 +207,7 @@ class InventoryService
     }
 
     /**
-     * Reconcile product stock and expiration dates directly from active FIFO inventory batches.
+     * Reconcile product physical stock, reserved stock, and expiration dates directly from active records.
      */
     public static function reconcileStock(?int $productId = null): void
     {
@@ -148,6 +216,11 @@ class InventoryService
         foreach ($products as $product) {
             $batchesRemaining = Inventory::where('product_id', $product->id)->sum('remaining_stock');
             $product->stock = (int) $batchesRemaining;
+
+            $reservedTotal = (int) Reservation::where('product_id', $product->id)
+                ->whereIn('status', Reservation::ALLOCATED_STATUSES)
+                ->sum('allocated_quantity');
+            $product->reserved_stock = max(0, $reservedTotal);
 
             $nearestBatch = Inventory::where('product_id', $product->id)
                 ->where('remaining_stock', '>', 0)

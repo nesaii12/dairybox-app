@@ -21,6 +21,7 @@ class Product extends Model
         'price',
         'image',
         'stock',
+        'reserved_stock',
         'manufacturing_date',
         'expiration_date',
         'status',
@@ -30,6 +31,8 @@ class Product extends Model
     {
         return [
             'price' => 'decimal:2',
+            'stock' => 'integer',
+            'reserved_stock' => 'integer',
             'manufacturing_date' => 'date',
             'expiration_date' => 'date',
         ];
@@ -76,11 +79,27 @@ class Product extends Model
     }
 
     /**
-     * Check if the product has low stock.
+     * Get the reservations for this product.
+     */
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    /**
+     * Computed available stock (Physical Stock - Reserved Stock).
+     */
+    public function getAvailableStockAttribute(): int
+    {
+        return max(0, (int) ($this->attributes['stock'] ?? 0) - (int) ($this->attributes['reserved_stock'] ?? 0));
+    }
+
+    /**
+     * Check if the product has low available stock.
      */
     public function isLowStock(int $threshold = 10): bool
     {
-        return $this->stock <= $threshold;
+        return $this->available_stock <= $threshold;
     }
 
     /**

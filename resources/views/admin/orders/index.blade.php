@@ -41,6 +41,7 @@
                     <option value="Delivery" {{ request('type') === 'Delivery' ? 'selected' : '' }}>Delivery</option>
                     <option value="Pickup" {{ request('type') === 'Pickup' ? 'selected' : '' }}>Pickup</option>
                     <option value="Walk-in" {{ request('type') === 'Walk-in' ? 'selected' : '' }}>Walk-in</option>
+                    <option value="Reservation" {{ request('type') === 'Reservation' ? 'selected' : '' }}>Reservation</option>
                 </select>
             </div>
 
@@ -102,6 +103,9 @@
                             @elseif($order->order_type === 'Walk-in')
                                 <i class="bi bi-person-walking text-purple-600"></i>
                                 <span class="font-semibold text-purple-700">Walk-in</span>
+                            @elseif($order->order_type === 'Reservation')
+                                <i class="bi bi-calendar2-check text-indigo-600"></i>
+                                <span class="font-semibold text-indigo-700">Reservation</span>
                             @else
                                 <i class="bi bi-shop text-amber-500"></i>
                                 <span>Pickup</span>

@@ -56,7 +56,7 @@ class CartController extends Controller
             } else {
                 $existing = $grouped[$key];
                 $freshProduct = $item->product ? $item->product->fresh() : null;
-                $maxStock = $freshProduct ? $freshProduct->stock : 9999;
+                $maxStock = $freshProduct ? $freshProduct->available_stock : 9999;
                 $newQty = min($existing->quantity + $item->quantity, $maxStock);
                 $unitPrice = $existing->unit_price;
                 $existing->update([
@@ -81,7 +81,7 @@ class CartController extends Controller
 
         foreach ($items as $item) {
             $freshProduct = $item->product ? $item->product->fresh() : null;
-            $freshStock = $freshProduct ? $freshProduct->stock : 0;
+            $freshStock = $freshProduct ? $freshProduct->available_stock : 0;
 
             if (!$freshProduct || empty($freshProduct->expiration_date) || $freshProduct->status !== 'active') {
                 $pName = $freshProduct ? $freshProduct->product_name : 'An item';
@@ -160,9 +160,11 @@ class CartController extends Controller
             return redirect()->back()->with('error', $msg);
         }
 
-        // Check if product is completely out of stock
-        if ($product->stock <= 0) {
-            $msg = "{$product->product_name} is currently out of stock.";
+        $availableStock = InventoryService::getAvailableStock($product);
+
+        // Check if product is completely out of available stock
+        if ($availableStock <= 0) {
+            $msg = InventoryService::insufficientStockMessage($product, 0);
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -174,23 +176,26 @@ class CartController extends Controller
             return redirect()->back()->with('error', $msg);
         }
 
-        if ($qty > $product->stock) {
-            $msg = "Cannot add {$qty} unit(s). Maximum available warehouse stock for {$product->product_name} is {$product->stock} unit" . ($product->stock > 1 ? 's' : '') . ".";
+        // Retrieve customer's consolidated cart early to check combined product quantity
+        $cart = $this->getCustomerCart(auth()->id());
+        $alreadyInCartForProduct = (int) CartItem::where('cart_id', $cart->id)
+            ->where('product_id', $product->id)
+            ->sum('quantity');
+
+        if (($alreadyInCartForProduct + $qty) > $availableStock) {
+            $msg = InventoryService::insufficientStockMessage($product, $availableStock);
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => $msg,
-                    'available_to_add' => $product->stock,
-                    'stock' => $product->stock,
-                    'available_left' => $product->stock,
+                    'available_to_add' => max(0, $availableStock - $alreadyInCartForProduct),
+                    'stock' => $availableStock,
+                    'available_left' => $availableStock,
                 ], 422);
             }
             return redirect()->back()->with('error', $msg);
         }
-
-        // Retrieve customer's consolidated cart
-        $cart = $this->getCustomerCart(auth()->id());
 
         $selectedMilk = $request->input('milk_type', $product->milk_type);
         $selectedSize = $request->input('size', $product->size);
@@ -218,8 +223,8 @@ class CartController extends Controller
         }
 
         if ($existingItem) {
-            // Merge: increase quantity capped at warehouse stock
-            $newQty = min($existingItem->quantity + $qty, $product->stock);
+            // Merge: increase quantity capped at available stock
+            $newQty = min($existingItem->quantity + $qty, $availableStock);
             $existingItem->update([
                 'quantity' => $newQty,
                 'subtotal' => $unitPrice * $newQty,
@@ -249,8 +254,8 @@ class CartController extends Controller
                 'product_image' => $product->image ? asset('storage/' . $product->image) : null,
                 'product_price' => number_format($unitPrice, 2),
                 'product_id' => $product->id,
-                'stock' => $product->stock,
-                'available_left' => $product->stock,
+                'stock' => $availableStock,
+                'available_left' => $availableStock,
             ]);
         }
 
@@ -269,16 +274,21 @@ class CartController extends Controller
 
         $qty = (int) $request->quantity;
         $product = $item->product->fresh();
+        $availableStock = InventoryService::getAvailableStock($product);
+        $otherSameProductQty = (int) CartItem::where('cart_id', $item->cart_id)
+            ->where('product_id', $product->id)
+            ->where('id', '!=', $item->id)
+            ->sum('quantity');
 
-        if ($qty > $product->stock) {
-            $msg = "Cannot set quantity to {$qty}. Maximum available stock is {$product->stock} units.";
+        if (($otherSameProductQty + $qty) > $availableStock) {
+            $msg = InventoryService::insufficientStockMessage($product, $availableStock);
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => $msg,
-                    'max_stock' => $product->stock,
-                    'quantity' => min($item->quantity, max(1, $product->stock)),
+                    'max_stock' => max(0, $availableStock - $otherSameProductQty),
+                    'quantity' => min($item->quantity, max(1, $availableStock - $otherSameProductQty)),
                 ], 422);
             }
             return redirect()->back()->with('error', $msg);
@@ -316,7 +326,7 @@ class CartController extends Controller
                 'total' => '₱' . number_format($total, 2),
                 'total_raw' => (float) $total,
                 'cart_count' => $cartCount,
-                'max_stock' => $product->stock,
+                'max_stock' => $availableStock,
             ]);
         }
 
@@ -394,10 +404,10 @@ class CartController extends Controller
             return redirect()->route('customer.cart.index')->with('error', 'Please select at least one product using the checkbox to checkout.');
         }
 
-        // Double check stock and expiration availability before checkout screen
+        // Double check available stock and expiration availability before checkout screen
         foreach ($items as $item) {
             $freshProduct = $item->product ? $item->product->fresh() : null;
-            $freshStock   = $freshProduct ? $freshProduct->stock : 0;
+            $freshStock   = $freshProduct ? $freshProduct->available_stock : 0;
 
             if (!$freshProduct || empty($freshProduct->expiration_date) || $freshProduct->status !== 'active') {
                 $pName = $freshProduct ? $freshProduct->product_name : 'An item';
@@ -493,10 +503,51 @@ class CartController extends Controller
         try {
             DB::beginTransaction();
 
+            // Aggregate quantities per product and lock rows in deterministic order to prevent overselling
+            $aggregatedQuantities = [];
+            foreach ($cartItems as $item) {
+                $pId = (int) $item->product_id;
+                $aggregatedQuantities[$pId] = ($aggregatedQuantities[$pId] ?? 0) + (int) $item->quantity;
+            }
+            $productIds = array_keys($aggregatedQuantities);
+            sort($productIds);
+
+            $lockedProducts = Product::whereIn('id', $productIds)
+                ->orderBy('id', 'asc')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($aggregatedQuantities as $pId => $totalRequestedQty) {
+                $product = $lockedProducts->get($pId);
+                if (!$product) {
+                    throw new \Exception('Selected product was not found.');
+                }
+
+                // Block products without valid expiration info or inactive at order placement
+                if (empty($product->expiration_date) || $product->status !== 'active') {
+                    throw new \Exception("'{$product->product_name}' cannot be ordered because its expiration date information is missing or unverified. Please remove it from your cart.");
+                }
+
+                // Block expired products at order placement
+                if ($product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
+                    throw new \Exception("'{$product->product_name}' has expired and cannot be ordered. Please remove it from your cart.");
+                }
+
+                $available = InventoryService::getAvailableStock($product);
+                if ($available < $totalRequestedQty) {
+                    throw new \Exception(InventoryService::insufficientStockMessage($product, $available));
+                }
+            }
+
             // Unique Order Number resolution DB-YYYYMMDD-XXXX
             $today = Carbon::today()->format('Ymd');
             $ordersTodayCount = Order::whereDate('created_at', Carbon::today())->count();
             $orderNumber = 'DB-' . $today . '-' . str_pad($ordersTodayCount + 1, 4, '0', STR_PAD_LEFT);
+            while (Order::where('order_number', $orderNumber)->exists()) {
+                $ordersTodayCount++;
+                $orderNumber = 'DB-' . $today . '-' . str_pad($ordersTodayCount + 1, 4, '0', STR_PAD_LEFT);
+            }
 
             $subtotal = $cartItems->sum('subtotal');
             $deliveryFee = Order::calculateDeliveryFee((float) $subtotal, $request->order_type);
@@ -518,22 +569,7 @@ class CartController extends Controller
             ]);
 
             foreach ($cartItems as $item) {
-                // Double check stock with fresh product row
-                $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
-                if (!$product || $product->stock < $item->quantity) {
-                    $available = $product ? $product->stock : 0;
-                    throw new \Exception("Insufficient stock for product '{$item->product->product_name}'. Available: {$available}, Requested: {$item->quantity}");
-                }
-
-                // Block products without valid expiration info or inactive at order placement
-                if (empty($product->expiration_date) || $product->status !== 'active') {
-                    throw new \Exception("'{$product->product_name}' cannot be ordered because its expiration date information is missing or unverified. Please remove it from your cart.");
-                }
-
-                // Block expired products at order placement
-                if ($product->expiration_date && \Carbon\Carbon::parse($product->expiration_date)->startOfDay()->lt(now()->startOfDay())) {
-                    throw new \Exception("'{$product->product_name}' has expired and cannot be ordered. Please remove it from your cart.");
-                }
+                $product = $lockedProducts->get($item->product_id);
 
                 $itemCust = Product::getCartItemCustomization($item->id, $item->product);
                 $unitPrice = $item->quantity > 0 ? ((float) $item->subtotal / $item->quantity) : $product->getPriceForSize($itemCust['size'] ?? 'Medium');
@@ -549,7 +585,7 @@ class CartController extends Controller
 
                 Product::saveOrderItemCustomization($orderItem->id, $itemCust['milk_type'], $itemCust['size']);
 
-                // Deduct stock using FIFO logic!
+                // Deduct stock using FIFO logic (also enforces Available Stock under lockForUpdate)
                 InventoryService::deductStock($item->product_id, $item->quantity, "Order checkout #{$orderNumber}");
 
                 // Delete only the checked-out item from the cart
@@ -630,7 +666,7 @@ class CartController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('customer.cart.index')->with('error', "Order failed: " . $e->getMessage());
+            return redirect()->route('customer.cart.index')->with('error', $e->getMessage());
         }
     }
 }
