@@ -298,7 +298,6 @@ class RegistrationOtpFlowTest extends TestCase
                 'masked_phone' => '0918***4567',
                 'delivery_channel' => 'sms',
                 'sms_provider' => 'semaphore',
-                'fallback_notice' => null,
             ]);
 
         Http::assertSent(function ($request) {

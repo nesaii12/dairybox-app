@@ -22,9 +22,10 @@ class ForecastController extends Controller
 
         $allProducts = Product::where('status', 'active')->orderBy('product_name')->get();
 
-        // Next calendar month
-        $targetMonth = Carbon::now()->addMonth()->format('Y-m');
-        $targetMonthLabel = Carbon::now()->addMonth()->format('F Y');
+        // Rolling Year-Over-Year Restart Baseline window & target projection month
+        $rollingWindow = ForecastService::getRollingWindow();
+        $targetMonth = $request->input('target_month') ?? ($rollingWindow['target_year'] . '-01');
+        $targetMonthLabel = Carbon::createFromFormat('Y-m', $targetMonth)->format('F Y');
 
         // Historical Sales Trend & Seasonal Demand Analytics
         $analytics = ForecastService::getHistoricalAnalytics($selectedProduct?->id);
@@ -98,6 +99,7 @@ class ForecastController extends Controller
             'selectedProduct',
             'targetMonth',
             'targetMonthLabel',
+            'rollingWindow',
             'analytics',
             'lastMonthStats',
             'topForecastProduct',
@@ -115,8 +117,9 @@ class ForecastController extends Controller
 
         $productId = $request->product_id;
         $product = Product::findOrFail($productId);
-        $targetMonth = Carbon::now()->addMonth()->format('Y-m');
-        $targetMonthLabel = Carbon::now()->addMonth()->format('F Y');
+        $rollingWindow = ForecastService::getRollingWindow();
+        $targetMonth = $request->input('target_month') ?? ($rollingWindow['target_year'] . '-01');
+        $targetMonthLabel = Carbon::createFromFormat('Y-m', $targetMonth)->format('F Y');
 
         try {
             // Predict demand
@@ -140,10 +143,10 @@ class ForecastController extends Controller
                 'ip_address' => $request->ip(),
             ]);
 
-            return redirect()->route('admin.forecast.index')->with('success', "Forecasting generated successfully for {$product->product_name} in {$targetMonthLabel}. Predicted Demand: " . round($predictedQty, 1) . " units.");
+            return redirect()->route('admin.forecast.index', ['target_month' => $targetMonth])->with('success', "Forecasting generated successfully for {$product->product_name} in {$targetMonthLabel}. Predicted Demand: " . round($predictedQty, 1) . " units.");
 
         } catch (\Exception $e) {
-            return redirect()->route('admin.forecast.index')->with('error', "Forecasting calculation failed: " . $e->getMessage());
+            return redirect()->route('admin.forecast.index', ['target_month' => $targetMonth])->with('error', "Forecasting calculation failed: " . $e->getMessage());
         }
     }
 
@@ -152,8 +155,9 @@ class ForecastController extends Controller
      */
     public function generateAll(Request $request)
     {
-        $targetMonth = Carbon::now()->addMonth()->format('Y-m');
-        $targetMonthLabel = Carbon::now()->addMonth()->format('F Y');
+        $rollingWindow = ForecastService::getRollingWindow();
+        $targetMonth = $request->input('target_month') ?? ($rollingWindow['target_year'] . '-01');
+        $targetMonthLabel = Carbon::createFromFormat('Y-m', $targetMonth)->format('F Y');
 
         try {
             $count = ForecastService::generateAllProducts($targetMonth);
@@ -165,10 +169,10 @@ class ForecastController extends Controller
                 'ip_address' => $request->ip(),
             ]);
 
-            return redirect()->route('admin.forecast.index')->with('success', "Demand forecasts refreshed for {$count} product(s) in {$targetMonthLabel}.");
+            return redirect()->route('admin.forecast.index', ['target_month' => $targetMonth])->with('success', "Demand forecasts refreshed for {$count} product(s) in {$targetMonthLabel}.");
 
         } catch (\Exception $e) {
-            return redirect()->route('admin.forecast.index')->with('error', "Bulk forecast generation failed: " . $e->getMessage());
+            return redirect()->route('admin.forecast.index', ['target_month' => $targetMonth])->with('error', "Bulk forecast generation failed: " . $e->getMessage());
         }
     }
 }

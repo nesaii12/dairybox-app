@@ -311,6 +311,182 @@
         </form>
     </div>
 
+    <!-- 3B. Reservation Cancellation Policy Settings -->
+    @php
+        $policyEnabledOld = old('cancellation_fee_enabled', $cancellationPolicy['enabled'] ? '1' : '0');
+        $policyEnabled = filter_var($policyEnabledOld, FILTER_VALIDATE_BOOLEAN);
+        $policyFeeValue = old('cancellation_fee_percentage', $cancellationPolicy['fee_percentage']);
+        $policyFeeFloat = max(0, min(100, (float) $policyFeeValue));
+        $policyRefundFloat = round(100 - $policyFeeFloat, 2);
+        $formatPct = fn (float $n) => fmod($n, 1.0) === 0.0 ? (string) (int) $n : rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+    @endphp
+    <div id="cancellation-policy" class="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 flex-shrink-0">
+                    <i class="bi bi-calendar2-x-fill text-base"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900">Reservation Cancellation Policy</h3>
+                    <p class="text-[11px] text-slate-500">Configure cancellation fee deductions and refund rules for cancelled reservations. Future edits do not alter past cancelled records.</p>
+                </div>
+            </div>
+            <span id="policyStatusBadge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border {{ $policyEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200' }}">
+                {{ $policyEnabled ? 'Fee Enabled' : 'Fee Disabled (100% Refund)' }}
+            </span>
+        </div>
+
+        <form action="{{ route('admin.settings.updateReservationPolicy') }}" method="POST" class="p-6 space-y-6">
+            @csrf
+            @method('PUT')
+
+            <!-- Enable/Disable Toggle + Percentage Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Toggle -->
+                <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                        <span class="block text-xs font-bold text-slate-800 mb-1">Cancellation Fee Status</span>
+                        <p class="text-[10px] text-slate-500 mb-3">When disabled, customer-initiated cancellations receive a 100% full refund of the down payment.</p>
+                    </div>
+                    <label for="cancellation_fee_enabled" id="policyToggleCard" class="inline-flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border {{ $policyEnabled ? 'border-emerald-200' : 'border-slate-200' }} rounded-xl cursor-pointer select-none transition-colors">
+                        <span id="policyToggleText" class="text-xs font-bold {{ $policyEnabled ? 'text-emerald-700' : 'text-slate-500' }}">
+                            {{ $policyEnabled ? 'Cancellation Fee Enabled' : 'Cancellation Fee Disabled' }}
+                        </span>
+                        <span class="relative inline-flex items-center shrink-0">
+                            <input type="hidden" name="cancellation_fee_enabled" value="0">
+                            <input type="checkbox" id="cancellation_fee_enabled" name="cancellation_fee_enabled" value="1"
+                                {{ $policyEnabled ? 'checked' : '' }}
+                                class="sr-only">
+                            <span id="policySwitchTrack"
+                                style="width: 44px; height: 24px; background-color: {{ $policyEnabled ? '#059669' : '#cbd5e1' }};"
+                                class="relative inline-flex items-center rounded-full transition-colors duration-200 shadow-inner">
+                                <span id="policySwitchThumb"
+                                    style="width: 18px; height: 18px; transform: translateX({{ $policyEnabled ? '23px' : '3px' }});"
+                                    class="inline-block rounded-full bg-white shadow-sm transition-transform duration-200"></span>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
+                <!-- Cancellation Fee Percentage -->
+                <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80">
+                    <label for="cancellation_fee_percentage" class="block text-xs font-bold text-slate-800 mb-1">Cancellation Fee Percentage</label>
+                    <p class="text-[10px] text-slate-500 mb-2">Percentage deducted from the down payment on customer-initiated cancellations (0–100).</p>
+                    <div class="relative">
+                        <input type="number" id="cancellation_fee_percentage" name="cancellation_fee_percentage"
+                            value="{{ $formatPct($policyFeeFloat) }}"
+                            min="0" max="100" step="0.01" required
+                            class="block w-full pr-10 pl-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/15 focus:border-sky-500 shadow-2xs">
+                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-bold text-slate-400">%</span>
+                    </div>
+                    @error('cancellation_fee_percentage')
+                        <p class="text-[11px] text-rose-500 font-medium mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Auto-Calculated Refund Percentage -->
+                <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80">
+                    <label for="refund_percentage_display" class="block text-xs font-bold text-slate-800 mb-1">Refund Percentage (Auto-calculated)</label>
+                    <p class="text-[10px] text-slate-500 mb-2">Automatically computed as 100% minus the cancellation fee percentage.</p>
+                    <div class="relative">
+                        <input type="text" id="refund_percentage_display" readonly
+                            value="{{ $formatPct($policyRefundFloat) }}%"
+                            class="block w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black text-emerald-700 cursor-not-allowed">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Policy Summary Strip -->
+            <div id="policyLiveSummaryBox" class="rounded-xl border border-sky-200/80 bg-sky-50/60 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 font-bold text-slate-800">
+                    <i class="bi bi-info-circle-fill text-sky-600"></i>
+                    <span id="policyLiveSummaryText">
+                        @if($policyEnabled)
+                            Cancellation Fee: {{ $formatPct($policyFeeFloat) }}% | Refund Percentage: {{ $formatPct($policyRefundFloat) }}%
+                        @else
+                            Cancellation Fee: Disabled (0% Applied) | Refund Percentage: 100%
+                        @endif
+                    </span>
+                </div>
+                <span class="text-[11px] text-slate-600">
+                    Business-initiated cancellations always issue a 100% full refund (₱0.00 fee).
+                </span>
+            </div>
+
+            <!-- Policy Description -->
+            <div>
+                <label for="cancellation_policy_description" class="block text-xs font-bold text-slate-700 mb-1.5">Cancellation Policy Description</label>
+                <textarea id="cancellation_policy_description" name="cancellation_policy_description" rows="3" maxlength="1000"
+                    placeholder="Describe the reservation cancellation fee and refund guidelines shown to staff..."
+                    class="block w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/15 focus:border-sky-500 shadow-2xs">{{ old('cancellation_policy_description', $cancellationPolicy['description']) }}</textarea>
+                @error('cancellation_policy_description')
+                    <p class="text-[11px] text-rose-500 font-medium mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <!-- Real-Time Refund Computation Preview -->
+            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Refund Computation Preview</h4>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Test any down payment amount to preview cancellation fee and refund calculations before saving.</p>
+                    </div>
+                    <div class="w-full sm:w-64 shrink-0">
+                        <label for="preview_down_payment" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Down Payment Amount</label>
+                        <div class="flex items-center bg-white border border-slate-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:border-sky-500 shadow-2xs">
+                            <span class="px-3 py-2 bg-slate-100 border-r border-slate-200 text-xs font-black text-slate-700 select-none">₱</span>
+                            <input type="number" id="preview_down_payment" min="0" step="0.01" placeholder="Enter down payment amount"
+                                class="block w-full px-3 py-2 bg-white border-0 text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-0">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="previewEmptyHint" class="text-xs text-slate-500 bg-white border border-slate-200/70 rounded-xl px-4 py-3">
+                    Enter a down payment amount above to preview customer-initiated and business-initiated refund computations.
+                </div>
+
+                <div id="previewResultGrid" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-800">Customer-Initiated Cancellation</span>
+                            <span id="previewCustomerRateBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"></span>
+                        </div>
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                            <span class="text-slate-500">Cancellation Fee</span>
+                            <span id="previewCustomerFee" class="font-bold text-rose-600">₱0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">Refund Amount (Pending Handover)</span>
+                            <span id="previewCustomerRefund" class="font-black text-emerald-700">₱0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-800">Business-Initiated Cancellation</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Full Refund Override</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                            <span class="text-slate-500">Cancellation Fee (0%)</span>
+                            <span class="font-bold text-slate-700">₱0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">Refund Amount (100%)</span>
+                            <span id="previewBusinessRefund" class="font-black text-emerald-700">₱0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 flex justify-end">
+                <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Save Changes</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- 4. Payment Gateway (Xendit) Status Card -->
     <div class="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden lg:col-span-2">
         <div class="p-6 border-b border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -453,6 +629,109 @@ XENDIT_WEBHOOK_TOKEN=your_webhook_verification_token</pre>
         if (confirmInput) {
             confirmInput.addEventListener('input', checkMatch);
         }
+
+        // Reservation Cancellation Policy Live Preview
+        const feeToggle = document.getElementById('cancellation_fee_enabled');
+        const feeInput = document.getElementById('cancellation_fee_percentage');
+        const refundDisplay = document.getElementById('refund_percentage_display');
+        const toggleCard = document.getElementById('policyToggleCard');
+        const toggleText = document.getElementById('policyToggleText');
+        const switchTrack = document.getElementById('policySwitchTrack');
+        const switchThumb = document.getElementById('policySwitchThumb');
+        const statusBadge = document.getElementById('policyStatusBadge');
+        const summaryText = document.getElementById('policyLiveSummaryText');
+        const previewDownPayment = document.getElementById('preview_down_payment');
+        const previewEmptyHint = document.getElementById('previewEmptyHint');
+        const previewResultGrid = document.getElementById('previewResultGrid');
+        const previewCustomerRateBadge = document.getElementById('previewCustomerRateBadge');
+        const previewCustomerFee = document.getElementById('previewCustomerFee');
+        const previewCustomerRefund = document.getElementById('previewCustomerRefund');
+        const previewBusinessRefund = document.getElementById('previewBusinessRefund');
+
+        function formatPctLabel(num) {
+            const rounded = Math.round(num * 100) / 100;
+            return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/\.?0+$/, '');
+        }
+
+        function formatCurrency(num) {
+            return '₱' + Number(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function updateCancellationPolicyPreview() {
+            if (!feeToggle || !feeInput) return;
+
+            const enabled = feeToggle.checked;
+            let rawFee = parseFloat(feeInput.value);
+            if (isNaN(rawFee)) rawFee = 0;
+            const feePct = Math.max(0, Math.min(100, Math.round(rawFee * 100) / 100));
+            const refundPct = Math.max(0, Math.round((100 - feePct) * 100) / 100);
+
+            if (refundDisplay) {
+                refundDisplay.value = `${formatPctLabel(refundPct)}%`;
+            }
+
+            if (toggleText) {
+                toggleText.textContent = enabled ? 'Cancellation Fee Enabled' : 'Cancellation Fee Disabled';
+                toggleText.className = enabled ? 'text-xs font-bold text-emerald-700' : 'text-xs font-bold text-slate-500';
+            }
+
+            if (toggleCard) {
+                toggleCard.className = enabled
+                    ? 'inline-flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl cursor-pointer select-none transition-colors'
+                    : 'inline-flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer select-none transition-colors';
+            }
+
+            if (switchTrack) {
+                switchTrack.style.backgroundColor = enabled ? '#059669' : '#cbd5e1';
+            }
+
+            if (switchThumb) {
+                switchThumb.style.transform = enabled ? 'translateX(23px)' : 'translateX(3px)';
+            }
+
+            if (statusBadge) {
+                statusBadge.textContent = enabled ? 'Fee Enabled' : 'Fee Disabled (100% Refund)';
+                statusBadge.className = enabled
+                    ? 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-600 border-slate-200';
+            }
+
+            if (summaryText) {
+                summaryText.textContent = enabled
+                    ? `Cancellation Fee: ${formatPctLabel(feePct)}% | Refund Percentage: ${formatPctLabel(refundPct)}%`
+                    : 'Cancellation Fee: Disabled (0% Applied) | Refund Percentage: 100%';
+            }
+
+            if (previewDownPayment && previewEmptyHint && previewResultGrid) {
+                const rawDp = previewDownPayment.value;
+                const dp = parseFloat(rawDp);
+
+                if (rawDp === '' || isNaN(dp) || dp <= 0) {
+                    previewEmptyHint.classList.remove('hidden');
+                    previewResultGrid.classList.add('hidden');
+                    return;
+                }
+
+                previewEmptyHint.classList.add('hidden');
+                previewResultGrid.classList.remove('hidden');
+
+                const appliedFeePct = enabled ? feePct : 0;
+                const feeAmount = Math.round(dp * (appliedFeePct / 100) * 100) / 100;
+                const customerRefund = Math.max(0, Math.round((dp - feeAmount) * 100) / 100);
+
+                previewCustomerRateBadge.textContent = enabled
+                    ? `${formatPctLabel(appliedFeePct)}% Fee`
+                    : 'Fee Disabled (0%)';
+                previewCustomerFee.textContent = formatCurrency(feeAmount);
+                previewCustomerRefund.textContent = formatCurrency(customerRefund);
+                previewBusinessRefund.textContent = formatCurrency(dp);
+            }
+        }
+
+        if (feeToggle) feeToggle.addEventListener('change', updateCancellationPolicyPreview);
+        if (feeInput) feeInput.addEventListener('input', updateCancellationPolicyPreview);
+        if (previewDownPayment) previewDownPayment.addEventListener('input', updateCancellationPolicyPreview);
+        updateCancellationPolicyPreview();
     });
 </script>
 @endsection

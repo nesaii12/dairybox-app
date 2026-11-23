@@ -20,9 +20,10 @@ class SettingController extends Controller
     {
         $user = auth()->user();
         $settings = SettingService::all();
+        $cancellationPolicy = SettingService::getReservationCancellationPolicy();
         $xenditConfigured = app(\App\Services\XenditService::class)->isConfigured();
 
-        return view('admin.settings.index', compact('user', 'settings', 'xenditConfigured'));
+        return view('admin.settings.index', compact('user', 'settings', 'cancellationPolicy', 'xenditConfigured'));
     }
 
     /**
@@ -79,5 +80,35 @@ class SettingController extends Controller
         SettingService::set($validated);
 
         return back()->with('success', 'Store and operational settings saved successfully.');
+    }
+
+    /**
+     * Update database-persisted Reservation Cancellation Policy settings.
+     */
+    public function updateReservationPolicy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'cancellation_fee_enabled' => ['nullable', 'boolean'],
+            'cancellation_fee_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+            'cancellation_policy_description' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'cancellation_fee_percentage.required' => 'Please enter a cancellation fee percentage between 0 and 100.',
+            'cancellation_fee_percentage.min' => 'Cancellation fee percentage cannot be less than 0%.',
+            'cancellation_fee_percentage.max' => 'Cancellation fee percentage cannot exceed 100%.',
+        ]);
+
+        $enabled = $request->boolean('cancellation_fee_enabled');
+        $feePercentage = (float) $validated['cancellation_fee_percentage'];
+        $description = $validated['cancellation_policy_description'] ?? '';
+
+        SettingService::updateReservationCancellationPolicy(
+            $enabled,
+            $feePercentage,
+            $description,
+            auth()->id(),
+            $request->ip()
+        );
+
+        return back()->with('success', 'Reservation cancellation policy saved successfully.');
     }
 }

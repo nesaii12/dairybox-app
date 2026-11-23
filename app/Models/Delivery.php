@@ -59,6 +59,60 @@ class Delivery extends Model
     }
 
     /**
+     * Accessor for arrived_at ensuring Philippine Time (Asia/Manila, UTC+8).
+     */
+    public function getArrivedAtAttribute($value)
+    {
+        if (!$value) {
+            return null;
+        }
+
+        return \Carbon\Carbon::parse($value, 'Asia/Manila')->timezone('Asia/Manila');
+    }
+
+    /**
+     * Mutator for arrived_at ensuring Philippine Time (Asia/Manila, UTC+8).
+     */
+    public function setArrivedAtAttribute($value)
+    {
+        if (!$value) {
+            $this->attributes['arrived_at'] = null;
+            return;
+        }
+
+        $this->attributes['arrived_at'] = $value instanceof \Carbon\Carbon
+            ? $value->copy()->timezone('Asia/Manila')->format('Y-m-d H:i:s')
+            : \Carbon\Carbon::parse($value, 'Asia/Manila')->timezone('Asia/Manila')->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Accessor for delivered_at ensuring Philippine Time (Asia/Manila, UTC+8).
+     */
+    public function getDeliveredAtAttribute($value)
+    {
+        if (!$value) {
+            return null;
+        }
+
+        return \Carbon\Carbon::parse($value, 'Asia/Manila')->timezone('Asia/Manila');
+    }
+
+    /**
+     * Mutator for delivered_at ensuring Philippine Time (Asia/Manila, UTC+8).
+     */
+    public function setDeliveredAtAttribute($value)
+    {
+        if (!$value) {
+            $this->attributes['delivered_at'] = null;
+            return;
+        }
+
+        $this->attributes['delivered_at'] = $value instanceof \Carbon\Carbon
+            ? $value->copy()->timezone('Asia/Manila')->format('Y-m-d H:i:s')
+            : \Carbon\Carbon::parse($value, 'Asia/Manila')->timezone('Asia/Manila')->format('Y-m-d H:i:s');
+    }
+
+    /**
      * Check if the order was cancelled after the rider arrived.
      */
     public function wasCancelledAfterArrival(): bool

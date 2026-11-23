@@ -21,9 +21,27 @@
 @section('content')
 <div class="space-y-8">
     <!-- Header -->
-    <div class="space-y-1">
-        <h1 class="text-4xl font-bold text-slate-900 tracking-tight font-serif">Shop</h1>
-        <p class="text-slate-500 text-sm">Fresh from the farm. Updated daily.</p>
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="space-y-1">
+            <h1 class="text-4xl font-bold text-slate-900 tracking-tight font-serif">Shop</h1>
+            <p class="text-slate-500 text-sm">Fresh from the farm. Updated daily.</p>
+        </div>
+
+        <!-- Reservation Contact Notice -->
+        <div class="inline-flex flex-wrap items-center gap-x-4 gap-y-1.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl px-4 py-2.5 text-xs text-slate-700">
+            <span class="font-bold text-slate-900 inline-flex items-center gap-1.5">
+                <i class="bi bi-calendar2-check-fill text-sky-600"></i>
+                <span>For reservation, please contact:</span>
+            </span>
+            <span class="inline-flex items-center gap-1 font-semibold">
+                <i class="bi bi-facebook text-sky-600"></i>
+                <span>FB Page: <strong class="text-slate-900">Dairybox Trinidad</strong></span>
+            </span>
+            <a href="tel:09503845678" class="inline-flex items-center gap-1 font-semibold hover:text-sky-600 transition-colors">
+                <i class="bi bi-telephone-fill text-emerald-600"></i>
+                <span>Contact No.: <strong class="text-slate-900 font-mono">09503845678</strong></span>
+            </a>
+        </div>
     </div>
 
     <!-- Search & Dynamic Category Pills Form -->

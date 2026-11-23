@@ -16,6 +16,7 @@ class CashLedgerEntry extends Model
         'rider_id',
         'rider_name',
         'remittance_id',
+        'reservation_id',
         'entry_type',
         'amount_expected',
         'amount_remitted',
@@ -49,6 +50,11 @@ class CashLedgerEntry extends Model
     public function remittance(): BelongsTo
     {
         return $this->belongsTo(RiderRemittance::class, 'remittance_id');
+    }
+
+    public function reservation(): BelongsTo
+    {
+        return $this->belongsTo(Reservation::class, 'reservation_id');
     }
 }
 

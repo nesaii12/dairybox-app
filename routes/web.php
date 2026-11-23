@@ -5,21 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public Landing Route
 Route::get('/', function () {
-    $products = \App\Models\Product::with('category')->withCount('ratings')->withAvg('ratings', 'rating')->active()->take(4)->get();
-    $allActiveProducts = \App\Models\Product::active()->get();
-    $productVariantsMap = [];
-    foreach ($allActiveProducts as $p) {
-        $key = strtolower(trim($p->product_name));
-        $expired = $p->expiration_date && \Carbon\Carbon::parse($p->expiration_date)->startOfDay()->lt(now()->startOfDay());
-        $productVariantsMap[$key][] = [
-            'id' => $p->id,
-            'milk_type' => $p->milk_type,
-            'size' => $p->size,
-            'available' => !$expired && $p->available_stock > 0,
-            'url' => route('customer.product', $p->id),
-        ];
-    }
-    return view('welcome', compact('products', 'productVariantsMap'));
+    return view('welcome');
 })->name('home');
 
 // Guest Routes
@@ -29,6 +15,8 @@ Route::middleware('guest')->group(function () {
     
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+    Route::post('/register/send-otp', [AuthController::class, 'sendRegistrationOtp'])->name('register.sendOtp')->middleware('throttle:3,1');
+    Route::post('/register/verify-otp', [AuthController::class, 'verifyRegistrationOtp'])->name('register.verifyOtp')->middleware('throttle:10,1');
     Route::post('/register/email-otp/send', [AuthController::class, 'sendEmailOtp'])->name('register.email.sendOtp')->middleware('throttle:5,1');
     Route::post('/register/email-otp/verify', [AuthController::class, 'verifyEmailOtp'])->name('register.email.verifyOtp')->middleware('throttle:10,1');
     Route::post('/register/phone-otp/send', [AuthController::class, 'sendPhoneOtp'])->name('register.phone.sendOtp')->middleware('throttle:5,1');
@@ -87,7 +75,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/reservations/{reservation}/confirm', [\App\Http\Controllers\Admin\ReservationController::class, 'confirm'])->name('reservations.confirm');
     Route::post('/reservations/{reservation}/ready', [\App\Http\Controllers\Admin\ReservationController::class, 'markReady'])->name('reservations.ready');
     Route::post('/reservations/{reservation}/complete', [\App\Http\Controllers\Admin\ReservationController::class, 'complete'])->name('reservations.complete');
+    Route::post('/reservations/{reservation}/convert-to-delivery', [\App\Http\Controllers\Admin\ReservationController::class, 'convertToDelivery'])->name('reservations.convertToDelivery');
     Route::post('/reservations/{reservation}/cancel', [\App\Http\Controllers\Admin\ReservationController::class, 'cancel'])->name('reservations.cancel');
+    Route::post('/reservations/{reservation}/confirm-refund', [\App\Http\Controllers\Admin\ReservationController::class, 'confirmRefund'])->name('reservations.confirmRefund');
     
     // Customers
     Route::get('/customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
@@ -135,6 +125,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::put('/settings/profile', [\App\Http\Controllers\Admin\SettingController::class, 'updateProfile'])->name('settings.updateProfile');
     Route::put('/settings/password', [\App\Http\Controllers\Admin\SettingController::class, 'updatePassword'])->name('settings.updatePassword');
     Route::put('/settings/store', [\App\Http\Controllers\Admin\SettingController::class, 'updateStore'])->name('settings.updateStore');
+    Route::put('/settings/reservation-policy', [\App\Http\Controllers\Admin\SettingController::class, 'updateReservationPolicy'])->name('settings.updateReservationPolicy');
 });
 
 // Public Customer Catalog Routes

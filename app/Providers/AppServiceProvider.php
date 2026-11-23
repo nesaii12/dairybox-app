@@ -50,19 +50,15 @@ class AppServiceProvider extends ServiceProvider
             }
 
             try {
-                $pendingFleetCash = (float) Order::where('order_type', 'Delivery')
+                $unremittedOrders = Order::where('order_type', 'Delivery')
                     ->whereRaw("LOWER(payment_method) = 'cod'")
                     ->whereNull('remittance_id')
                     ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
-                    ->sum('total_amount');
+                    ->get();
 
-                $pendingRemittanceRidersCount = Order::where('order_type', 'Delivery')
-                    ->whereRaw("LOWER(payment_method) = 'cod'")
-                    ->whereNull('remittance_id')
-                    ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
-                    ->whereNotNull('rider_id')
-                    ->distinct('rider_id')
-                    ->count('rider_id');
+                $collectibleOrders = $unremittedOrders->filter(fn ($o) => $o->collectibleCodAmount() > 0);
+                $pendingFleetCash = (float) $collectibleOrders->sum(fn ($o) => $o->collectibleCodAmount());
+                $pendingRemittanceRidersCount = $collectibleOrders->pluck('rider_id')->filter()->unique()->count();
 
                 $pendingRemittancesCount = $pendingFleetCash > 0 ? max(1, $pendingRemittanceRidersCount) : 0;
             } catch (\Throwable $e) {
@@ -91,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
                     Reservation::STATUS_PENDING,
                     Reservation::STATUS_CONFIRMED,
                     Reservation::STATUS_READY,
+                    Reservation::STATUS_OUT_FOR_DELIVERY,
                 ])->count();
             } catch (\Throwable $e) {
                 $activeReservationsCount = 0;

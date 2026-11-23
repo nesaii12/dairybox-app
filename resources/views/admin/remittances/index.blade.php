@@ -96,6 +96,77 @@
         </div>
     </div>
 
+    @if($totalUnremittedCash > 0 && isset($ridersWithPending) && $ridersWithPending->isNotEmpty())
+    <!-- Notification Alert: Unremitted Fleet Cash Requiring Handover -->
+    <div class="bg-gradient-to-r from-amber-500/10 via-amber-50 to-amber-100/60 border border-amber-300 rounded-2xl p-5 sm:p-6 shadow-xs relative overflow-hidden transition-all">
+        <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 relative z-10">
+            <div class="flex items-start space-x-3.5 max-w-3xl">
+                <div class="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shrink-0 shadow-sm shadow-amber-500/20 mt-0.5">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 shadow-2xs">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping"></span>
+                            Handover Required
+                        </span>
+                        <span class="text-xs font-bold text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
+                            ₱{{ number_format($totalUnremittedCash, 2) }} Pending Fleet Cash
+                        </span>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900 tracking-tight">Riders with Pending COD Cash Remittances</h3>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                        There {{ $ridersWithPending->count() === 1 ? 'is' : 'are' }} currently <strong>{{ $ridersWithPending->count() }} delivery {{ Str::plural('rider', $ridersWithPending->count()) }}</strong> holding completed Cash on Delivery collections totaling <strong class="text-amber-900">₱{{ number_format($totalUnremittedCash, 2) }}</strong> awaiting physical turnover and verification into the store cash ledger.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0 self-start lg:self-center">
+                <a href="#remittanceFormSection" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs">
+                    <i class="bi bi-arrow-down-circle"></i>
+                    <span>Jump to Reconcile</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Rider Pending Remittance Cards Grid -->
+        <div class="mt-4 pt-4 border-t border-amber-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            @foreach($ridersWithPending as $pendingRider)
+            <div class="bg-white rounded-xl border border-amber-200/90 p-3.5 flex items-center justify-between gap-3 shadow-2xs hover:border-amber-400 hover:shadow-xs transition-all group">
+                <div class="flex items-center space-x-3 min-w-0">
+                    <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0 group-hover:scale-105 transition-transform">
+                        <i class="bi bi-bicycle text-sm"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <span class="text-xs font-black text-slate-900 block truncate">{{ $pendingRider->name }}</span>
+                        <div class="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                            @if($pendingRider->phone)
+                                <span class="truncate">{{ $pendingRider->phone }}</span>
+                                <span>•</span>
+                            @endif
+                            <span class="font-bold text-amber-700 whitespace-nowrap">{{ $pendingRider->pending_orders_count }} {{ Str::plural('order', $pendingRider->pending_orders_count) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2.5 shrink-0 text-right">
+                    <div>
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Unremitted</span>
+                        <span class="text-xs font-black text-amber-900 block">₱{{ number_format($pendingRider->pending_cod_total, 2) }}</span>
+                    </div>
+                    <button type="button" onclick="selectRiderForRemittance('{{ $pendingRider->id }}')" 
+                        class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                        title="Select {{ $pendingRider->name }} in remittance form">
+                        <span>Reconcile</span>
+                        <i class="bi bi-arrow-right text-[11px]"></i>
+                    </button>
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     <!-- Remittance Input Form Section -->
     <div id="remittanceFormSection" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white">
@@ -137,7 +208,11 @@
                                     data-pending-total="{{ $rider->pending_cod_total }}"
                                     data-phone="{{ $rider->phone }}"
                                     {{ (string) old('rider_id', $selectedRiderId) === (string) $rider->id ? 'selected' : '' }}>
-                                    {{ $rider->name }} ({{ $rider->pending_orders_count }} orders pending • ₱{{ number_format($rider->pending_cod_total, 2) }})
+                                    @if($rider->pending_cod_total > 0)
+                                        ⚠️ {{ $rider->name }} — ₱{{ number_format($rider->pending_cod_total, 2) }} Pending Handover ({{ $rider->pending_orders_count }} {{ Str::plural('order', $rider->pending_orders_count) }})
+                                    @else
+                                        {{ $rider->name }} — Cleared (₱0.00 / 0 pending)
+                                    @endif
                                 </option>
                             @endforeach
                         </select>
@@ -789,10 +864,10 @@
                     <tr>
                         <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Timestamp</th>
                         <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Admin Handover ID</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Rider Name</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Remittance Ref</th>
+                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Source / Party</th>
+                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Reference</th>
                         <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Expected (₱)</th>
-                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Remitted (₱)</th>
+                        <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Net Cash Flow (₱)</th>
                         <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Variance (₱)</th>
                         <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Payment Mode</th>
                     </tr>
@@ -808,16 +883,21 @@
                             <span class="text-[10px] text-slate-400 font-mono">ID: #{{ $entry->admin_id }}</span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap font-bold text-slate-800">
-                            {{ $entry->rider_name }}
+                            <span class="block">{{ $entry->rider_name }}</span>
+                            @if($entry->entry_type === 'RESERVATION_REFUND')
+                                <span class="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Reservation Refund</span>
+                            @elseif($entry->entry_type === 'RESERVATION_CANCELLATION_FEE')
+                                <span class="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Cancellation Fee</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap font-mono font-bold text-sky-700">
-                            {{ $entry->remittance?->reference_no ?? 'N/A' }}
+                            {{ $entry->remittance?->reference_no ?? $entry->reservation?->reservation_code ?? 'N/A' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-slate-600">
-                            ₱{{ number_format($entry->amount_expected, 2) }}
+                            {{ $entry->amount_expected < 0 ? '-₱' . number_format(abs($entry->amount_expected), 2) : '₱' . number_format($entry->amount_expected, 2) }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap font-black text-emerald-700">
-                            ₱{{ number_format($entry->amount_remitted, 2) }}
+                        <td class="px-6 py-4 whitespace-nowrap font-black {{ $entry->amount_remitted < 0 ? 'text-rose-600' : 'text-emerald-700' }}">
+                            {{ $entry->amount_remitted < 0 ? '-₱' . number_format(abs($entry->amount_remitted), 2) : '₱' . number_format($entry->amount_remitted, 2) }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap font-bold">
                             @if($entry->variance == 0)
@@ -1058,9 +1138,10 @@
                     class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between">
-                        <span class="font-black text-xs text-slate-900 font-mono">${order.order_number}</span>
+                        <span class="font-black text-xs text-slate-900 font-mono">${order.order_number}${order.is_reservation ? ' <span class="font-sans text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Reservation COD</span>' : ''}</span>
                         <span class="font-black text-xs text-slate-900">₱${Number(order.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
+                    ${order.is_reservation ? `<div class="text-[10px] text-emerald-700 font-semibold mt-0.5">Order Total: ₱${Number(order.order_total_sales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} • Down Payment Paid: ₱${Number(order.down_payment_paid || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>` : ''}
                     <div class="flex items-center justify-between mt-1 text-[11px] text-slate-500">
                         <span class="truncate"><i class="bi bi-person mr-1"></i>${order.customer_name}</span>
                         <span class="font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded text-[10px]">${order.batch_id}</span>
@@ -1456,6 +1537,17 @@
             form.action = oldAction;
             form.target = oldTarget;
         }, 400);
+    };
+
+    // Quick-select rider from unremitted alert card
+    window.selectRiderForRemittance = function (riderId) {
+        if (!riderSelect) return;
+        riderSelect.value = riderId;
+        riderSelect.dispatchEvent(new Event('change'));
+        const formSec = document.getElementById('remittanceFormSection');
+        if (formSec) {
+            formSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     };
 
     // Auto-trigger rider load if pre-selected via query string

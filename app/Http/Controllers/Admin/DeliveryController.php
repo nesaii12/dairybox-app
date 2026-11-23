@@ -8,7 +8,9 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\AppNotification;
 use App\Models\AuditLog;
+use App\Models\Reservation;
 use App\Services\InventoryService;
+use App\Services\ReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +24,7 @@ class DeliveryController extends Controller
         $statusFilter = $request->query('status', 'all');
         $search = $request->query('search');
 
-        $query = Delivery::with(['order.customer', 'rider', 'order.orderItems.product'])
+        $query = Delivery::with(['order.customer', 'order.reservation', 'rider', 'order.orderItems.product'])
             ->latest('updated_at');
 
         // Apply status tabs
@@ -162,14 +164,19 @@ class DeliveryController extends Controller
                 'cancellation_reason' => $reason,
             ]);
 
-            // Return FIFO inventory stock
-            foreach ($order->orderItems as $item) {
-                InventoryService::addStock(
-                    $item->product_id,
-                    $item->quantity,
-                    $item->product->expiration_date,
-                    "Admin Cancelled Delivery #{$order->order_number}"
-                );
+            $linkedReservation = Reservation::where('order_id', $order->id)->first();
+            if ($linkedReservation) {
+                ReservationService::cancelConvertedDeliveryOrder($order, $reason, auth()->id(), $request->ip());
+            } else {
+                // Return FIFO inventory stock for standard online orders
+                foreach ($order->orderItems as $item) {
+                    InventoryService::addStock(
+                        $item->product_id,
+                        $item->quantity,
+                        $item->product->expiration_date,
+                        "Admin Cancelled Delivery #{$order->order_number}"
+                    );
+                }
             }
 
             // Notify customer

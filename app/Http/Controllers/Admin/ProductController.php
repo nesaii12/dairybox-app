@@ -81,7 +81,7 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'preset_image' => 'nullable|string|max:255',
-            'initial_stock' => 'required|integer|min:0',
+            'initial_stock' => 'required|integer|min:0|max:' . Product::MAX_STOCK_LIMIT,
             'status' => 'nullable|in:active,inactive',
             'manufacturing_date' => 'nullable|date|before_or_equal:today',
             'expiration_date' => $requestedStatus === 'active'
@@ -90,6 +90,7 @@ class ProductController extends Controller
         ], [
             'milk_types.required' => 'Please check at least one available milk type (Carabao or Cow).',
             'sizes.required' => 'Please check at least one available product size (Small, Medium, or Large).',
+            'initial_stock.max' => 'Initial stock cannot exceed ' . Product::MAX_STOCK_LIMIT . ' units per product to avoid spoilage.',
             'expiration_date.required' => 'A valid expiration date is required before setting Catalog Visibility Status to Active.',
             'expiration_date.after' => 'The expiration date must be strictly after the manufacturing date.',
         ]);
@@ -132,7 +133,8 @@ class ProductController extends Controller
                 $request->initial_stock, 
                 $request->expiration_date ? $request->expiration_date : null,
                 'Initial stock upload',
-                $request->manufacturing_date ? $request->manufacturing_date : null
+                $request->manufacturing_date ? $request->manufacturing_date : null,
+                true
             );
         }
 

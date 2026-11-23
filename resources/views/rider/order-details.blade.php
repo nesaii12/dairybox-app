@@ -122,28 +122,57 @@
     </div>
 
     <!-- Payment & Collection Card -->
-    <div class="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+    @php
+        $isResOrder = $order->isReservationOrder();
+        $resDownPayment = (float) ($order->down_payment_paid ?? 0);
+        $codCollectible = $order->collectibleCodAmount();
+        $hasPendingCod = $order->hasPendingBalance();
+    @endphp
+    <div class="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-3">
         <div class="flex items-center justify-between">
             <div>
                 <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">PAYMENT MODE</span>
-                <span class="text-xs font-bold text-slate-800 mt-0.5 block">{{ strtoupper($order->payment_method) }}</span>
+                <span class="text-xs font-bold text-slate-800 mt-0.5 block">
+                    {{ $isResOrder ? ($hasPendingCod ? 'RESERVATION COD BALANCE' : 'RESERVATION FULLY PAID') : strtoupper($order->payment_method) }}
+                </span>
             </div>
             <div class="text-right">
-                @if($order->isPaid())
+                @if(!$hasPendingCod)
                     <span class="text-[8px] font-black text-emerald-600 uppercase tracking-widest block flex items-center justify-end">
-                        <i class="bi bi-check-circle-fill mr-1 text-[8px]"></i> PAID ONLINE
+                        <i class="bi bi-check-circle-fill mr-1 text-[8px]"></i> {{ $isResOrder ? 'FULLY PAID' : 'PAID ONLINE' }}
                     </span>
                     <span class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg inline-block mt-0.5">
-                        ₱0.00 to collect
+                        {{ $isResOrder ? 'Fully Paid / ₱0.00 to Collect' : '₱0.00 to collect' }}
                     </span>
                 @else
-                    <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">COLLECT CASH</span>
+                    <span class="text-[8px] font-black text-amber-700 uppercase tracking-widest block">COLLECT CASH (COD)</span>
                     <span class="text-sm font-black text-slate-950">
-                        ₱{{ number_format($order->total_amount, 2) }}
+                        ₱{{ number_format($codCollectible, 2) }}
                     </span>
                 @endif
             </div>
         </div>
+
+        @if($isResOrder)
+            <div class="pt-3 border-t border-slate-100 space-y-1.5 text-xs">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Down Payment Paid</span>
+                    <span class="font-bold text-emerald-700">₱{{ number_format($resDownPayment, 2) }} Paid</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Delivery Fee</span>
+                    <span class="font-bold {{ (float) $order->delivery_fee > 0 ? 'text-slate-800' : 'text-emerald-700' }}">
+                        {{ (float) $order->delivery_fee > 0 ? '₱' . number_format((float) $order->delivery_fee, 2) : 'Free' }}
+                    </span>
+                </div>
+                <div class="flex justify-between font-black">
+                    <span class="text-slate-800">Pending Balance to Collect</span>
+                    <span class="{{ $hasPendingCod ? 'text-amber-700' : 'text-emerald-700' }}">
+                        {{ $hasPendingCod ? '₱' . number_format($codCollectible, 2) : '₱0.00 (Fully Paid)' }}
+                    </span>
+                </div>
+            </div>
+        @endif
     </div>
 
     <!-- Package Contents Items -->
@@ -156,7 +185,7 @@
                 <div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0">
                     <div class="min-w-0 pr-3">
                         <p class="font-bold text-slate-800 truncate">{{ $item->product ? $item->product->product_name : 'Dairy Product' }}</p>
-                        <p class="text-[10px] text-slate-400">{{ $item->product?->size }} • ₱{{ number_format($item->unit_price, 2) }}</p>
+                        <p class="text-[10px] text-slate-400">{{ $item->product?->size }} • ₱{{ number_format((float) ($item->price ?? $item->unit_price ?? 0), 2) }}</p>
                     </div>
                     <div class="text-right shrink-0">
                         <span class="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">x{{ $item->quantity }}</span>
@@ -200,7 +229,7 @@
                         <i class="bi bi-geo-alt-fill text-sky-600"></i>
                         <span>Arrived at Customer Location</span>
                     </span>
-                    <span class="text-[10px] text-sky-700 font-mono">{{ $order->delivery->arrived_at->format('h:i A') }}</span>
+                    <span class="text-[10px] text-sky-700 font-mono">{{ $order->delivery->arrived_at->timezone('Asia/Manila')->format('h:i A') }}</span>
                 </div>
             @endif
 

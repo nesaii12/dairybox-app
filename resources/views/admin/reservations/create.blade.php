@@ -113,8 +113,19 @@
                             class="w-full text-xs font-medium rounded-xl border-slate-200 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
                             <option value="">-- Choose Product --</option>
                             @foreach($products as $p)
-                                <option value="{{ $p['id'] }}" {{ old('product_id') == $p['id'] ? 'selected' : '' }}>
-                                    {{ $p['product_name'] }} ({{ $p['size'] }}) — Avail: {{ $p['available_stock'] }} / Phys: {{ $p['physical_stock'] }}
+                                @php
+                                    $isBlockedProduct = $p['is_expired'] || $p['reservable_stock'] <= 0;
+                                @endphp
+                                <option value="{{ $p['id'] }}"
+                                        {{ old('product_id') == $p['id'] ? 'selected' : '' }}
+                                        {{ $isBlockedProduct ? 'disabled' : '' }}>
+                                    @if($p['is_expired'])
+                                        {{ $p['product_name'] }} ({{ $p['size'] }}) — Expired (Not Reservable)
+                                    @elseif($p['reservable_stock'] <= 0)
+                                        {{ $p['product_name'] }} ({{ $p['size'] }}) — 0 Reservable
+                                    @else
+                                        {{ $p['product_name'] }} ({{ $p['size'] }}) — Reservable: {{ $p['reservable_stock'] }} pcs (Phys: {{ $p['physical_stock'] }})
+                                    @endif
                                 </option>
                             @endforeach
                         </select>
@@ -131,10 +142,11 @@
 
                     <!-- Quantity -->
                     <div class="sm:col-span-2">
-                        <label for="quantity" class="block text-[11px] font-bold text-slate-600 mb-1">Quantity <span class="text-rose-500">*</span></label>
-                        <input type="number" name="quantity" id="quantity" required min="1" value="{{ old('quantity', 1) }}"
+                        <label for="quantity" class="block text-[11px] font-bold text-slate-600 mb-1">Quantity (Min. 15) <span class="text-rose-500">*</span></label>
+                        <input type="number" name="quantity" id="quantity" required min="15" value="{{ old('quantity', 15) }}"
                             oninput="recalculateReservation()"
                             class="w-full text-xs font-bold text-center rounded-xl border-slate-200 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
+                        <p id="quantityError" class="hidden mt-1 text-[10px] font-bold text-rose-600"></p>
                     </div>
 
                     <!-- Unit Price -->
@@ -161,7 +173,7 @@
                             </div>
                             <div class="h-6 w-px bg-slate-200"></div>
                             <div>
-                                <span class="text-[10px] uppercase font-bold text-slate-400 block">Available Stock</span>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block">Reservable for Pickup</span>
                                 <span id="infoAvailable" class="font-black text-emerald-600">0 pcs</span>
                             </div>
                         </div>
@@ -210,11 +222,13 @@
 
                     <!-- Down Payment -->
                     <div>
-                        <label for="down_payment" class="block text-[11px] font-bold text-slate-600 mb-1">Down Payment (₱)</label>
-                        <input type="number" name="down_payment" id="down_payment" step="0.01" min="0"
-                            value="{{ old('down_payment', '0.00') }}"
+                        <label for="down_payment" class="block text-[11px] font-bold text-slate-600 mb-1">Down Payment (₱) <span class="text-rose-500">*</span></label>
+                        <input type="number" name="down_payment" id="down_payment" required step="0.01" min="0.01"
+                            value="{{ old('down_payment', '') }}"
+                            placeholder="Required (> ₱0.00)"
                             oninput="recalculateReservation(true)"
                             class="w-full text-xs font-bold rounded-xl border-slate-200 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
+                        <p id="downPaymentError" class="hidden mt-1 text-[10px] font-bold text-rose-600"></p>
                     </div>
 
                     <!-- Remaining Balance (Computed) -->
@@ -226,11 +240,10 @@
 
                     <!-- Payment Status -->
                     <div>
-                        <label for="payment_status" class="block text-[11px] font-bold text-slate-600 mb-1">Payment Status</label>
-                        <select name="payment_status" id="payment_status" onchange="onPaymentStatusChange()"
+                        <label for="payment_status" class="block text-[11px] font-bold text-slate-600 mb-1">Payment Status <span class="text-rose-500">*</span></label>
+                        <select name="payment_status" id="payment_status" required onchange="onPaymentStatusChange()"
                             class="w-full text-xs font-semibold rounded-xl border-slate-200 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
-                            <option value="Unpaid" {{ old('payment_status', 'Unpaid') === 'Unpaid' ? 'selected' : '' }}>Unpaid</option>
-                            <option value="Partially Paid" {{ old('payment_status') === 'Partially Paid' ? 'selected' : '' }}>Partially Paid</option>
+                            <option value="Partially Paid" {{ old('payment_status', 'Partially Paid') === 'Partially Paid' ? 'selected' : '' }}>Partially Paid</option>
                             <option value="Fully Paid" {{ old('payment_status') === 'Fully Paid' ? 'selected' : '' }}>Fully Paid</option>
                         </select>
                     </div>
@@ -263,7 +276,7 @@
                 <a href="{{ route('admin.reservations.index') }}" class="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 transition-all">
                     Cancel
                 </a>
-                <button type="submit" class="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 border border-sky-600 shadow-sm transition-all active:scale-95 cursor-pointer">
+                <button type="submit" id="saveReservationBtn" class="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 border border-sky-600 shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                     <i class="bi bi-check2-circle text-sm"></i>
                     <span>Save Reservation</span>
                 </button>
@@ -274,8 +287,34 @@
 
 <script>
     const reservationProducts = @json($products);
+    const todayDateStr = @json(now()->toDateString());
     const initialOldSize = @json(old('size'));
     const initialOldPrice = @json(old('unit_price'));
+
+    function computeReservableForPickup(product, pickupDate) {
+        if (!product || product.is_expired || (product.non_expired_stock || 0) <= 0) {
+            return 0;
+        }
+        const effectiveDate = pickupDate && pickupDate > todayDateStr ? pickupDate : todayDateStr;
+        const batches = product.valid_batches || [];
+        let eligibleBatchQty = 0;
+        batches.forEach(b => {
+            if (b.expiration_date && b.expiration_date >= effectiveDate) {
+                eligibleBatchQty += parseInt(b.remaining_stock || 0, 10);
+            }
+        });
+
+        const allocations = product.active_allocations || [];
+        let allocatedForDateOrLater = 0;
+        allocations.forEach(a => {
+            if (a.pickup_date && a.pickup_date >= effectiveDate) {
+                allocatedForDateOrLater += parseInt(a.allocated_quantity || 0, 10);
+            }
+        });
+
+        const netEligible = Math.max(0, eligibleBatchQty - allocatedForDateOrLater);
+        return Math.max(0, Math.min(parseInt(product.available_stock || 0, 10), netEligible));
+    }
 
     function fillRegisteredCustomer(select) {
         const opt = select.options[select.selectedIndex];
@@ -333,13 +372,12 @@
         // Populate Stock Info Banner
         document.getElementById('infoPhysical').textContent = `${product.physical_stock} pcs`;
         document.getElementById('infoReserved').textContent = `${product.reserved_stock} pcs`;
-        document.getElementById('infoAvailable').textContent = `${product.available_stock} pcs`;
         document.getElementById('infoExpiry').textContent = product.latest_expiry
             ? `Valid through ${product.latest_expiry}`
-            : 'No batch expiry recorded';
+            : 'Expired — No valid non-expired batches';
         infoBox.classList.remove('hidden');
 
-        recalculateReservation();
+        recalculateReservation(false);
     }
 
     function onReservationSizeChange() {
@@ -348,20 +386,18 @@
         if (selectedOpt && selectedOpt.dataset.price) {
             document.getElementById('unit_price').value = Number(selectedOpt.dataset.price).toFixed(2);
         }
-        recalculateReservation();
+        recalculateReservation(true);
     }
 
     function onPaymentStatusChange() {
         const status = document.getElementById('payment_status').value;
         const qty = parseInt(document.getElementById('quantity').value || '0', 10);
         const unitPrice = parseFloat(document.getElementById('unit_price').value || '0');
-        const total = Math.max(0, qty * unitPrice);
+        const total = Math.max(0, Math.round(qty * unitPrice * 100) / 100);
         const dpInput = document.getElementById('down_payment');
 
         if (status === 'Fully Paid') {
             dpInput.value = total.toFixed(2);
-        } else if (status === 'Unpaid') {
-            dpInput.value = '0.00';
         }
         recalculateReservation(false);
     }
@@ -372,37 +408,68 @@
         const total = Math.round(qty * unitPrice * 100) / 100;
 
         const dpInput = document.getElementById('down_payment');
-        let dp = Math.max(0, parseFloat(dpInput.value || '0'));
-        const remaining = Math.max(0, Math.round((total - dp) * 100) / 100);
+        const dpRaw = dpInput.value;
+        const dp = dpRaw === '' ? 0 : parseFloat(dpRaw);
+        const remaining = Math.max(0, Math.round((total - (isNaN(dp) ? 0 : dp)) * 100) / 100);
+
+        dpInput.max = total > 0 ? total.toFixed(2) : '';
 
         document.getElementById('total_amount_display').value = `₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         document.getElementById('remaining_balance_display').value = `₱${remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
         if (autoUpdatePaymentStatus) {
             const paySelect = document.getElementById('payment_status');
-            if (dp <= 0) {
-                paySelect.value = 'Unpaid';
-            } else if (total > 0 && dp >= total) {
+            if (total > 0 && !isNaN(dp) && dp >= total) {
                 paySelect.value = 'Fully Paid';
             } else {
                 paySelect.value = 'Partially Paid';
             }
         }
 
-        // Live availability / expiry warning
+        // Guardrail 0: Minimum reservation quantity (15 pieces)
+        const qtyInput = document.getElementById('quantity');
+        const qtyErrorEl = document.getElementById('quantityError');
+        const minReservationQty = 15;
+        let hasBlockingError = false;
+
+        if (isNaN(qty) || qty < minReservationQty) {
+            if (qtyErrorEl) {
+                qtyErrorEl.textContent = 'Minimum reservation is 15 pieces of products.';
+                qtyErrorEl.classList.remove('hidden');
+            }
+            qtyInput?.classList.add('border-rose-400', 'bg-rose-50/40');
+            hasBlockingError = true;
+        } else {
+            if (qtyErrorEl) {
+                qtyErrorEl.textContent = '';
+                qtyErrorEl.classList.add('hidden');
+            }
+            qtyInput?.classList.remove('border-rose-400', 'bg-rose-50/40');
+        }
+
+        // Guardrail 1: Non-expired & pickup-date batch eligibility
         const productId = parseInt(document.getElementById('product_id').value || '0', 10);
         const product = reservationProducts.find(p => p.id === productId);
         const warningEl = document.getElementById('stockWarningMsg');
-        const statusVal = document.getElementById('status').value;
         const pickupDate = document.getElementById('pickup_date').value;
 
-        if (product && warningEl) {
+        if (product) {
+            const reservable = computeReservableForPickup(product, pickupDate);
+            const availEl = document.getElementById('infoAvailable');
+            availEl.textContent = `${reservable} pcs`;
+            availEl.className = reservable > 0 ? 'font-black text-emerald-600' : 'font-black text-rose-600';
+
             let warnings = [];
-            if (qty > product.available_stock && (statusVal === 'Confirmed' || statusVal === 'Ready for Pickup')) {
-                warnings.push(`Sorry! Only ${product.available_stock} pieces of ${product.product_name} are currently available.`);
-            }
-            if (pickupDate && product.latest_expiry && pickupDate > product.latest_expiry) {
-                warnings.push(`Scheduled pickup date (${pickupDate}) is after the latest active batch expiry (${product.latest_expiry}).`);
+            if (product.is_expired || (product.non_expired_stock || 0) <= 0) {
+                warnings.push(`${product.product_name} cannot be reserved because its remaining stock has expired.`);
+                hasBlockingError = true;
+            } else if (qty > reservable) {
+                if (reservable === 0 && pickupDate && product.latest_expiry && pickupDate > product.latest_expiry) {
+                    warnings.push(`All active batches expire before the scheduled pickup date (${pickupDate}). Latest valid expiry: ${product.latest_expiry}.`);
+                } else {
+                    warnings.push(`Only ${reservable} non-expired pieces of ${product.product_name} are reservable for ${pickupDate || 'this date'}.`);
+                }
+                hasBlockingError = true;
             }
 
             if (warnings.length > 0) {
@@ -412,7 +479,37 @@
                 warningEl.textContent = '';
                 warningEl.classList.add('hidden');
             }
+        } else {
+            hasBlockingError = true;
         }
+
+        // Guardrail 2: Require Down Payment > 0 and <= Total Amount
+        const dpErrorEl = document.getElementById('downPaymentError');
+        let dpError = '';
+        if (isNaN(dp) || dp <= 0) {
+            dpError = 'Down payment must be greater than ₱0.00.';
+            hasBlockingError = true;
+        } else if (total > 0 && dp > total) {
+            dpError = `Down payment cannot exceed ₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+            hasBlockingError = true;
+        }
+
+        if (dpError) {
+            dpErrorEl.textContent = dpError;
+            dpErrorEl.classList.remove('hidden');
+            dpInput.classList.add('border-rose-400', 'bg-rose-50/40');
+        } else {
+            dpErrorEl.textContent = '';
+            dpErrorEl.classList.add('hidden');
+            dpInput.classList.remove('border-rose-400', 'bg-rose-50/40');
+        }
+
+        const saveBtn = document.getElementById('saveReservationBtn');
+        if (saveBtn) {
+            saveBtn.disabled = hasBlockingError || qty < 15;
+        }
+
+        return !hasBlockingError;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -421,6 +518,12 @@
         } else {
             recalculateReservation(false);
         }
+
+        document.getElementById('reservationForm')?.addEventListener('submit', (e) => {
+            if (!recalculateReservation(false)) {
+                e.preventDefault();
+            }
+        });
     });
 </script>
 @endsection

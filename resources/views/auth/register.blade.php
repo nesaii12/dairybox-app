@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="min-h-full">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
@@ -20,51 +20,100 @@
     <style>
         body {
             font-family: 'Outfit', sans-serif;
-            background: linear-gradient(135deg, #FAF6F0 0%, #E6F0FA 100%);
+            background-color: #0f172a;
+        }
+
+        .auth-glass-input {
+            background-color: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.30);
+            border-radius: 0.75rem;
+            padding: 0.62rem 0.9rem;
+            font-size: 0.9rem;
+            color: #ffffff;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .auth-glass-input:focus {
+            border-color: rgba(125, 211, 252, 0.85);
+            background-color: rgba(255, 255, 255, 0.22);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+        }
+
+        .auth-glass-input::placeholder {
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 0.86rem;
+        }
+
+        .auth-glass-input:-webkit-autofill,
+        .auth-glass-input:-webkit-autofill:hover,
+        .auth-glass-input:-webkit-autofill:focus {
+            -webkit-text-fill-color: #ffffff;
+            -webkit-box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.45) inset;
+            transition: background-color 9999s ease-in-out 0s;
+            caret-color: #ffffff;
         }
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen flex flex-col justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+<body class="min-h-screen text-white antialiased overflow-x-hidden relative">
 
-    <div class="sm:mx-auto sm:w-full sm:max-w-md my-auto">
-        <!-- Logo & Header -->
-        <div class="text-center mb-6">
-            <a href="{{ url('/') }}" class="inline-flex flex-col items-center group">
-                <div class="w-16 h-16 rounded-2xl bg-white p-2.5 flex items-center justify-center shadow-lg shadow-sky-100 border border-slate-100 mb-3 group-hover:scale-105 transition-transform">
-                    <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox Logo" class="w-full h-full object-contain">
-                </div>
-            </a>
-            <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Create Account</h2>
-            <p class="mt-2 text-sm text-slate-600">
-                Join DairyBox to order fresh milk &amp; ice creams!
-            </p>
+    <!-- Full-Bleed Shuffled Background Image Slideshow (z-0, 10s interval, no arrows) -->
+    <div id="registerSlideshowBackdrop" class="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none bg-slate-950" aria-hidden="true">
+        <div id="registerSlidesContainer" class="absolute inset-0 w-full h-full">
+            <img src="{{ asset('images/hero/slide-03.jpg') }}" alt="DairyBox Farm & Community" class="absolute inset-0 w-full h-full object-cover object-center opacity-100 transition-opacity duration-700 ease-in-out">
         </div>
+        <!-- Balanced Dark Contrast Overlay -->
+        <div class="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/50"></div>
+    </div>
 
-        <div class="bg-white pt-12 pb-8 px-6 shadow-xl shadow-slate-100 rounded-2xl border border-slate-100 relative">
-            <!-- Back to Home Arrow -->
-            <a href="{{ url('/') }}" class="absolute top-4 left-4 inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-50 border border-slate-200 text-slate-400 hover:text-slate-800 transition-all hover:bg-slate-100 shadow-2xs hover:scale-105" title="Back to Home">
-                <i class="bi bi-arrow-left text-sm font-bold"></i>
-            </a>
+    <div class="relative z-10 min-h-screen flex items-center justify-center py-8 px-4 sm:px-6">
+
+        <!-- Centered See-Through Frosted Glass Create Account Card -->
+        <div class="w-full max-w-md bg-black/30 backdrop-blur-md border border-white/25 rounded-3xl shadow-2xl p-6 sm:p-8">
+
+            <!-- Top Area: Logo & Back Link (matching Login) -->
+            <div class="flex items-center justify-between mb-6">
+                <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 group transition-opacity hover:opacity-90" title="DairyBox Home">
+                    <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm border border-white/35 flex items-center justify-center p-1.5 shadow-sm">
+                        <img src="{{ asset('images/dairybox-icon.png') }}" alt="DairyBox Logo" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-xl font-bold tracking-tight text-white drop-shadow-xs">Dairy<span class="text-sky-300">Box</span></span>
+                </a>
+
+                <a href="{{ url('/') }}" class="inline-flex items-center gap-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20">
+                    <i class="bi bi-arrow-left"></i>
+                    <span>Back to Store</span>
+                </a>
+            </div>
+
+            <!-- Heading -->
+            <div class="mb-6">
+                <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight drop-shadow-sm">Create Account</h2>
+                <p class="mt-1.5 text-sm text-white/80">
+                    Join DairyBox to order fresh milk &amp; ice creams!
+                </p>
+            </div>
 
             <!-- Server Flash Alerts -->
             @if(session('success'))
-            <div class="mb-4 bg-emerald-50 border border-emerald-100 text-emerald-800 px-4 py-2.5 rounded-xl flex items-center space-x-2 text-sm" role="alert">
-                <i class="bi bi-check-circle-fill text-emerald-500"></i>
+            <div class="mb-4 bg-emerald-500/20 backdrop-blur-sm border border-emerald-300/40 text-emerald-100 px-4 py-2.5 rounded-xl flex items-center space-x-2 text-sm" role="alert">
+                <i class="bi bi-check-circle-fill text-emerald-300"></i>
                 <span class="font-medium">{{ session('success') }}</span>
             </div>
             @endif
 
             @if(session('error'))
-            <div class="mb-4 bg-rose-50 border border-rose-100 text-rose-800 px-4 py-2.5 rounded-xl flex items-center space-x-2 text-sm" role="alert">
-                <i class="bi bi-exclamation-triangle-fill text-rose-500"></i>
+            <div class="mb-4 bg-rose-500/20 backdrop-blur-sm border border-rose-300/40 text-rose-100 px-4 py-2.5 rounded-xl flex items-center space-x-2 text-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill text-rose-300"></i>
                 <span class="font-medium">{{ session('error') }}</span>
             </div>
             @endif
 
             <!-- Dynamic Form Error Alert -->
-            <div id="register-alert" class="hidden mb-4 bg-rose-50 border border-rose-200/80 text-rose-800 px-4 py-2.5 rounded-xl items-start space-x-2 text-xs" role="alert">
-                <i class="bi bi-exclamation-triangle-fill text-rose-500 mt-0.5 shrink-0"></i>
+            <div id="register-alert" class="hidden mb-4 bg-rose-500/20 backdrop-blur-sm border border-rose-300/40 text-rose-100 px-4 py-2.5 rounded-xl items-start space-x-2 text-xs" role="alert">
+                <i class="bi bi-exclamation-triangle-fill text-rose-300 mt-0.5 shrink-0"></i>
                 <span id="register-alert-text" class="font-medium leading-relaxed"></span>
             </div>
 
@@ -73,94 +122,94 @@
 
                 <!-- Full Name -->
                 <div>
-                    <label for="name" class="block text-sm font-semibold text-slate-700">Full Name</label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-person text-slate-400 text-sm"></i>
+                    <label for="name" class="block text-xs font-semibold text-white/85 mb-1.5">Full Name</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i class="bi bi-person text-white/60 text-sm"></i>
                         </div>
                         <input id="name" name="name" type="text" required autocomplete="name" value="{{ old('name') }}"
-                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            class="auth-glass-input !pl-10"
                             placeholder="Juan Dela Cruz">
                     </div>
-                    <p data-field-error="name" class="hidden mt-1 text-xs text-rose-600 font-semibold"></p>
+                    <p data-field-error="name" class="hidden mt-1 text-xs text-rose-300 font-semibold"></p>
                     @error('name')
-                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                        <p class="mt-1 text-xs text-rose-300 font-semibold">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <!-- Email Address -->
                 <div>
-                    <label for="email" class="block text-sm font-semibold text-slate-700">Email Address</label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-envelope text-slate-400 text-sm"></i>
+                    <label for="email" class="block text-xs font-semibold text-white/85 mb-1.5">Email Address</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i class="bi bi-envelope text-white/60 text-sm"></i>
                         </div>
                         <input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}"
-                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            class="auth-glass-input !pl-10"
                             placeholder="yourname@gmail.com">
                     </div>
-                    <p data-field-error="email" class="hidden mt-1 text-xs text-rose-600 font-semibold"></p>
+                    <p data-field-error="email" class="hidden mt-1 text-xs text-rose-300 font-semibold"></p>
                     @error('email')
-                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                        <p class="mt-1 text-xs text-rose-300 font-semibold">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <!-- Phone Number -->
                 <div>
-                    <label for="phone" class="block text-sm font-semibold text-slate-700">Contact Number</label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-telephone text-slate-400 text-sm"></i>
+                    <label for="phone" class="block text-xs font-semibold text-white/85 mb-1.5">Contact Number</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i class="bi bi-telephone text-white/60 text-sm"></i>
                         </div>
                         <input id="phone" name="phone" type="tel" inputmode="numeric" maxlength="13" required value="{{ old('phone') }}"
-                            class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            class="auth-glass-input !pl-10"
                             placeholder="09171234567">
                     </div>
-                    <p data-field-error="phone" class="hidden mt-1 text-xs text-rose-600 font-semibold"></p>
+                    <p data-field-error="phone" class="hidden mt-1 text-xs text-rose-300 font-semibold"></p>
                     @error('phone')
-                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                        <p class="mt-1 text-xs text-rose-300 font-semibold">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <!-- Password -->
                 <div>
-                    <label for="password" class="block text-sm font-semibold text-slate-700">Password</label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-lock text-slate-400 text-sm"></i>
+                    <label for="password" class="block text-xs font-semibold text-white/85 mb-1.5">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i class="bi bi-lock text-white/60 text-sm"></i>
                         </div>
                         <input id="password" name="password" type="password" required autocomplete="new-password"
-                            class="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            class="auth-glass-input !pl-10 !pr-10"
                             placeholder="Create a strong password">
-                        <button type="button" onclick="togglePasswordVisibility('password', 'toggle-pass-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
+                        <button type="button" onclick="togglePasswordVisibility('password', 'toggle-pass-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-white/70 hover:text-white focus:outline-none cursor-pointer">
                             <i id="toggle-pass-icon" class="bi bi-eye text-sm"></i>
                         </button>
                     </div>
-                    <p data-field-error="password" class="hidden mt-1 text-xs text-rose-600 font-semibold"></p>
+                    <p data-field-error="password" class="hidden mt-1 text-xs text-rose-300 font-semibold"></p>
                     @error('password')
-                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                        <p class="mt-1 text-xs text-rose-300 font-semibold">{{ $message }}</p>
                     @enderror
 
-                    <!-- Password Requirements Checklist -->
-                    <div class="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                        <p class="text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                            <i class="bi bi-shield-check text-sky-600"></i> Password Requirements:
+                    <!-- Password Requirements Checklist (Frosted Glass) -->
+                    <div class="mt-2.5 p-3 rounded-xl bg-white/10 border border-white/20">
+                        <p class="text-[11px] font-semibold text-white/85 mb-1.5 flex items-center gap-1">
+                            <i class="bi bi-shield-check text-sky-300"></i> Password Requirements:
                         </p>
                         <div class="grid grid-cols-2 gap-1.5 text-[11px]">
-                            <div id="rule-length" class="flex items-center gap-1.5 text-slate-500 transition-colors">
-                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                            <div id="rule-length" class="flex items-center gap-1.5 text-white/70 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-white/50"></i>
                                 <span>8+ characters</span>
                             </div>
-                            <div id="rule-case" class="flex items-center gap-1.5 text-slate-500 transition-colors">
-                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                            <div id="rule-case" class="flex items-center gap-1.5 text-white/70 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-white/50"></i>
                                 <span>Upper &amp; lowercase</span>
                             </div>
-                            <div id="rule-number" class="flex items-center gap-1.5 text-slate-500 transition-colors">
-                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                            <div id="rule-number" class="flex items-center gap-1.5 text-white/70 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-white/50"></i>
                                 <span>At least 1 number</span>
                             </div>
-                            <div id="rule-symbol" class="flex items-center gap-1.5 text-slate-500 transition-colors">
-                                <i class="bi bi-circle text-[9px] text-slate-400"></i>
+                            <div id="rule-symbol" class="flex items-center gap-1.5 text-white/70 transition-colors">
+                                <i class="bi bi-circle text-[9px] text-white/50"></i>
                                 <span>At least 1 symbol</span>
                             </div>
                         </div>
@@ -169,15 +218,15 @@
 
                 <!-- Confirm Password -->
                 <div>
-                    <label for="password_confirmation" class="block text-sm font-semibold text-slate-700">Confirm Password</label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-shield-check text-slate-400 text-sm"></i>
+                    <label for="password_confirmation" class="block text-xs font-semibold text-white/85 mb-1.5">Confirm Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i class="bi bi-shield-check text-white/60 text-sm"></i>
                         </div>
                         <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password"
-                            class="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all"
+                            class="auth-glass-input !pl-10 !pr-10"
                             placeholder="Re-type password">
-                        <button type="button" onclick="togglePasswordVisibility('password_confirmation', 'toggle-confirm-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
+                        <button type="button" onclick="togglePasswordVisibility('password_confirmation', 'toggle-confirm-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-white/70 hover:text-white focus:outline-none cursor-pointer">
                             <i id="toggle-confirm-icon" class="bi bi-eye text-sm"></i>
                         </button>
                     </div>
@@ -186,20 +235,21 @@
 
                 <div class="pt-2">
                     <button type="submit" id="register-submit-btn"
-                        class="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                        class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl shadow-lg shadow-sky-950/30 text-sm font-semibold text-white bg-sky-600/90 hover:bg-sky-500 active:scale-[0.995] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                         <span id="register-submit-spinner" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
                         <span id="register-submit-label">Register Account</span>
                     </button>
                 </div>
 
-                <div class="relative flex items-center justify-center my-3">
-                    <div class="border-t border-slate-200/80 w-full"></div>
-                    <span class="absolute px-3 bg-white text-[11px] font-semibold text-slate-400 uppercase tracking-wider">or</span>
+                <div class="relative flex items-center justify-center my-2">
+                    <div class="border-t border-white/20 w-full"></div>
+                    <span class="px-3 text-[11px] font-semibold text-white/65 uppercase tracking-wider shrink-0">or</span>
+                    <div class="border-t border-white/20 w-full"></div>
                 </div>
 
                 <div>
                     <a href="{{ route('auth.google') }}"
-                        class="w-full flex items-center justify-center py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300 transition-all shadow-xs hover:shadow-sm">
+                        class="w-full flex items-center justify-center py-2.5 px-4 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/30 rounded-xl text-sm font-medium text-white transition-all shadow-sm">
                         <svg class="w-4 h-4 mr-2.5 flex-shrink-0" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -211,84 +261,86 @@
                 </div>
             </form>
 
-            <div class="mt-6 text-center">
-                <p class="text-xs text-slate-500">
+            <div class="mt-6 text-center space-y-2">
+                <p class="text-xs text-white/75">
                     Already have an account?
-                    <a href="{{ route('login') }}" class="font-bold text-sky-600 hover:text-sky-500 ml-1">Log in here</a>
+                    <a href="{{ route('login') }}" class="font-bold text-sky-300 hover:text-white ml-1 transition-colors">Log in here</a>
+                </p>
+                <p class="text-[11px] text-white/55">
+                    &copy; {{ date('Y') }} DairyBox Management System. All rights reserved.
                 </p>
             </div>
         </div>
     </div>
 
-    <!-- OTP Verification Modal -->
-    <div id="otp-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="otp-modal-title">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 sm:p-7 relative">
+    <!-- OTP Verification Modal (Matching Frosted Glass Aesthetic) -->
+    <div id="otp-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="otp-modal-title">
+        <div class="w-full max-w-md bg-slate-950/75 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/25 p-6 sm:p-7 relative text-white">
             <button type="button" id="otp-modal-close" aria-label="Close verification modal"
-                class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer">
+                class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white/75 hover:text-white flex items-center justify-center transition-colors cursor-pointer">
                 <i class="bi bi-x-lg text-xs"></i>
             </button>
 
             <div class="text-center mb-5">
-                <div class="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-3">
-                    <i class="bi bi-chat-dots-fill text-xl"></i>
+                <div class="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-300/35 text-sky-300 flex items-center justify-center mx-auto mb-3">
+                    <i id="otp-modal-icon" class="bi bi-shield-lock-fill text-xl"></i>
                 </div>
-                <h3 id="otp-modal-title" class="text-xl font-extrabold text-slate-900 tracking-tight">Verify Your Phone Number</h3>
-                <p class="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    We sent a 6-digit SMS verification code to
-                    <strong id="otp-masked-target" class="text-slate-900 font-bold"></strong>.
+                <h3 id="otp-modal-title" class="text-xl font-bold text-white tracking-tight">Verify Your Account</h3>
+                <p id="otp-modal-subtitle" class="mt-1.5 text-xs sm:text-sm text-white/80 leading-relaxed">
+                    We sent a 6-digit verification code to
+                    <strong id="otp-masked-target" class="text-white font-bold"></strong>.
                 </p>
-                <p id="otp-fallback-notice" class="hidden mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-1.5 leading-snug"></p>
-                <p class="mt-1.5 text-[11px] text-slate-400">Code expires in 5 minutes.</p>
+                <p class="mt-1.5 text-[11px] text-white/55">Code expires in 5 minutes.</p>
             </div>
 
             <!-- Inline Modal Feedback -->
-            <div id="otp-modal-error" class="hidden mb-4 bg-rose-50 border border-rose-200/80 text-rose-700 px-3.5 py-2.5 rounded-xl items-start gap-2 text-xs" role="alert">
-                <i class="bi bi-exclamation-circle-fill text-rose-500 mt-0.5 shrink-0"></i>
+            <div id="otp-modal-error" class="hidden mb-4 bg-rose-500/20 border border-rose-300/40 text-rose-100 px-3.5 py-2.5 rounded-xl items-start gap-2 text-xs" role="alert">
+                <i class="bi bi-exclamation-circle-fill text-rose-300 mt-0.5 shrink-0"></i>
                 <span id="otp-modal-error-text" class="font-medium leading-relaxed"></span>
             </div>
 
-            <div id="otp-modal-info" class="hidden mb-4 bg-emerald-50 border border-emerald-200/80 text-emerald-700 px-3.5 py-2.5 rounded-xl items-start gap-2 text-xs" role="status">
-                <i class="bi bi-check-circle-fill text-emerald-500 mt-0.5 shrink-0"></i>
+            <div id="otp-modal-info" class="hidden mb-4 bg-emerald-500/20 border border-emerald-300/40 text-emerald-100 px-3.5 py-2.5 rounded-xl items-start gap-2 text-xs" role="status">
+                <i class="bi bi-check-circle-fill text-emerald-300 mt-0.5 shrink-0"></i>
                 <span id="otp-modal-info-text" class="font-medium leading-relaxed"></span>
             </div>
 
             <form id="otp-verify-form" class="space-y-4" novalidate>
                 <div>
-                    <label for="otp-code-input" class="block text-center text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                    <label for="otp-code-input" class="block text-center text-xs font-semibold uppercase tracking-wider text-white/75 mb-2">
                         Enter 6-Digit Verification Code
                     </label>
                     <input id="otp-code-input" name="otp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
-                        class="block w-full py-3 px-4 text-center text-2xl font-extrabold font-mono tracking-[0.45em] pl-[calc(1rem+0.45em)] bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 placeholder-slate-300 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/15 transition-all"
+                        class="block w-full py-3 px-4 text-center text-2xl font-extrabold font-mono tracking-[0.45em] pl-[calc(1rem+0.45em)] bg-white/15 border-2 border-white/30 rounded-xl text-white placeholder-white/40 focus:bg-white/20 focus:outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-400/20 transition-all"
                         placeholder="000000">
                 </div>
 
                 <button type="submit" id="verify-otp-submit-btn"
-                    class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl shadow-md text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                    class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl shadow-lg shadow-sky-950/30 text-sm font-semibold text-white bg-sky-600/90 hover:bg-sky-500 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                     <span id="verify-otp-spinner" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
                     <span id="verify-otp-label">Verify &amp; Create Account</span>
                 </button>
             </form>
 
             <!-- 60-Second Countdown & Resend Code -->
-            <div class="mt-5 pt-4 border-t border-slate-100 text-center space-y-2">
-                <p id="otp-countdown-row" class="text-xs text-slate-500 flex items-center justify-center gap-1.5">
-                    <i class="bi bi-clock text-slate-400"></i>
+            <div class="mt-5 pt-4 border-t border-white/15 text-center space-y-2">
+                <p id="otp-countdown-row" class="text-xs text-white/75 flex items-center justify-center gap-1.5">
+                    <i class="bi bi-clock text-white/60"></i>
                     <span>Resend code in</span>
-                    <span id="otp-countdown-display" class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">01:00</span>
+                    <span id="otp-countdown-display" class="font-mono font-bold text-white bg-white/15 px-2 py-0.5 rounded-md">01:00</span>
                 </p>
 
                 <div id="otp-resend-row" class="hidden">
-                    <p class="text-xs text-slate-500">
+                    <p class="text-xs text-white/75">
                         Didn't receive the code?
                         <button type="button" id="otp-resend-btn"
-                            class="font-bold text-sky-600 hover:text-sky-500 ml-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="font-bold text-sky-300 hover:text-white ml-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                             Resend Code
                         </button>
                     </p>
                 </div>
 
-                <button type="button" id="otp-edit-email-btn" class="text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-                    Wrong phone number? Edit registration details
+                <button type="button" id="otp-edit-email-btn" class="text-[11px] font-medium text-white/60 hover:text-white transition-colors cursor-pointer">
+                    Wrong contact details? Edit registration details
                 </button>
             </div>
         </div>
@@ -302,14 +354,65 @@
 
             if (input.type === 'password') {
                 input.type = 'text';
-                icon.className = 'bi bi-eye-slash text-sm text-sky-600';
+                icon.className = 'bi bi-eye-slash text-sm text-sky-300';
             } else {
                 input.type = 'password';
-                icon.className = 'bi bi-eye text-sm text-slate-400';
+                icon.className = 'bi bi-eye text-sm text-white/70';
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Shuffled 10-second background slideshow matching Login & Home
+            const heroSlides = [
+                { src: @json(asset('images/hero/slide-01.jpg')), alt: 'DairyBox and Philippine Carabao Center team at launch' },
+                { src: @json(asset('images/hero/slide-02.jpg')), alt: 'DairyBox Trinidad grand opening community celebration' },
+                { src: @json(asset('images/hero/slide-03.jpg')), alt: 'DairyBox display chiller stocked with fresh carabao and flavored milk' },
+                { src: @json(asset('images/hero/slide-04.jpg')), alt: 'DairyBox 150L pasteurizer machine and holding tank' },
+                { src: @json(asset('images/hero/slide-05.jpg')), alt: 'DairyBox official ribbon-cutting ceremony' },
+                { src: @json(asset('images/hero/slide-06.jpg')), alt: 'DairyBox storefront entrance opening with partners' },
+                { src: @json(asset('images/hero/slide-07.jpg')), alt: 'DairyBox storefront blessing ceremony' },
+                { src: @json(asset('images/hero/slide-08.jpg')), alt: 'DairyBox launch program remarks' },
+                { src: @json(asset('images/hero/slide-09.jpg')), alt: 'DairyBox opening address in front of storefront sign' },
+                { src: @json(asset('images/hero/slide-10.jpg')), alt: 'DairyBox Trinidad storefront team photo' },
+            ];
+
+            function shuffleSlides(list) {
+                const shuffled = list.slice();
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled;
+            }
+
+            const slidesContainer = document.getElementById('registerSlidesContainer');
+            if (slidesContainer && heroSlides.length > 0) {
+                const orderedSlides = shuffleSlides(heroSlides);
+                let currentIndex = 0;
+                const INTERVAL_MS = 10000;
+
+                slidesContainer.innerHTML = '';
+                const slideElements = orderedSlides.map((slide, idx) => {
+                    const img = document.createElement('img');
+                    img.src = slide.src;
+                    img.alt = slide.alt;
+                    img.decoding = 'async';
+                    img.loading = idx === 0 ? 'eager' : 'lazy';
+                    img.className = 'absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ' + (idx === 0 ? 'opacity-100' : 'opacity-0');
+                    slidesContainer.appendChild(img);
+                    return img;
+                });
+
+                setInterval(() => {
+                    const nextIdx = (currentIndex + 1) % orderedSlides.length;
+                    slideElements[currentIndex].classList.remove('opacity-100');
+                    slideElements[currentIndex].classList.add('opacity-0');
+                    currentIndex = nextIdx;
+                    slideElements[currentIndex].classList.remove('opacity-0');
+                    slideElements[currentIndex].classList.add('opacity-100');
+                }, INTERVAL_MS);
+            }
+
             const registerForm = document.getElementById('register-form');
             const nameInput = document.getElementById('name');
             const emailInput = document.getElementById('email');
@@ -327,8 +430,9 @@
             const otpModal = document.getElementById('otp-modal');
             const otpModalClose = document.getElementById('otp-modal-close');
             const otpEditEmailBtn = document.getElementById('otp-edit-email-btn');
-            const otpMaskedTarget = document.getElementById('otp-masked-target');
-            const otpFallbackNotice = document.getElementById('otp-fallback-notice');
+            const otpModalIcon = document.getElementById('otp-modal-icon');
+            const otpModalTitle = document.getElementById('otp-modal-title');
+            const otpModalSubtitle = document.getElementById('otp-modal-subtitle');
             const otpVerifyForm = document.getElementById('otp-verify-form');
             const otpCodeInput = document.getElementById('otp-code-input');
             const verifyOtpSubmitBtn = document.getElementById('verify-otp-submit-btn');
@@ -369,11 +473,11 @@
                     const passed = rule.test(val);
                     const icon = rule.el.querySelector('i');
                     if (passed) {
-                        rule.el.className = 'flex items-center gap-1.5 text-emerald-600 font-medium transition-colors';
-                        if (icon) icon.className = 'bi bi-check-circle-fill text-[11px] text-emerald-600';
+                        rule.el.className = 'flex items-center gap-1.5 text-emerald-300 font-medium transition-colors';
+                        if (icon) icon.className = 'bi bi-check-circle-fill text-[11px] text-emerald-300';
                     } else {
-                        rule.el.className = 'flex items-center gap-1.5 text-slate-500 transition-colors';
-                        if (icon) icon.className = 'bi bi-circle text-[9px] text-slate-400';
+                        rule.el.className = 'flex items-center gap-1.5 text-white/70 transition-colors';
+                        if (icon) icon.className = 'bi bi-circle text-[9px] text-white/50';
                     }
                 }
                 checkMatch();
@@ -391,11 +495,11 @@
 
                 matchHint.classList.remove('hidden');
                 if (passVal === confirmVal) {
-                    matchHint.className = 'text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1';
-                    matchHint.innerHTML = '<i class="bi bi-check-circle-fill text-xs text-emerald-600"></i> Passwords match';
+                    matchHint.className = 'text-[11px] font-semibold text-emerald-300 mt-1 flex items-center gap-1';
+                    matchHint.innerHTML = '<i class="bi bi-check-circle-fill text-xs text-emerald-300"></i> Passwords match';
                 } else {
-                    matchHint.className = 'text-[11px] font-medium text-rose-500 mt-1 flex items-center gap-1';
-                    matchHint.innerHTML = '<i class="bi bi-exclamation-circle text-xs text-rose-500"></i> Passwords do not match';
+                    matchHint.className = 'text-[11px] font-medium text-rose-300 mt-1 flex items-center gap-1';
+                    matchHint.innerHTML = '<i class="bi bi-exclamation-circle text-xs text-rose-300"></i> Passwords do not match';
                 }
             }
 
@@ -501,15 +605,26 @@
                 }, 1000);
             }
 
-            function openOtpModal(maskedTarget, cooldownSeconds, fallbackNotice = null) {
-                otpMaskedTarget.textContent = maskedTarget;
-                if (fallbackNotice) {
-                    otpFallbackNotice.textContent = fallbackNotice;
-                    otpFallbackNotice.classList.remove('hidden');
-                } else {
-                    otpFallbackNotice.textContent = '';
-                    otpFallbackNotice.classList.add('hidden');
-                }
+            function updateModalDeliveryCopy(data) {
+                const isLiveSms = data.delivery_channel === 'sms';
+                const target = isLiveSms
+                    ? (data.masked_phone || phoneInput.value.trim())
+                    : (data.masked_email || emailInput.value.trim().toLowerCase());
+
+                otpModalIcon.className = isLiveSms
+                    ? 'bi bi-chat-dots-fill text-xl'
+                    : 'bi bi-envelope-check-fill text-xl';
+                otpModalTitle.textContent = isLiveSms ? 'Verify Your Phone Number' : 'Verify Your Email';
+                otpModalSubtitle.innerHTML = '';
+                otpModalSubtitle.append(isLiveSms ? 'We sent a 6-digit SMS verification code to ' : 'We sent a 6-digit verification code to ');
+                const strong = document.createElement('strong');
+                strong.className = 'text-white font-bold';
+                strong.textContent = target;
+                otpModalSubtitle.append(strong, '.');
+            }
+
+            function openOtpModal(data, cooldownSeconds) {
+                updateModalDeliveryCopy(data);
                 otpCodeInput.value = '';
                 clearModalAlerts();
                 otpModal.classList.remove('hidden');
@@ -558,11 +673,10 @@
 
                     if (res.ok && data.success) {
                         pendingEmail = data.email || emailInput.value.trim().toLowerCase();
-                        openOtpModal(data.masked_phone || phoneInput.value.trim(), data.cooldown || 60, data.fallback_notice || null);
+                        openOtpModal(data, data.cooldown || 60);
                     } else if (res.status === 429 && data.cooldown && (data.masked_phone || data.masked_email)) {
-                        // A valid OTP was already sent within the cooldown window; let the user enter it
                         pendingEmail = data.email || emailInput.value.trim().toLowerCase();
-                        openOtpModal(data.masked_phone || data.masked_email, data.cooldown, null);
+                        openOtpModal(data, data.cooldown);
                         showModalError(data.message || 'Please wait before requesting another code.');
                     } else {
                         showFieldErrors(data.errors);
@@ -593,7 +707,7 @@
 
                 const otp = otpCodeInput.value.replace(/\D/g, '');
                 if (otp.length !== 6) {
-                    showModalError('Please enter the 6-digit verification code sent to your phone number.');
+                    showModalError('Please enter the 6-digit verification code sent to you.');
                     otpCodeInput.focus();
                     return;
                 }
@@ -656,17 +770,12 @@
 
                     if (res.ok && data.success) {
                         pendingEmail = data.email || pendingEmail;
-                        otpMaskedTarget.textContent = data.masked_phone || otpMaskedTarget.textContent;
-                        if (data.fallback_notice) {
-                            otpFallbackNotice.textContent = data.fallback_notice;
-                            otpFallbackNotice.classList.remove('hidden');
-                        } else {
-                            otpFallbackNotice.textContent = '';
-                            otpFallbackNotice.classList.add('hidden');
-                        }
+                        updateModalDeliveryCopy(data);
                         otpCodeInput.value = '';
                         otpCodeInput.focus();
-                        showModalInfo('A new 6-digit SMS verification code has been sent.');
+                        showModalInfo(data.delivery_channel === 'sms'
+                            ? 'A new 6-digit SMS verification code has been sent.'
+                            : 'A new 6-digit verification code has been sent.');
                         startResendCountdown(data.cooldown || 60);
                     } else if (res.status === 429 && data.cooldown) {
                         showModalError(data.message || 'Please wait before resending.');

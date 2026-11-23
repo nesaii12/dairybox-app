@@ -25,6 +25,11 @@
                           {{ $filter === 'near_expiry' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100' }}">
                     <i class="bi bi-exclamation-triangle"></i> Near Expiry
                 </a>
+                <a href="{{ request()->fullUrlWithQuery(['filter' => 'expired', 'page' => 1]) }}"
+                   class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all
+                          {{ $filter === 'expired' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100' }}">
+                    <i class="bi bi-x-circle"></i> Expired
+                </a>
                 <a href="{{ request()->fullUrlWithQuery(['filter' => 'new_stock', 'page' => 1]) }}"
                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all
                           {{ $filter === 'new_stock' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' }}">
@@ -94,6 +99,8 @@
                     // Pick display batch based on active filter
                     if ($filter === 'near_expiry') {
                         $displayBatch = $nearExpiryBatch ?? $firstBatch;
+                    } elseif ($filter === 'expired') {
+                        $displayBatch = $expiredBatch ?? $firstBatch;
                     } elseif ($filter === 'new_stock') {
                         // Show ONLY the new batch for this product
                         $displayBatch = $newBatch;
@@ -127,12 +134,15 @@
                     <!-- Stock Breakdown (Physical / Reserved / Available) -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         @php
+                            $maxStockLimit = \App\Models\Product::MAX_STOCK_LIMIT;
                             $displayedStock = ($filter === 'new_stock' && $displayBatch) ? $displayBatch->remaining_stock : $product->stock;
                             $reservedStock = (int) ($product->reserved_stock ?? 0);
                             $availableStock = $product->available_stock;
+                            $isOverLimit = $product->stock > $maxStockLimit;
+                            $isAtLimit = $product->stock === $maxStockLimit;
                         @endphp
-                        <span class="text-sm font-bold {{ $displayedStock == 0 ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : 'text-slate-900') }}">
-                            {{ $displayedStock }} physical
+                        <span class="text-sm font-bold {{ $displayedStock == 0 ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : ($isOverLimit ? 'text-amber-700' : 'text-slate-900')) }}">
+                            {{ $displayedStock }} <span class="text-xs font-medium text-slate-400">/ {{ $maxStockLimit }}</span> physical
                         </span>
                         <div class="flex items-center gap-1.5 mt-1 flex-wrap">
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
@@ -141,6 +151,15 @@
                             @if($reservedStock > 0)
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
                                     {{ $reservedStock }} reserved
+                                </span>
+                            @endif
+                            @if($isOverLimit)
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Over {{ $maxStockLimit }} Limit
+                                </span>
+                            @elseif($isAtLimit)
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                    At Limit
                                 </span>
                             @endif
                         </div>
@@ -224,6 +243,9 @@
                         @if($filter === 'near_expiry')
                             <i class="bi bi-check-circle text-3xl text-emerald-300 mb-2 block"></i>
                             <p class="text-xs text-slate-500 font-medium">No products with batches expiring within 7 days.</p>
+                        @elseif($filter === 'expired')
+                            <i class="bi bi-check-circle text-3xl text-emerald-300 mb-2 block"></i>
+                            <p class="text-xs text-slate-500 font-medium">No products with expired batches found.</p>
                         @elseif($filter === 'new_stock')
                             <i class="bi bi-box-seam text-3xl text-slate-300 mb-2 block"></i>
                             <p class="text-xs text-slate-500 font-medium">No recent new stock available.</p>
@@ -250,19 +272,19 @@
     <div class="lg:col-span-1">
         <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6">
             <h3 class="text-lg font-bold text-slate-950 mb-1">Stock Management</h3>
-            <p class="text-xs text-slate-500 mb-6">Manually adjust warehouse inventory levels. Stock additions will create new FIFO batches.</p>
+            <p class="text-xs text-slate-500 mb-6">Manually adjust warehouse inventory levels. Stock In is capped at {{ \App\Models\Product::MAX_STOCK_LIMIT }} units per product to avoid spoilage.</p>
             
             <form id="stockAdjustmentForm" action="{{ route('admin.inventory.adjust') }}" method="POST" class="space-y-4">
                 @csrf
                 <!-- Product Selector -->
                 <div>
                     <label for="product_id" class="block text-sm font-semibold text-slate-700">Select Product</label>
-                    <select name="product_id" id="product_id" required
+                    <select name="product_id" id="product_id" required onchange="syncStockLimitState()"
                         class="mt-1.5 block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all">
                         <option value="">-- Choose Product --</option>
                         @foreach($productsForForm as $p)
-                            <option value="{{ $p->id }}" {{ old('product_id') == $p->id ? 'selected' : '' }}>
-                                {{ $p->product_name }} ({{ $p->size }}) - Avail: {{ $p->available_stock }} / Phys: {{ $p->stock }}
+                            <option value="{{ $p->id }}" data-stock="{{ $p->stock }}" data-available="{{ $p->available_stock }}" data-name="{{ $p->product_name }}" {{ old('product_id') == $p->id ? 'selected' : '' }}>
+                                {{ $p->product_name }} ({{ $p->size }}) - Stock: {{ $p->stock }}/{{ \App\Models\Product::MAX_STOCK_LIMIT }} (Avail: {{ $p->available_stock }})
                             </option>
                         @endforeach
                     </select>
@@ -285,7 +307,13 @@
                 <div>
                     <label for="quantity" class="block text-sm font-semibold text-slate-700">Quantity</label>
                     <input type="number" name="quantity" id="quantity" required min="1" value="{{ old('quantity', 1) }}"
+                        oninput="syncStockLimitState()" onchange="syncStockLimitState()"
                         class="mt-1.5 block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-sm transition-all">
+                    <p id="stock_limit_hint" class="hidden mt-1.5 text-[11px] font-medium text-slate-500"></p>
+                    <p id="stock_limit_error" class="hidden items-start gap-1.5 mt-1.5 text-xs font-semibold text-rose-600" role="alert">
+                        <i class="bi bi-exclamation-circle-fill mt-0.5 shrink-0"></i>
+                        <span id="stock_limit_error_text"></span>
+                    </p>
                     @error('quantity')
                         <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>
                     @enderror
@@ -399,12 +427,97 @@
         return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
+    const MAX_STOCK_LIMIT = {{ \App\Models\Product::MAX_STOCK_LIMIT }};
+    let isExpiryInvalidState = false;
+    let isStockLimitInvalidState = false;
+
+    function updateAdjustmentSubmitButton() {
+        const submitBtn = document.getElementById('stockAdjustmentSubmitBtn');
+        if (!submitBtn) return;
+        const blocked = isExpiryInvalidState || isStockLimitInvalidState;
+        submitBtn.disabled = blocked;
+        submitBtn.classList.toggle('opacity-50', blocked);
+        submitBtn.classList.toggle('cursor-not-allowed', blocked);
+        submitBtn.classList.toggle('hover:bg-sky-500', !blocked);
+        submitBtn.classList.toggle('cursor-pointer', !blocked);
+    }
+
+    function syncStockLimitState() {
+        const productSelect = document.getElementById('product_id');
+        const typeSelect = document.getElementById('adjustment_type');
+        const qtyInput = document.getElementById('quantity');
+        const hintEl = document.getElementById('stock_limit_hint');
+        const errEl = document.getElementById('stock_limit_error');
+        const errText = document.getElementById('stock_limit_error_text');
+
+        if (!productSelect || !typeSelect || !qtyInput) return true;
+
+        const selectedOpt = productSelect.options[productSelect.selectedIndex];
+        const hasProduct = Boolean(selectedOpt && selectedOpt.value);
+
+        if (typeSelect.value !== 'in' || !hasProduct) {
+            qtyInput.removeAttribute('max');
+            qtyInput.setCustomValidity('');
+            if (hintEl) hintEl.classList.add('hidden');
+            if (errEl) {
+                errEl.classList.add('hidden');
+                errEl.classList.remove('flex');
+            }
+            isStockLimitInvalidState = false;
+            updateAdjustmentSubmitButton();
+            return true;
+        }
+
+        const currentStock = parseInt(selectedOpt.dataset.stock || '0', 10) || 0;
+        const productName = selectedOpt.dataset.name || 'this product';
+        const remaining = Math.max(0, MAX_STOCK_LIMIT - currentStock);
+        const qty = parseInt(qtyInput.value || '0', 10) || 0;
+
+        if (remaining > 0) {
+            qtyInput.max = String(remaining);
+            if (hintEl) {
+                hintEl.textContent = `Remaining stock capacity: ${remaining} of ${MAX_STOCK_LIMIT} units (to avoid spoilage).`;
+                hintEl.classList.remove('hidden');
+            }
+        } else {
+            qtyInput.max = '0';
+            if (hintEl) hintEl.classList.add('hidden');
+        }
+
+        let invalidMsg = '';
+        if (remaining <= 0) {
+            invalidMsg = `Stock limit reached for ${productName} (${currentStock}/${MAX_STOCK_LIMIT} units). Stock In is blocked until stock drops below ${MAX_STOCK_LIMIT}.`;
+        } else if (qty > remaining) {
+            invalidMsg = `Cannot add ${qty} units. Remaining capacity for ${productName} is ${remaining} units (max ${MAX_STOCK_LIMIT} to avoid spoilage).`;
+        }
+
+        if (invalidMsg) {
+            if (errText) errText.textContent = invalidMsg;
+            if (errEl) {
+                errEl.classList.remove('hidden');
+                errEl.classList.add('flex');
+            }
+            qtyInput.setCustomValidity(invalidMsg);
+            isStockLimitInvalidState = true;
+            updateAdjustmentSubmitButton();
+            return false;
+        }
+
+        if (errEl) {
+            errEl.classList.add('hidden');
+            errEl.classList.remove('flex');
+        }
+        qtyInput.setCustomValidity('');
+        isStockLimitInvalidState = false;
+        updateAdjustmentSubmitButton();
+        return true;
+    }
+
     function setExpiryErrorState(isInvalid, message = '', clearServerError = true) {
         const expiryInput = document.getElementById('expiration_date');
         const errContainer = document.getElementById('stock_date_error');
         const errText = document.getElementById('stock_date_error_text');
         const serverErr = document.getElementById('stock_date_server_error');
-        const submitBtn = document.getElementById('stockAdjustmentSubmitBtn');
 
         if (!expiryInput) return;
 
@@ -423,11 +536,8 @@
             expiryInput.setCustomValidity(message);
             expiryInput.setAttribute('aria-invalid', 'true');
 
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                submitBtn.classList.remove('hover:bg-sky-500', 'cursor-pointer');
-            }
+            isExpiryInvalidState = true;
+            updateAdjustmentSubmitButton();
             return;
         }
 
@@ -448,12 +558,8 @@
         }
 
         expiryInput.setCustomValidity('');
-
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            submitBtn.classList.add('hover:bg-sky-500', 'cursor-pointer');
-        }
+        isExpiryInvalidState = false;
+        updateAdjustmentSubmitButton();
     }
 
     function syncStockDates(clearServerError = true) {
@@ -507,10 +613,12 @@
             expiryInput.setAttribute('required', 'required');
             syncStockDates(!isInitialLoad);
         }
+        syncStockLimitState();
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         toggleExpiryField(true);
+        syncStockLimitState();
 
         const form = document.getElementById('stockAdjustmentForm');
         const expiryInput = document.getElementById('expiration_date');
@@ -519,9 +627,17 @@
 
         if (form) {
             form.addEventListener('submit', function (e) {
-                if (typeSelect && typeSelect.value === 'in' && !syncStockDates(true)) {
-                    e.preventDefault();
-                    if (expiryInput) expiryInput.focus();
+                if (typeSelect && typeSelect.value === 'in') {
+                    if (!syncStockLimitState()) {
+                        e.preventDefault();
+                        const qtyInput = document.getElementById('quantity');
+                        if (qtyInput) qtyInput.focus();
+                        return;
+                    }
+                    if (!syncStockDates(true)) {
+                        e.preventDefault();
+                        if (expiryInput) expiryInput.focus();
+                    }
                 }
             });
         }

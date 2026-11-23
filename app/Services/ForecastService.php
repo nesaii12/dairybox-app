@@ -10,144 +10,161 @@ use Illuminate\Support\Facades\DB;
 class ForecastService
 {
     /**
-     * Predict demand for a product in a target month using
-     * last-month sales momentum combined with linear regression and seasonal adjustment.
+     * Determine the active rolling year-over-year forecast window and data archival status.
+     * 
+     * Rules:
+     * - Currently in 2026:
+     *   Primary basis: 2026 Full-Year Sales to predict 2027 Demand.
+     *   2025 data remains active for multi-year comparison and will auto-archive when 2027 arrives.
+     * - Once 2027 arrives:
+     *   2025 data is automatically archived (excluded from active baseline queries).
+     *   Primary basis switches to 2026 Full-Year Sales to predict 2028 Demand.
+     * - Rolling onwards (Year Y >= 2028):
+     *   Data older than Y-1 is archived, Y-1 full year is basis, predicting Y+1 demand.
+     */
+    public static function getRollingWindow(?Carbon $now = null): array
+    {
+        $now = $now ?? Carbon::now();
+        $currentYear = (int) $now->year;
+
+        if ($currentYear <= 2026) {
+            $basisYear = 2026;
+            $targetYear = 2027;
+            $archivedYears = [];
+            $pendingArchiveYear = 2025;
+            $archiveStatus = '2025 Data Active (Auto-archives upon 2027 rollover)';
+            $isArchived2025 = false;
+        } elseif ($currentYear === 2027) {
+            $basisYear = 2026;
+            $targetYear = 2028;
+            $archivedYears = [2025];
+            $pendingArchiveYear = null;
+            $archiveStatus = '2025 Data Automatically Archived (Basis: 2026 Full-Year Sales → Target: 2028 Demand)';
+            $isArchived2025 = true;
+        } else {
+            $basisYear = $currentYear - 1;
+            $targetYear = $currentYear + 1;
+            $archivedYears = range(2025, $currentYear - 2);
+            $pendingArchiveYear = null;
+            $archiveStatus = "Historical data prior to {$basisYear} archived";
+            $isArchived2025 = true;
+        }
+
+        return [
+            'current_year' => $currentYear,
+            'basis_year' => $basisYear,
+            'target_year' => $targetYear,
+            'archived_years' => $archivedYears,
+            'pending_archive_year' => $pendingArchiveYear,
+            'archive_status' => $archiveStatus,
+            'is_archived_2025' => $isArchived2025,
+            'basis_label' => "{$basisYear} Full-Year Sales",
+            'target_label' => "{$targetYear} Demand",
+            'description' => ($currentYear <= 2026)
+                ? "Currently using {$basisYear} Full-Year Sales as the basis to predict {$targetYear} Demand. Once 2027 arrives, 2025 data automatically archives, switching primary forecast basis to 2026 Full-Year Sales to predict 2028 Demand."
+                : "2025 historical data is automatically archived. Primary forecast basis is {$basisYear} Full-Year Sales predicting {$targetYear} Demand.",
+        ];
+    }
+
+    /**
+     * Predict demand for a product in a target month using the rolling year-over-year restart model.
+     * Uses the basis year (2026 Full-Year Sales) as the foundational baseline to project target demand (2027 Demand).
+     * Excludes any archived years (e.g. 2025 data is excluded once 2027 arrives).
      */
     public static function predictProductDemand(int $productId, string $targetMonthYear): float
     {
+        $window = self::getRollingWindow();
+        $basisYear = $window['basis_year'];
+        $targetYear = $window['target_year'];
+        $archivedYears = $window['archived_years'];
+
+        $targetParts = explode('-', $targetMonthYear);
+        $targetCalMonth = isset($targetParts[1]) ? (int) $targetParts[1] : 1;
         $dateExpr = "COALESCE(sales.sales_date, DATE(orders.created_at))";
 
-        // Fetch monthly sales history for the product prior to the target month
-        $salesHistory = DB::table('order_items')
+        // Query product sales, strictly excluding archived data
+        $query = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-            ->select(
-                DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m') as month"),
-                DB::raw('SUM(order_items.quantity) as total_qty')
-            )
             ->where('order_items.product_id', $productId)
-            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
-            ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear])
-            ->groupBy('month')
-            ->orderBy('month', 'asc')
-            ->get();
+            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted']);
 
-        $n = $salesHistory->count();
-        if ($n === 0) {
+        if (!empty($archivedYears)) {
+            $query->whereRaw("YEAR({$dateExpr}) NOT IN (" . implode(',', array_map('intval', $archivedYears)) . ")");
+        }
+
+        // Limit to historical data prior to the target projection month
+        $query->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear]);
+
+        $salesHistory = $query->select(
+            DB::raw("YEAR({$dateExpr}) as yr"),
+            DB::raw("MONTH({$dateExpr}) as mo"),
+            DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m') as ym"),
+            DB::raw("SUM(order_items.quantity) as total_qty"),
+            DB::raw("SUM(order_items.subtotal) as total_revenue")
+        )
+        ->groupBy('yr', 'mo', 'ym')
+        ->orderBy('ym', 'asc')
+        ->get();
+
+        if ($salesHistory->isEmpty()) {
             return 0.0;
         }
 
-        // Handle partial ongoing current month so early-month data doesn't drag down momentum or trend
-        $currentYm = Carbon::now()->format('Y-m');
-        $latestRec = $salesHistory->last();
-        $prevRec = $n >= 2 ? $salesHistory->slice(-2, 1)->first() : null;
+        // 1. Primary Baseline: Basis Year (2026 Full-Year Sales)
+        $basisRecords = $salesHistory->where('yr', $basisYear);
+        $basisMonthsCount = $basisRecords->count();
+        $basisTotalQty = (float) $basisRecords->sum('total_qty');
+        $basisMonthlyAvg = $basisMonthsCount > 0 ? ($basisTotalQty / max(1, $basisMonthsCount)) : 0.0;
 
-        $effectiveHistory = $salesHistory->values();
-        if (
-            $n >= 2
-            && $latestRec->month === $currentYm
-            && Carbon::now()->day < 25
-            && (float) $latestRec->total_qty < (float) $prevRec->total_qty
-        ) {
-            // Use completed months for regression trend if current month is still early/partial,
-            // while keeping the higher of current vs last completed month for recent momentum
-            $regressionHistory = $salesHistory->slice(0, $n - 1)->values();
-            $lastMonthQty = max((float) $latestRec->total_qty, (float) $prevRec->total_qty);
-            $priorMonthQty = $n >= 3
-                ? (float) $salesHistory->slice(-3, 1)->first()->total_qty
-                : (float) $prevRec->total_qty;
-            $referenceMonthNum = (int) date('m', strtotime($prevRec->month . '-01'));
-        } else {
-            $regressionHistory = $effectiveHistory;
-            $lastMonthQty = (float) $latestRec->total_qty;
-            $priorMonthQty = $prevRec ? (float) $prevRec->total_qty : $lastMonthQty;
-            $referenceMonthNum = (int) date('m', strtotime($latestRec->month . '-01'));
+        // Sales in matching calendar month of the basis year (e.g. May 2026 for May 2027)
+        $basisMonthRecord = $basisRecords->firstWhere('mo', $targetCalMonth);
+        $basisMonthQty = $basisMonthRecord ? (float) $basisMonthRecord->total_qty : null;
+
+        // 2. Momentum within the Basis Year (anchored on recent months of 2026)
+        $latestBasisRec = $basisRecords->sortByDesc('ym')->first();
+        $prevBasisRec = $basisRecords->sortByDesc('ym')->skip(1)->first();
+        $recentMomentum = $latestBasisRec ? (float) $latestBasisRec->total_qty : $basisMonthlyAvg;
+        if ($latestBasisRec && $prevBasisRec) {
+            $recentMomentum = ((float) $latestBasisRec->total_qty * 0.70) + ((float) $prevBasisRec->total_qty * 0.30);
         }
 
-        // 1. Recent Momentum Forecast (anchored on last month's sales so top sellers last month lead next month)
-        $recentMomentum = ($lastMonthQty * 0.75) + ($priorMonthQty * 0.25);
+        // 3. Seasonal Demand Index for the target calendar month
+        // Compare historical sales for this calendar month across active (unarchived) years
+        $targetMonthAvg = $salesHistory->where('mo', $targetCalMonth)->avg('total_qty');
+        $overallAvg = $salesHistory->avg('total_qty');
+        $seasonalIndex = ($overallAvg > 0 && $targetMonthAvg > 0)
+            ? ((float) $targetMonthAvg / (float) $overallAvg)
+            : 1.0;
+        $clampedSeasonal = max(0.80, min(1.30, $seasonalIndex));
 
-        $regCount = $regressionHistory->count();
-        if ($regCount < 2) {
-            return round(max(0.0, $recentMomentum), 2);
-        }
+        // 4. Year-over-Year Growth Trend (Basis Year vs Prior Unarchived Year, e.g. 2026 vs 2025)
+        $priorYear = $basisYear - 1;
+        $priorYearSales = $salesHistory->where('yr', $priorYear);
+        $yoyGrowthFactor = 1.0;
 
-        // 2. Linear Regression Trend: y = slope * x + intercept
-        $sumX = 0;
-        $sumY = 0;
-        $sumXY = 0;
-        $sumX2 = 0;
-
-        foreach ($regressionHistory as $index => $history) {
-            $x = $index + 1;
-            $y = (float) $history->total_qty;
-            $sumX += $x;
-            $sumY += $y;
-            $sumXY += $x * $y;
-            $sumX2 += $x * $x;
-        }
-
-        $denominator = $regCount * $sumX2 - $sumX * $sumX;
-        $slope = $denominator != 0
-            ? ($regCount * $sumXY - $sumX * $sumY) / $denominator
-            : 0;
-        $intercept = ($sumY - $slope * $sumX) / $regCount;
-
-        $predictedIndex = $regCount + 1;
-        $trendForecast = max(0.0, $slope * $predictedIndex + $intercept);
-
-        // 3. Seasonal Adjustment for target calendar month
-        $targetMonthNum = (int) date('m', strtotime($targetMonthYear . '-01'));
-        $seasonalData = DB::table('order_items')
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-            ->where('order_items.product_id', $productId)
-            ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
-            ->whereRaw("MONTH({$dateExpr}) = ?", [$targetMonthNum])
-            ->select(DB::raw('SUM(order_items.quantity) as qty'))
-            ->groupBy(DB::raw("YEAR({$dateExpr})"))
-            ->pluck('qty');
-
-        $overallAverage = $sumY / max(1, $regCount);
-        $seasonalIndex = 1.0;
-
-        if ($seasonalData->isNotEmpty() && $overallAverage > 0) {
-            $seasonalAverage = (float) $seasonalData->avg();
-            $seasonalIndex = $seasonalAverage / $overallAverage;
-        } else {
-            // Fall back to storewide seasonal index for that calendar month if product-specific month is not yet recorded
-            $storeMonthAvg = DB::table('order_items')
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-                ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
-                ->whereRaw("MONTH({$dateExpr}) = ?", [$targetMonthNum])
-                ->select(DB::raw('SUM(order_items.quantity) as qty'))
-                ->groupBy(DB::raw("YEAR({$dateExpr})"))
-                ->pluck('qty')
-                ->avg();
-
-            $storeOverallAvg = DB::table('order_items')
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
-                ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
-                ->select(DB::raw('SUM(order_items.quantity) as qty'))
-                ->groupBy(DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m')"))
-                ->pluck('qty')
-                ->avg();
-
-            if ($storeMonthAvg && $storeOverallAvg > 0) {
-                $seasonalIndex = (float) $storeMonthAvg / (float) $storeOverallAvg;
+        if ($priorYearSales->isNotEmpty() && !in_array($priorYear, $archivedYears)) {
+            $priorTotal = (float) $priorYearSales->sum('total_qty');
+            if ($priorTotal > 0 && $basisTotalQty > 0) {
+                $priorMonths = max(1, $priorYearSales->count());
+                $basisMonths = max(1, $basisMonthsCount);
+                $priorRate = $priorTotal / $priorMonths;
+                $basisRate = $basisTotalQty / $basisMonths;
+                $rawGrowth = ($basisRate - $priorRate) / $priorRate;
+                $yoyGrowthFactor = 1.0 + max(-0.10, min(0.20, $rawGrowth));
             }
         }
 
-        $clampedSeasonal = max(0.75, min(1.35, $seasonalIndex));
-        $seasonalTrendForecast = $trendForecast * $clampedSeasonal;
-        $seasonalMomentumForecast = $recentMomentum * max(0.85, min(1.25, $seasonalIndex));
+        // 5. Synthesize Rolling Demand Forecast
+        if ($basisMonthQty !== null && $basisMonthQty > 0) {
+            $baseDemand = ($basisMonthQty * 0.65) + ($recentMomentum * 0.35);
+        } else {
+            $baseDemand = ($basisMonthlyAvg * 0.50) + ($recentMomentum * 0.50);
+        }
 
-        // Blend 65% recent last-month momentum with 35% seasonal trend so last month's top-selling product leads next month
-        $blended = (0.65 * $seasonalMomentumForecast) + (0.35 * $seasonalTrendForecast);
+        $predictedSales = $baseDemand * $yoyGrowthFactor * $clampedSeasonal;
 
-        return round(max(0.0, $blended), 2);
+        return round(max(0.0, $predictedSales), 2);
     }
 
     /**
@@ -155,16 +172,22 @@ class ForecastService
      */
     public static function getLastMonthProductStats(?string $targetMonthYear = null): array
     {
-        $targetMonthYear = $targetMonthYear ?? Carbon::now()->addMonth()->format('Y-m');
+        $window = self::getRollingWindow();
+        $targetMonthYear = $targetMonthYear ?? ($window['target_year'] . '-01');
         $dateExpr = "COALESCE(sales.sales_date, DATE(orders.created_at))";
 
-        // Find the latest recorded month prior to targetMonthYear
-        $recordedMonths = DB::table('order_items')
+        // Find the latest recorded month prior to targetMonthYear, excluding archived years
+        $query = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
             ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted'])
-            ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear])
-            ->select(
+            ->whereRaw("DATE_FORMAT({$dateExpr}, '%Y-%m') < ?", [$targetMonthYear]);
+
+        if (!empty($window['archived_years'])) {
+            $query->whereRaw("YEAR({$dateExpr}) NOT IN (" . implode(',', array_map('intval', $window['archived_years'])) . ")");
+        }
+
+        $recordedMonths = $query->select(
                 DB::raw("DATE_FORMAT({$dateExpr}, '%Y-%m') as ym"),
                 DB::raw("SUM(order_items.quantity) as total_qty")
             )
@@ -265,11 +288,12 @@ class ForecastService
 
     /**
      * Return the recommended restock quantity for a product given its forecast.
-     * Safety buffer: forecast + 20% headroom, minus current stock. Min 0.
+     * Safety buffer: forecast + 20% headroom, capped at Product::MAX_STOCK_LIMIT (100 units)
+     * to prevent dairy spoilage, minus current stock. Min 0.
      */
     public static function recommendedRestock(float $predictedSales, int $currentStock): int
     {
-        $buffer = (int) ceil($predictedSales * 1.20);
+        $buffer = min(Product::MAX_STOCK_LIMIT, (int) ceil($predictedSales * 1.20));
         return max(0, $buffer - $currentStock);
     }
 
@@ -301,17 +325,21 @@ class ForecastService
      */
     public static function getHistoricalAnalytics(?int $productId = null): array
     {
+        $window = self::getRollingWindow();
+        $dateExpr = "COALESCE(sales.sales_date, DATE(orders.created_at))";
+
         $baseQuery = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('sales', 'orders.id', '=', 'sales.order_id')
             ->whereIn('orders.order_status', ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted']);
 
+        if (!empty($window['archived_years'])) {
+            $baseQuery->whereRaw("YEAR({$dateExpr}) NOT IN (" . implode(',', array_map('intval', $window['archived_years'])) . ")");
+        }
+
         if ($productId) {
             $baseQuery->where('order_items.product_id', $productId);
         }
-
-        // Use sales.sales_date when present, falling back to orders.created_at
-        $dateExpr = "COALESCE(sales.sales_date, DATE(orders.created_at))";
 
         // 1. Monthly Historical Trend (Chronological YYYY-MM)
         $monthlyRecords = (clone $baseQuery)
@@ -495,6 +523,7 @@ class ForecastService
         $timelineRevenues = $monthlyRecords->map(fn($r) => round((float) $r->total_revenue, 2))->values()->toArray();
 
         return [
+            'rolling_window' => $window,
             'has_data' => $monthlyRecords->isNotEmpty(),
             'months_analyzed' => $n,
             'years_analyzed' => count($years),

@@ -11,7 +11,11 @@
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Product Reservations</h2>
             <p class="text-xs text-slate-500 mt-0.5">Manage advance orders, track reserved inventory allocations, and fulfill scheduled pickups without overselling.</p>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex items-center gap-2 shrink-0 flex-wrap">
+            <a href="{{ route('admin.settings.index') }}#cancellation-policy" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition-all shadow-2xs">
+                <i class="bi bi-sliders"></i>
+                <span>Cancellation Policy</span>
+            </a>
             <a href="{{ route('admin.inventory.index') }}" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition-all shadow-2xs">
                 <i class="bi bi-archive"></i>
                 <span>View Inventory</span>
@@ -160,6 +164,7 @@
                                 'Pending' => 'bg-amber-50 text-amber-700 border-amber-200',
                                 'Confirmed' => 'bg-sky-50 text-sky-700 border-sky-200',
                                 'Ready for Pickup' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                                'Out for Delivery' => 'bg-orange-50 text-orange-700 border-orange-200',
                                 'Completed' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                                 'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-200',
                             ];
@@ -239,6 +244,34 @@
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $badgeClass }}">
                                     {{ $reservation->status }}
                                 </span>
+                                @if(($reservation->fulfillment_type ?? 'Pickup') === 'Delivery')
+                                    <span class="block mt-1">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                            <i class="bi bi-truck"></i>
+                                            <span>{{ $reservation->rider?->name ?? 'Rider Delivery' }}</span>
+                                        </span>
+                                    </span>
+                                @endif
+                                @if($reservation->status === 'Cancelled' && $reservation->refund_status)
+                                    @php
+                                        $refundMiniStyles = [
+                                            'Pending' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                            'Completed' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                            'Not Applicable' => 'bg-slate-100 text-slate-500 border-slate-200',
+                                        ];
+                                    @endphp
+                                    <span class="block mt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border {{ $refundMiniStyles[$reservation->refund_status] ?? 'bg-slate-100 text-slate-600 border-slate-200' }}">
+                                            @if($reservation->refund_status === 'Pending')
+                                                Refund Pending: ₱{{ number_format((float) $reservation->refund_amount, 2) }}
+                                            @elseif($reservation->refund_status === 'Completed')
+                                                Refunded: ₱{{ number_format((float) $reservation->refund_amount, 2) }}
+                                            @else
+                                                No Refund
+                                            @endif
+                                        </span>
+                                    </span>
+                                @endif
                             </td>
 
                             <!-- Actions -->
@@ -282,6 +315,30 @@
                                         </form>
                                     @endif
 
+                                    @if($reservation->canConvertToDelivery())
+                                        @php
+                                            $convertData = [
+                                                'url' => route('admin.reservations.convertToDelivery', $reservation->id),
+                                                'code' => $reservation->reservation_code,
+                                                'customer' => $reservation->customer_name,
+                                                'product' => $reservation->product?->product_name ?? 'Product',
+                                                'quantity' => (int) $reservation->quantity,
+                                                'allocated' => (int) $reservation->allocated_quantity,
+                                                'subtotal' => $reservation->productSubtotal(),
+                                                'down_payment' => (float) $reservation->down_payment,
+                                                'address' => $reservation->customer?->address ?? '',
+                                            ];
+                                        @endphp
+                                        <button type="button"
+                                            data-convert="{{ json_encode($convertData) }}"
+                                            onclick="openIndexConvertModal(this)"
+                                            class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-500 transition-colors cursor-pointer"
+                                            title="Convert to Rider Delivery">
+                                            <i class="bi bi-truck"></i>
+                                            <span>Deliver</span>
+                                        </button>
+                                    @endif
+
                                     @if($reservation->canComplete())
                                         <form action="{{ route('admin.reservations.complete', $reservation->id) }}" method="POST" class="inline"
                                               onsubmit="return confirm('Mark {{ $reservation->reservation_code }} as Completed? This deducts {{ $reservation->quantity }} pcs from physical stock and records the full sale.')">
@@ -296,15 +353,24 @@
                                     @endif
 
                                     @if($reservation->canCancel())
-                                        <form action="{{ route('admin.reservations.cancel', $reservation->id) }}" method="POST" class="inline"
-                                              onsubmit="return confirm('Cancel reservation {{ $reservation->reservation_code }}? Any reserved stock will be released back to available inventory.')">
-                                            @csrf
-                                            <button type="submit"
-                                                class="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200/70 transition-colors cursor-pointer"
-                                                title="Cancel Reservation">
-                                                <i class="bi bi-x-circle"></i>
-                                            </button>
-                                        </form>
+                                        @php
+                                            $cancelPayload = [
+                                                'url' => route('admin.reservations.cancel', $reservation->id),
+                                                'code' => $reservation->reservation_code,
+                                                'customer' => $reservation->customer_name,
+                                                'product' => $reservation->product?->product_name ?? 'Product',
+                                                'quantity' => (int) $reservation->quantity,
+                                                'allocated' => (int) $reservation->allocated_quantity,
+                                                'down_payment' => (float) $reservation->down_payment,
+                                            ];
+                                        @endphp
+                                        <button type="button"
+                                            data-cancel="{{ json_encode($cancelPayload) }}"
+                                            onclick="openIndexCancelModal(this)"
+                                            class="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200/70 transition-colors cursor-pointer"
+                                            title="Cancel Reservation">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
                                     @endif
                                 </div>
                             </td>
@@ -341,6 +407,251 @@
                 {{ $reservations->links() }}
             </div>
         @endif
+    </div>
+</div>
+
+<!-- Cancel Reservation Modal -->
+<div id="indexCancelModal" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="indexCancelTitle">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
+        <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="bi bi-x-circle text-rose-400"></i>
+                <h3 id="indexCancelTitle" class="text-sm font-bold">Cancel Reservation</h3>
+            </div>
+            <button type="button" onclick="closeIndexCancelModal()" class="text-slate-400 hover:text-white cursor-pointer">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <form id="indexCancelForm" action="#" method="POST" class="p-6 space-y-4">
+            @csrf
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs flex items-center justify-between">
+                <div>
+                    <span id="idxCancelCustomer" class="font-bold text-slate-900 block">—</span>
+                    <span id="idxCancelProduct" class="text-slate-500">—</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Down Payment</span>
+                    <span id="idxCancelDownPayment" class="text-sm font-black text-emerald-700">₱0.00</span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <span class="block text-xs font-bold text-slate-700">Cancellation Initiated By</span>
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-sky-300 cursor-pointer bg-white">
+                    <input type="radio" name="cancellation_initiated_by" id="idxInitCustomer" value="customer" checked onchange="updateIndexCancelPreview()" class="mt-0.5 text-sky-600 focus:ring-sky-500">
+                    <div class="text-xs">
+                        <span class="font-bold text-slate-900 block">Customer-Initiated Cancellation</span>
+                        <span class="text-[11px] text-slate-500">
+                            @if($cancellationPolicy['enabled'])
+                                Applies configured policy: {{ rtrim(rtrim(number_format($cancellationPolicy['fee_percentage'], 2, '.', ''), '0'), '.') }}% fee / {{ rtrim(rtrim(number_format($cancellationPolicy['refund_percentage'], 2, '.', ''), '0'), '.') }}% refund.
+                            @else
+                                Cancellation fee is currently disabled (0% fee / 100% refund).
+                            @endif
+                        </span>
+                    </div>
+                </label>
+
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-emerald-300 cursor-pointer bg-white">
+                    <input type="radio" name="cancellation_initiated_by" id="idxInitBusiness" value="business" onchange="updateIndexCancelPreview()" class="mt-0.5 text-emerald-600 focus:ring-emerald-500">
+                    <div class="text-xs">
+                        <span class="font-bold text-slate-900 block">Business-Initiated (Unable to Fulfill)</span>
+                        <span class="text-[11px] text-slate-500">Full refund override: ₱0.00 fee and 100% down payment refund.</span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Applied Cancellation Fee (<span id="idxPreviewFeePct">0%</span>)</span>
+                    <span id="idxPreviewFeeAmt" class="font-bold text-rose-600">₱0.00</span>
+                </div>
+                <div class="flex items-center justify-between pt-2 border-t border-slate-200/80">
+                    <span class="font-bold text-slate-800">Refund Amount (Status: Pending)</span>
+                    <span id="idxPreviewRefundAmt" class="text-base font-black text-emerald-700">₱0.00</span>
+                </div>
+                <p id="idxCancelStockNote" class="text-[11px] text-slate-500 pt-1"></p>
+            </div>
+
+            <div>
+                <label for="idx_cancellation_reason" class="block text-xs font-bold text-slate-700 mb-1">Cancellation Reason</label>
+                <input type="text" name="cancellation_reason" id="idx_cancellation_reason" maxlength="255"
+                    placeholder="Optional reason for cancellation audit log"
+                    class="w-full text-xs rounded-xl border-slate-300 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeIndexCancelModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer">
+                    Keep Reservation
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-xs cursor-pointer">
+                    Confirm Cancellation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const indexPolicy = @json($cancellationPolicy);
+    let activeCancelDownPayment = 0;
+
+    function formatIdxPeso(val) {
+        return '₱' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatIdxPct(val) {
+        const r = Math.round(Number(val || 0) * 100) / 100;
+        return (Number.isInteger(r) ? String(r) : r.toFixed(2).replace(/\.?0+$/, '')) + '%';
+    }
+
+    function updateIndexCancelPreview() {
+        const selected = document.querySelector('#indexCancelModal input[name="cancellation_initiated_by"]:checked');
+        const initiator = selected ? selected.value : 'customer';
+        const feePct = (initiator === 'business' || !indexPolicy.enabled) ? 0 : Number(indexPolicy.fee_percentage || 0);
+        const feeAmt = Math.round(activeCancelDownPayment * (feePct / 100) * 100) / 100;
+        const refundAmt = Math.max(0, Math.round((activeCancelDownPayment - feeAmt) * 100) / 100);
+
+        document.getElementById('idxPreviewFeePct').textContent = formatIdxPct(feePct);
+        document.getElementById('idxPreviewFeeAmt').textContent = formatIdxPeso(feeAmt);
+        document.getElementById('idxPreviewRefundAmt').textContent = formatIdxPeso(refundAmt);
+    }
+
+    function openIndexCancelModal(trigger) {
+        const payload = typeof trigger === 'string'
+            ? JSON.parse(trigger)
+            : (trigger && trigger.dataset && trigger.dataset.cancel ? JSON.parse(trigger.dataset.cancel) : trigger);
+        activeCancelDownPayment = Number(payload.down_payment || 0);
+        document.getElementById('indexCancelTitle').textContent = `Cancel Reservation ${payload.code}`;
+        document.getElementById('indexCancelForm').action = payload.url;
+        document.getElementById('idxCancelCustomer').textContent = payload.customer;
+        document.getElementById('idxCancelProduct').textContent = `${payload.quantity} pcs • ${payload.product}`;
+        document.getElementById('idxCancelDownPayment').textContent = formatIdxPeso(activeCancelDownPayment);
+        document.getElementById('idxCancelStockNote').textContent = `Reserved stock (${payload.allocated} pcs) will be released back to Available Stock. Refund stays Pending until handover is confirmed.`;
+        document.getElementById('idxInitCustomer').checked = true;
+        document.getElementById('idx_cancellation_reason').value = '';
+        updateIndexCancelPreview();
+        document.getElementById('indexCancelModal').classList.remove('hidden');
+    }
+
+    function closeIndexCancelModal() {
+        document.getElementById('indexCancelModal').classList.add('hidden');
+    }
+
+    function openIndexConvertModal(trigger) {
+        const data = JSON.parse(trigger.dataset.convert);
+        const subtotal = Number(data.subtotal || 0);
+        const downPayment = Number(data.down_payment || 0);
+        const deliveryFee = subtotal >= 3000 ? 0 : 25;
+        const total = Math.round((subtotal + deliveryFee) * 100) / 100;
+        const pendingCod = Math.max(0, Math.round((total - downPayment) * 100) / 100);
+
+        document.getElementById('idxConvertTitle').textContent = `Convert ${data.code} to Rider Delivery`;
+        document.getElementById('idxConvertForm').action = data.url;
+        document.getElementById('idxConvertCustomer').textContent = data.customer;
+        document.getElementById('idxConvertProduct').textContent = `${data.quantity} pcs • ${data.product}`;
+        document.getElementById('idxConvertAddress').value = data.address || '';
+        document.getElementById('idxConvertSubtotal').textContent = formatIdxPeso(subtotal);
+        document.getElementById('idxConvertFee').textContent = deliveryFee > 0 ? formatIdxPeso(deliveryFee) : 'Free (₱0.00)';
+        document.getElementById('idxConvertTotal').textContent = formatIdxPeso(total);
+        document.getElementById('idxConvertDownPayment').textContent = '-' + formatIdxPeso(downPayment);
+        document.getElementById('idxConvertPendingCod').textContent = pendingCod > 0 ? formatIdxPeso(pendingCod) : '₱0.00 (Fully Paid)';
+        document.getElementById('idxConvertStockNote').textContent = `Reserved stock (${data.allocated} pcs) stays locked while in transit until rider confirms delivery.`;
+        document.getElementById('indexConvertModal').classList.remove('hidden');
+    }
+
+    function closeIndexConvertModal() {
+        document.getElementById('indexConvertModal').classList.add('hidden');
+    }
+</script>
+
+<!-- Convert to Rider Delivery Modal -->
+<div id="indexConvertModal" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="idxConvertTitle">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
+        <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="bi bi-truck text-amber-400"></i>
+                <h3 id="idxConvertTitle" class="text-sm font-bold">Convert to Rider Delivery</h3>
+            </div>
+            <button type="button" onclick="closeIndexConvertModal()" class="text-slate-400 hover:text-white cursor-pointer">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <form id="idxConvertForm" action="#" method="POST" class="p-6 space-y-4">
+            @csrf
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs flex items-center justify-between">
+                <div>
+                    <span id="idxConvertCustomer" class="font-bold text-slate-900 block">—</span>
+                    <span id="idxConvertProduct" class="text-slate-500">—</span>
+                </div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    Pickup Day Dispatch
+                </span>
+            </div>
+
+            <div>
+                <label for="idxConvertAddress" class="block text-xs font-bold text-slate-700 mb-1">Delivery Destination / Address <span class="text-rose-500">*</span></label>
+                <input type="text" name="delivery_address" id="idxConvertAddress" required maxlength="250"
+                    placeholder="Enter complete delivery address and landmark"
+                    class="w-full text-xs rounded-xl border-slate-300 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
+            </div>
+
+            <div>
+                <label for="idxConvertRider" class="block text-xs font-bold text-slate-700 mb-1">Assign Delivery Rider <span class="text-rose-500">*</span></label>
+                @if($activeRiders->isEmpty())
+                    <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                        No active riders available.
+                    </div>
+                @else
+                    <select name="rider_id" id="idxConvertRider" required
+                        class="w-full text-xs font-semibold rounded-xl border-slate-300 bg-white py-2.5 px-3 focus:border-sky-500 focus:ring-sky-500 shadow-2xs">
+                        <option value="">-- Select Active Rider --</option>
+                        @foreach($activeRiders as $riderOption)
+                            <option value="{{ $riderOption->id }}">
+                                {{ $riderOption->name }}@if($riderOption->phone) ({{ $riderOption->phone }})@endif
+                            </option>
+                        @endforeach
+                    </select>
+                @endif
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Product Subtotal</span>
+                    <span id="idxConvertSubtotal" class="font-bold text-slate-900">₱0.00</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Delivery Fee</span>
+                    <span id="idxConvertFee" class="font-bold text-slate-900">₱0.00</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Updated Total Amount</span>
+                    <span id="idxConvertTotal" class="font-bold text-slate-900">₱0.00</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Less Down Payment Paid</span>
+                    <span id="idxConvertDownPayment" class="font-bold text-emerald-700">-₱0.00</span>
+                </div>
+                <div class="flex items-center justify-between pt-2 border-t border-slate-200/80">
+                    <span class="font-bold text-slate-800">Pending Balance to Collect (COD)</span>
+                    <span id="idxConvertPendingCod" class="text-base font-black text-amber-700">₱0.00</span>
+                </div>
+                <p id="idxConvertStockNote" class="text-[11px] text-slate-500 pt-1"></p>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeIndexConvertModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer">
+                    Cancel
+                </button>
+                <button type="submit" {{ $activeRiders->isEmpty() ? 'disabled' : '' }}
+                    class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                    Dispatch to Rider
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection

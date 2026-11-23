@@ -28,8 +28,9 @@ class GenerateForecasts extends Command
      */
     public function handle(): int
     {
+        $rollingWindow = ForecastService::getRollingWindow();
         $targetMonth = $this->option('month')
-            ?? Carbon::now()->addMonth()->format('Y-m');
+            ?? ($rollingWindow['target_year'] . '-01');
 
         $targetLabel = Carbon::createFromFormat('Y-m', $targetMonth)->format('F Y');
 

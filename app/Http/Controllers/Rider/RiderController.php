@@ -10,6 +10,8 @@ use App\Models\AppNotification;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\InventoryService;
+use App\Services\ReservationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -47,7 +49,7 @@ class RiderController extends Controller
         }
 
         // Fetch active deliveries for the current rider
-        $deliveries = Delivery::with(['order.customer', 'order.orderItems.product'])
+        $deliveries = Delivery::with(['order.customer', 'order.orderItems.product', 'order.reservation'])
             ->where('rider_id', $riderId)
             ->whereIn('delivery_status', ['Out for Delivery', 'Assigned'])
             ->orderBy('created_at', 'asc')
@@ -121,28 +123,39 @@ class RiderController extends Controller
             return redirect()->back()->with('error', 'Only active deliveries can be marked as arrived.');
         }
 
+        // Record the exact current server time in Philippine Time (Asia/Manila, UTC+8)
+        $nowInManila = Carbon::now('Asia/Manila');
+
         $delivery->update([
-            'arrived_at' => now(),
+            'arrived_at' => $nowInManila,
         ]);
 
         $order = $delivery->order;
+        if ($order) {
+            $order->touch();
+        }
+
+        $formattedTime = $nowInManila->format('h:i A');
 
         // Notify customer that rider is at the destination
-        AppNotification::create([
-            'user_id' => $order->customer_id,
-            'title' => 'Rider Arrived at Location',
-            'message' => "Your rider has arrived at the destination for Order {$order->order_number}. Please prepare to receive your items.",
-            'link' => route('customer.orders.show', $order->id),
-            'is_read' => false,
-        ]);
+        if ($order && $order->customer_id) {
+            AppNotification::create([
+                'user_id' => $order->customer_id,
+                'title' => 'Rider Arrived at Location',
+                'message' => "Your rider has arrived at the destination for Order {$order->order_number} at {$formattedTime}. Please prepare to receive your items.",
+                'link' => route('customer.orders.show', $order->id),
+                'is_read' => false,
+            ]);
+        }
 
         // Notify admin
         $admins = User::where('role', 'admin')->get();
+        $riderName = $delivery->rider?->name ?? 'Assigned Rider';
         foreach ($admins as $admin) {
             AppNotification::create([
                 'user_id' => $admin->id,
                 'title' => "Rider Arrived: {$order->order_number}",
-                'message' => "Rider {$delivery->rider->name} has arrived at the customer location for Order {$order->order_number}.",
+                'message' => "Rider {$riderName} arrived at customer location for Order {$order->order_number} at {$formattedTime}.",
                 'link' => route('admin.deliveries.index', ['search' => $order->order_number]),
                 'is_read' => false,
             ]);
@@ -151,11 +164,11 @@ class RiderController extends Controller
         AuditLog::create([
             'user_id' => auth()->id(),
             'action' => 'RIDER_ARRIVED',
-            'details' => "Rider arrived at location for Order {$order->order_number}",
+            'details' => "Rider arrived at location for Order {$order->order_number} at {$formattedTime} (Philippine Time)",
             'ip_address' => $request->ip(),
         ]);
 
-        return redirect()->route('rider.dashboard')->with('success', "Arrival recorded for Order {$order->order_number}. Customer notified.");
+        return redirect()->route('rider.dashboard')->with('success', "Arrival recorded at {$formattedTime} for Order {$order->order_number}. Customer notified.");
     }
 
     public function updateStatus(Request $request, Delivery $delivery)
@@ -179,11 +192,19 @@ class RiderController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Update delivery status & metadata
+            $nowManila = Carbon::now('Asia/Manila');
+            $linkedReservation = \App\Models\Reservation::where('order_id', $order->id)->first();
+            $collectibleCod = $order->collectibleCodAmount();
+
+            // 1. Update delivery status & metadata (always accurate Asia/Manila timestamps)
             $deliveryData = [
                 'delivery_status' => $newStatus,
-                'delivered_at' => ($newStatus === 'Delivered') ? now() : null,
+                'delivered_at' => ($newStatus === 'Delivered') ? $nowManila : null,
             ];
+
+            if ($newStatus === 'Delivered' && $delivery->arrived_at === null) {
+                $deliveryData['arrived_at'] = $nowManila;
+            }
 
             if ($newStatus !== 'Delivered') {
                 $deliveryData['cancelled_after_arrival'] = $cancelledAfterArrival;
@@ -193,28 +214,40 @@ class RiderController extends Controller
             $delivery->update($deliveryData);
 
             // 2. Update order status
-            $orderStatus = ($newStatus === 'Delivered')
-                ? (strtolower($order->payment_method ?? 'cod') === 'cod' ? 'Delivered - Pending Remittance' : 'Delivered')
-                : 'Cancelled';
-            $orderData = [
-                'order_status' => $orderStatus,
-            ];
-
-            if ($newStatus !== 'Delivered') {
-                $orderData['cancelled_after_arrival'] = $cancelledAfterArrival;
-                $orderData['cancellation_reason'] = $cancellationReason;
+            if ($newStatus === 'Delivered') {
+                $requiresRemittance = $collectibleCod > 0;
+                $orderStatus = $requiresRemittance ? 'Delivered - Pending Remittance' : 'Delivered';
+                $orderData = [
+                    'order_status' => $orderStatus,
+                ];
+                if (!$requiresRemittance) {
+                    $orderData['payment_status'] = 'paid';
+                    $orderData['paid_at'] = $order->paid_at ?? $nowManila;
+                }
+            } else {
+                $orderData = [
+                    'order_status' => 'Cancelled',
+                    'cancelled_after_arrival' => $cancelledAfterArrival,
+                    'cancellation_reason' => $cancellationReason,
+                ];
             }
 
             $order->update($orderData);
 
             // 3. Fulfill downstream consequences
             if ($newStatus === 'Delivered') {
-                // Record sales
-                Sale::create([
-                    'order_id' => $order->id,
-                    'total_amount' => $order->total_amount,
-                    'sales_date' => now()->toDateString(),
-                ]);
+                if ($linkedReservation) {
+                    // Converted reservation delivery: deduct Physical Stock (FIFO), release Reserved Stock,
+                    // mark Reservation Completed, log fulfilled Sale, and refresh Forecast.
+                    ReservationService::completeConvertedDeliveryOrder($order, auth()->id(), $request->ip());
+                } else {
+                    // Standard online delivery order: record sales
+                    Sale::create([
+                        'order_id' => $order->id,
+                        'total_amount' => $order->total_amount,
+                        'sales_date' => $nowManila->toDateString(),
+                    ]);
+                }
 
                 // Notify customer
                 AppNotification::create([
@@ -228,18 +261,24 @@ class RiderController extends Controller
                 AuditLog::create([
                     'user_id' => auth()->id(),
                     'action' => 'RIDER_DELIVERY_SUCCESS',
-                    'details' => "Rider completed delivery of Order {$order->order_number}",
+                    'details' => "Rider completed delivery of Order {$order->order_number}" . ($linkedReservation ? " (Reservation Delivery — Collected COD: ₱" . number_format($collectibleCod, 2) . ")" : ''),
                     'ip_address' => $request->ip(),
                 ]);
             } else {
-                // Return FIFO inventory back
-                foreach ($order->orderItems as $item) {
-                    InventoryService::addStock(
-                        $item->product_id, 
-                        $item->quantity, 
-                        $item->product->expiration_date, 
-                        "Delivery Cancelled/Failed #{$order->order_number} (" . ($cancelledAfterArrival ? 'Post-Arrival' : 'Standard') . ")"
-                    );
+                if ($linkedReservation) {
+                    // Converted reservation delivery: stock was held in Reserved Stock (not deducted from Physical Stock),
+                    // so release Reserved Stock cleanly without inflating Physical Stock.
+                    ReservationService::cancelConvertedDeliveryOrder($order, $cancellationReason, auth()->id(), $request->ip());
+                } else {
+                    // Standard online delivery order: return FIFO inventory back
+                    foreach ($order->orderItems as $item) {
+                        InventoryService::addStock(
+                            $item->product_id, 
+                            $item->quantity, 
+                            $item->product->expiration_date, 
+                            "Delivery Cancelled/Failed #{$order->order_number} (" . ($cancelledAfterArrival ? 'Post-Arrival' : 'Standard') . ")"
+                        );
+                    }
                 }
 
                 // Notify customer
@@ -296,7 +335,7 @@ class RiderController extends Controller
             return redirect()->route('customer.catalog');
         }
 
-        $deliveries = Delivery::with(['order.customer', 'order.orderItems.product'])
+        $deliveries = Delivery::with(['order.customer', 'order.orderItems.product', 'order.reservation'])
             ->where('rider_id', auth()->id())
             ->where('delivery_status', '!=', 'Out for Delivery')
             ->orderBy('updated_at', 'desc')
@@ -317,7 +356,7 @@ class RiderController extends Controller
             abort(403, 'Unauthorized access to this order record.');
         }
 
-        $order->load(['customer', 'orderItems.product', 'delivery', 'rider']);
+        $order->load(['customer', 'orderItems.product', 'delivery', 'rider', 'reservation']);
 
         $customer = $order->customer;
         $completedOrdersCount = $customer->orders()
@@ -325,6 +364,10 @@ class RiderController extends Controller
             ->count();
 
         if ($request->wantsJson() || $request->ajax()) {
+            $displayCustomerName = $order->reservation?->customer_name ?? $customer->name;
+            $displayCustomerPhone = $order->reservation?->contact_number ?? $customer->phone;
+            $collectibleCod = $order->collectibleCodAmount();
+
             return response()->json([
                 'success' => true,
                 'order' => [
@@ -332,9 +375,14 @@ class RiderController extends Controller
                     'order_number' => $order->order_number,
                     'order_status' => $order->order_status,
                     'order_type' => $order->order_type,
+                    'is_reservation' => $order->isReservationOrder(),
                     'payment_method' => $order->payment_method,
                     'payment_status' => $order->payment_status,
-                    'is_paid' => $order->isPaid(),
+                    'is_paid' => $order->isPaid() || !$order->hasPendingBalance(),
+                    'has_pending_balance' => $order->hasPendingBalance(),
+                    'down_payment_paid' => number_format((float) ($order->down_payment_paid ?? 0), 2),
+                    'pending_balance' => number_format($collectibleCod, 2),
+                    'collectible_cod' => number_format($collectibleCod, 2),
                     'delivery_address' => $order->delivery_address,
                     'schedule_date' => $order->schedule_date ? $order->schedule_date->format('M d, Y') : null,
                     'schedule_time' => $order->schedule_time ? \Carbon\Carbon::parse($order->schedule_time)->format('h:i A') : 'Flexible Window',
@@ -347,20 +395,20 @@ class RiderController extends Controller
                             'name' => $item->product ? $item->product->product_name : 'Item',
                             'size' => $item->product ? $item->product->size : null,
                             'quantity' => $item->quantity,
-                            'price' => number_format($item->unit_price, 2),
+                            'price' => number_format((float) ($item->price ?? $item->unit_price ?? 0), 2),
                             'subtotal' => number_format($item->subtotal, 2),
                         ];
                     }),
                     'delivery' => $order->delivery ? [
                         'id' => $order->delivery->id,
                         'delivery_status' => $order->delivery->delivery_status,
-                        'arrived_at' => $order->delivery->arrived_at ? $order->delivery->arrived_at->format('h:i A') : null,
+                        'arrived_at' => $order->delivery->arrived_at ? $order->delivery->arrived_at->timezone('Asia/Manila')->format('h:i A') : null,
                     ] : null,
                 ],
                 'customer' => [
                     'id' => $customer->id,
-                    'name' => $customer->name,
-                    'phone' => $customer->phone,
+                    'name' => $displayCustomerName,
+                    'phone' => $displayCustomerPhone,
                     'email' => $customer->email,
                     'avatar' => $customer->avatar,
                     'member_since' => $customer->created_at->format('M Y'),

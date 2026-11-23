@@ -76,7 +76,7 @@
             padding: 0 10px !important;
             font-size: 0.8rem !important;
             font-weight: 600 !important;
-            color: #475569 !important; /* slate-600 */
+            color: #356bb6ff !important; /* slate-600 */
             background-color: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 8px !important; /* rounded-lg */
@@ -106,7 +106,7 @@
             border-color: #0ea5e9 !important;
             color: #ffffff !important;
             font-weight: 700 !important;
-            box-shadow: 0 4px 12px -2px rgba(14, 165, 233, 0.35) !important;
+            box-shadow: 0 4px 12px -2px rgba(8, 14, 120, 0.87) !important;
         }
         /* Disabled state */
         nav[role="navigation"] span[aria-disabled="true"] > span {
@@ -604,24 +604,43 @@
 
             // Payment Box
             const isPaid = order.is_paid;
+            const isReservation = Boolean(order.is_reservation);
+            const collectibleCod = order.collectible_cod || order.total_amount;
             const paymentLabel = document.getElementById('modalPaymentLabel');
             const paymentMethod = document.getElementById('modalPaymentMethod');
             const paymentAmount = document.getElementById('modalPaymentAmount');
             const paymentBox = document.getElementById('modalPaymentBox');
 
-            paymentMethod.innerText = (order.payment_method || 'COD').toUpperCase();
-            if (isPaid) {
-                paymentBox.className = 'p-3 rounded-2xl border bg-emerald-50/70 border-emerald-200 text-emerald-900 flex items-center justify-between';
-                paymentLabel.innerText = 'ONLINE PAYMENT (PAID)';
-                paymentLabel.className = 'block text-[8px] font-black uppercase tracking-wider text-emerald-700';
-                paymentAmount.innerText = '₱0.00 to collect';
-                paymentAmount.className = 'text-xs font-bold text-emerald-700 bg-white/80 px-2 py-0.5 rounded-lg border border-emerald-200';
+            if (isReservation) {
+                paymentMethod.innerText = `Down Payment: ₱${order.down_payment_paid || '0.00'} Paid • Fee: ${order.delivery_fee === '0.00' ? 'Free' : '₱' + order.delivery_fee}`;
+                if (isPaid || !order.has_pending_balance) {
+                    paymentBox.className = 'p-3 rounded-2xl border bg-emerald-50/70 border-emerald-200 text-emerald-900 flex items-center justify-between gap-2';
+                    paymentLabel.innerText = 'RESERVATION FULLY PAID';
+                    paymentLabel.className = 'block text-[8px] font-black uppercase tracking-wider text-emerald-700';
+                    paymentAmount.innerText = '₱0.00 to Collect';
+                    paymentAmount.className = 'text-xs font-bold text-emerald-700 bg-white/80 px-2 py-0.5 rounded-lg border border-emerald-200 shrink-0';
+                } else {
+                    paymentBox.className = 'p-3 rounded-2xl border bg-amber-50/80 border-amber-200 text-amber-950 flex items-center justify-between gap-2';
+                    paymentLabel.innerText = 'RESERVATION PENDING BALANCE (COD)';
+                    paymentLabel.className = 'block text-[8px] font-black uppercase tracking-wider text-amber-700';
+                    paymentAmount.innerText = `₱${collectibleCod}`;
+                    paymentAmount.className = 'text-sm font-black text-slate-950 shrink-0';
+                }
             } else {
-                paymentBox.className = 'p-3 rounded-2xl border bg-slate-50 border-slate-200 text-slate-800 flex items-center justify-between';
-                paymentLabel.innerText = 'CASH ON DELIVERY';
-                paymentLabel.className = 'block text-[8px] font-black uppercase tracking-wider text-slate-500';
-                paymentAmount.innerText = `₱${order.total_amount}`;
-                paymentAmount.className = 'text-sm font-black text-slate-950';
+                paymentMethod.innerText = (order.payment_method || 'COD').toUpperCase();
+                if (isPaid) {
+                    paymentBox.className = 'p-3 rounded-2xl border bg-emerald-50/70 border-emerald-200 text-emerald-900 flex items-center justify-between';
+                    paymentLabel.innerText = 'ONLINE PAYMENT (PAID)';
+                    paymentLabel.className = 'block text-[8px] font-black uppercase tracking-wider text-emerald-700';
+                    paymentAmount.innerText = '₱0.00 to collect';
+                    paymentAmount.className = 'text-xs font-bold text-emerald-700 bg-white/80 px-2 py-0.5 rounded-lg border border-emerald-200';
+                } else {
+                    paymentBox.className = 'p-3 rounded-2xl border bg-slate-50 border-slate-200 text-slate-800 flex items-center justify-between';
+                    paymentLabel.innerText = 'CASH ON DELIVERY';
+                    paymentLabel.className = 'block text-[8px] font-black uppercase tracking-wider text-slate-500';
+                    paymentAmount.innerText = `₱${collectibleCod}`;
+                    paymentAmount.className = 'text-sm font-black text-slate-950';
+                }
             }
 
             // Items list

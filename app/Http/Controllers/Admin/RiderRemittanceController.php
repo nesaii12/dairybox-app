@@ -30,29 +30,46 @@ class RiderRemittanceController extends Controller
             ->get();
 
         $activeRiders->each(function ($rider) {
-            $pendingOrders = Order::where('rider_id', $rider->id)
+            $pendingOrders = Order::with('reservation')
+                ->where(function ($q) use ($rider) {
+                    $q->where('rider_id', $rider->id)
+                      ->orWhereHas('delivery', function ($dq) use ($rider) {
+                          $dq->where('rider_id', $rider->id);
+                      });
+                })
                 ->where('order_type', 'Delivery')
                 ->whereRaw("LOWER(payment_method) = 'cod'")
                 ->whereNull('remittance_id')
                 ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
-                ->get();
+                ->get()
+                ->filter(fn ($order) => $order->collectibleCodAmount() > 0)
+                ->values();
 
             $rider->pending_orders_count = $pendingOrders->count();
-            $rider->pending_cod_total = (float) $pendingOrders->sum('total_amount');
+            $rider->pending_cod_total = (float) $pendingOrders->sum(fn ($order) => $order->collectibleCodAmount());
         });
 
-        // 2. High-Level Metrics
+        // Sort riders so those with pending unremitted cash appear first
+        $activeRiders = $activeRiders->sortByDesc('pending_cod_total')->values();
+        $ridersWithPending = $activeRiders->filter(fn($r) => $r->pending_cod_total > 0)->values();
+
+        // 2. High-Level Metrics (scoped to rider remittances so reservation ledger entries do not distort rider metrics)
         $today = Carbon::today()->toDateString();
 
-        $totalRemittedToday = (float) CashLedgerEntry::whereDate('ledger_date', $today)->sum('amount_remitted');
+        $totalRemittedToday = (float) CashLedgerEntry::whereDate('ledger_date', $today)
+            ->where('entry_type', 'RIDER_REMITTANCE')
+            ->sum('amount_remitted');
         $pendingVerificationsCount = RiderRemittance::where('status', 'pending_verification')->count();
-        $todayNetVariance = (float) CashLedgerEntry::whereDate('ledger_date', $today)->sum('variance');
+        $todayNetVariance = (float) CashLedgerEntry::whereDate('ledger_date', $today)
+            ->where('entry_type', 'RIDER_REMITTANCE')
+            ->sum('variance');
 
         $totalUnremittedCash = (float) Order::where('order_type', 'Delivery')
             ->whereRaw("LOWER(payment_method) = 'cod'")
             ->whereNull('remittance_id')
             ->whereIn('order_status', ['Delivered', 'Delivered - Pending Remittance'])
-            ->sum('total_amount');
+            ->get()
+            ->sum(fn ($order) => $order->collectibleCodAmount());
 
         // 3. Remittance History with timeframe and multi-criteria filtering
         [$historyQuery, $dates] = $this->buildRemittanceQuery($request);
@@ -61,7 +78,7 @@ class RiderRemittanceController extends Controller
         $filterType = $dates['filter_type'];
 
         // 4. Daily Cash Ledger with filtering
-        $ledgerQuery = CashLedgerEntry::with(['admin', 'rider', 'remittance'])
+        $ledgerQuery = CashLedgerEntry::with(['admin', 'rider', 'remittance', 'reservation'])
             ->latest('recorded_at');
 
         if ($request->filled('ledger_date')) {
@@ -78,6 +95,7 @@ class RiderRemittanceController extends Controller
 
         return view('admin.remittances.index', compact(
             'activeRiders',
+            'ridersWithPending',
             'remittances',
             'ledgerEntries',
             'totalRemittedToday',
@@ -257,8 +275,13 @@ class RiderRemittanceController extends Controller
      */
     public function getRiderOrders(User $rider)
     {
-        $orders = Order::with('customer')
-            ->where('rider_id', $rider->id)
+        $orders = Order::with(['customer', 'reservation'])
+            ->where(function ($q) use ($rider) {
+                $q->where('rider_id', $rider->id)
+                  ->orWhereHas('delivery', function ($dq) use ($rider) {
+                      $dq->where('rider_id', $rider->id);
+                  });
+            })
             ->where('order_type', 'Delivery')
             ->whereRaw("LOWER(payment_method) = 'cod'")
             ->whereNull('remittance_id')
@@ -266,16 +289,25 @@ class RiderRemittanceController extends Controller
             ->orderBy('schedule_date', 'desc')
             ->orderBy('id', 'desc')
             ->get()
+            ->filter(fn ($order) => $order->collectibleCodAmount() > 0)
+            ->values()
             ->map(function ($order) {
+                $codCollectible = $order->collectibleCodAmount();
+                $customerName = $order->reservation?->customer_name ?? $order->customer?->name ?? 'Guest Customer';
+                $customerPhone = $order->reservation?->contact_number ?? $order->customer?->phone ?? 'N/A';
+
                 return [
                     'id' => $order->id,
                     'order_number' => $order->order_number,
-                    'customer_name' => $order->customer?->name ?? 'Guest Customer',
-                    'customer_phone' => $order->customer?->phone ?? 'N/A',
+                    'customer_name' => $customerName,
+                    'customer_phone' => $customerPhone,
                     'delivery_address' => $order->delivery_address ?? 'Store Area',
                     'schedule_date' => $order->schedule_date ? $order->schedule_date->format('M d, Y') : 'N/A',
                     'schedule_time' => $order->schedule_time ?? 'Standard Run',
-                    'total_amount' => (float) $order->total_amount,
+                    'total_amount' => $codCollectible,
+                    'order_total_sales' => (float) $order->total_amount,
+                    'down_payment_paid' => (float) ($order->down_payment_paid ?? 0),
+                    'is_reservation' => $order->isReservationOrder(),
                     'order_status' => $order->order_status,
                     'batch_id' => 'BATCH-' . ($order->schedule_date ? $order->schedule_date->format('Ymd') : date('Ymd')),
                 ];
@@ -314,7 +346,12 @@ class RiderRemittanceController extends Controller
 
         // Fetch selected orders and verify integrity
         $orders = Order::whereIn('id', $request->order_ids)
-            ->where('rider_id', $rider->id)
+            ->where(function ($q) use ($rider) {
+                $q->where('rider_id', $rider->id)
+                  ->orWhereHas('delivery', function ($dq) use ($rider) {
+                      $dq->where('rider_id', $rider->id);
+                  });
+            })
             ->whereNull('remittance_id')
             ->get();
 
@@ -324,7 +361,7 @@ class RiderRemittanceController extends Controller
                 ->with('error', 'No valid unremitted orders found for this rider run.');
         }
 
-        $expectedAmount = (float) $orders->sum('total_amount');
+        $expectedAmount = (float) $orders->sum(fn ($order) => $order->collectibleCodAmount());
         $actualAmount = (float) $request->actual_amount;
         $variance = round($actualAmount - $expectedAmount, 2);
         $isConfirm = $request->action_type === 'confirm';
@@ -352,9 +389,9 @@ class RiderRemittanceController extends Controller
 
             // 2. Attach orders and update order statuses
             foreach ($orders as $order) {
-                // Attach to pivot
+                // Attach to pivot using exact collectible COD amount (Pending Balance for converted reservations)
                 $remittance->orders()->attach($order->id, [
-                    'amount' => $order->total_amount,
+                    'amount' => $order->collectibleCodAmount(),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -438,7 +475,7 @@ class RiderRemittanceController extends Controller
      */
     public function show(RiderRemittance $remittance)
     {
-        $remittance->load(['rider', 'admin', 'orders.customer', 'orders.orderItems.product', 'ledgerEntry']);
+        $remittance->load(['rider', 'admin', 'orders.customer', 'orders.reservation', 'orders.orderItems.product', 'ledgerEntry']);
 
         return response()->json([
             'success' => true,
@@ -462,12 +499,12 @@ class RiderRemittanceController extends Controller
                     return [
                         'id' => $order->id,
                         'order_number' => $order->order_number,
-                        'customer_name' => $order->customer?->name ?? 'Guest Customer',
+                        'customer_name' => $order->reservation?->customer_name ?? $order->customer?->name ?? 'Guest Customer',
                         'delivery_address' => $order->delivery_address ?? 'N/A',
                         'total_sales_value' => (float) $order->total_amount,
                         'subtotal' => (float) $order->subtotal,
                         'delivery_fee' => (float) $order->delivery_fee,
-                        'amount' => (float) ($order->pivot->amount ?? $order->total_amount),
+                        'amount' => (float) ($order->pivot->amount ?? $order->collectibleCodAmount()),
                         'order_status' => $order->order_status,
                         'items' => $order->orderItems->map(function ($item) {
                             return [

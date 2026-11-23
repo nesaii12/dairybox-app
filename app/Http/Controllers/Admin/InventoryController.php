@@ -42,6 +42,17 @@ class InventoryController extends Controller
                 ->orderBy('expiration_date', 'asc')
                 ->orderBy('created_at', 'desc');
 
+        } elseif ($filter === 'expired') {
+            // Products with at least one active batch already past its expiration date
+            $productQuery->where('stock', '>', 0)
+                ->whereHas('inventories', function ($q) use ($today) {
+                    $q->where('remaining_stock', '>', 0)
+                      ->whereNotNull('expiration_date')
+                      ->whereDate('expiration_date', '<', $today);
+                })
+                ->orderBy('expiration_date', 'asc')
+                ->orderBy('created_at', 'desc');
+
         } elseif ($filter === 'new_stock') {
             // Only products with genuinely recent stock-in batches (last 24 hours)
             // that are not cancelled-delivery returns and not already near-expiry or expired
@@ -132,7 +143,15 @@ class InventoryController extends Controller
 
         try {
             if ($request->adjustment_type === 'in') {
-                InventoryService::addStock($productId, $qty, $request->expiration_date, $remarks, $request->manufacturing_date);
+                if (((int) $product->stock + (int) $qty) > Product::MAX_STOCK_LIMIT) {
+                    $limitMsg = InventoryService::stockLimitExceededMessage($product, (int) $qty);
+                    return redirect()->back()
+                        ->withErrors(['quantity' => $limitMsg])
+                        ->with('error', $limitMsg)
+                        ->withInput();
+                }
+
+                InventoryService::addStock($productId, $qty, $request->expiration_date, $remarks, $request->manufacturing_date, true);
                 
                 AuditLog::create([
                     'user_id' => auth()->id(),
@@ -164,7 +183,7 @@ class InventoryController extends Controller
                 return redirect()->route('admin.inventory.index')->with('success', "Stock deducted successfully for {$product->product_name} under FIFO resolution.");
             }
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', "Inventory deduction failed: " . $e->getMessage())
+            return redirect()->back()->with('error', "Inventory adjustment failed: " . $e->getMessage())
                 ->withInput();
         }
     }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Inventory;
+use App\Models\User;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -88,5 +89,67 @@ class InventoryTest extends TestCase
         $this->expectExceptionMessage("Insufficient stock for product ID {$product->id} under FIFO resolution.");
 
         InventoryService::deductStock($product->id, 10, 'checkout');
+    }
+
+    public function test_stock_in_rejects_expiration_date_before_manufacturing_date(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $category = Category::create(['category_name' => 'Dairy']);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'product_name' => 'Mango Graham Bar',
+            'description' => 'Fresh batch',
+            'milk_type' => 'Cow',
+            'size' => 'Medium',
+            'price' => 50.00,
+            'stock' => 10,
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('admin.inventory.adjust'), [
+            'product_id' => $product->id,
+            'adjustment_type' => 'in',
+            'quantity' => 25,
+            'manufacturing_date' => now()->toDateString(),
+            'expiration_date' => now()->subDays(20)->toDateString(),
+            'remarks' => 'Invalid batch dates',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'expiration_date' => 'Expiration date must be on or after the manufacturing date.',
+        ]);
+
+        $this->assertEquals(10, $product->fresh()->stock);
+    }
+
+    public function test_stock_in_accepts_expiration_date_on_or_after_manufacturing_date(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $category = Category::create(['category_name' => 'Dairy']);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'product_name' => 'Mango Graham Bar',
+            'description' => 'Fresh batch',
+            'milk_type' => 'Cow',
+            'size' => 'Medium',
+            'price' => 50.00,
+            'stock' => 10,
+            'status' => 'active',
+        ]);
+
+        $today = now()->toDateString();
+
+        $response = $this->actingAs($admin)->post(route('admin.inventory.adjust'), [
+            'product_id' => $product->id,
+            'adjustment_type' => 'in',
+            'quantity' => 15,
+            'manufacturing_date' => $today,
+            'expiration_date' => $today,
+            'remarks' => 'Same-day expiry batch',
+        ]);
+
+        $response->assertRedirect(route('admin.inventory.index'));
+        $response->assertSessionHasNoErrors();
+        $this->assertEquals(25, $product->fresh()->stock);
     }
 }

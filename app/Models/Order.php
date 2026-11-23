@@ -30,6 +30,8 @@ class Order extends Model
         'subtotal',
         'delivery_fee',
         'total_amount',
+        'down_payment_paid',
+        'pending_balance',
         'order_status',
         'cancelled_after_arrival',
         'cancellation_reason',
@@ -42,6 +44,8 @@ class Order extends Model
             'subtotal' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'down_payment_paid' => 'decimal:2',
+            'pending_balance' => 'decimal:2',
             'cancelled_after_arrival' => 'boolean',
             'paid_at' => 'datetime',
         ];
@@ -49,12 +53,47 @@ class Order extends Model
 
     public function isPaid(): bool
     {
-        return strtolower($this->payment_status) === 'paid';
+        return strtolower((string) $this->payment_status) === 'paid';
     }
 
     public function isOnlinePayment(): bool
     {
-        return strtolower($this->payment_method) === 'xendit';
+        return strtolower((string) $this->payment_method) === 'xendit';
+    }
+
+    public function isReservationOrder(): bool
+    {
+        return (float) ($this->down_payment_paid ?? 0) > 0
+            || $this->pending_balance !== null
+            || ($this->relationLoaded('reservation') && $this->reservation !== null);
+    }
+
+    /**
+     * Exact cash-on-delivery (COD) amount the rider must collect upon handover and remit to admin.
+     * - Paid orders: ₱0.00
+     * - Converted reservation deliveries: pending_balance (Total Amount - Down Payment Paid)
+     * - Standard COD orders: total_amount
+     */
+    public function collectibleCodAmount(): float
+    {
+        if ($this->isPaid()) {
+            return 0.00;
+        }
+
+        if ($this->pending_balance !== null) {
+            return round(max(0.0, (float) $this->pending_balance), 2);
+        }
+
+        if (strtolower((string) $this->payment_method) === 'cod') {
+            return round(max(0.0, (float) $this->total_amount), 2);
+        }
+
+        return 0.00;
+    }
+
+    public function hasPendingBalance(): bool
+    {
+        return $this->collectibleCodAmount() > 0;
     }
 
     /**
@@ -148,6 +187,11 @@ class Order extends Model
     public function sale(): HasOne
     {
         return $this->hasOne(Sale::class);
+    }
+
+    public function reservation(): HasOne
+    {
+        return $this->hasOne(Reservation::class, 'order_id');
     }
 
     /**

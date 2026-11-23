@@ -97,7 +97,7 @@
                 <p class="text-xs text-rose-700 mt-1">
                     The rider reported that the customer cancelled this order after arrival at the delivery destination
                     @if($order->delivery?->arrived_at)
-                        ({{ $order->delivery->arrived_at->format('M d, Y h:i A') }})
+                        ({{ $order->delivery->arrived_at->timezone('Asia/Manila')->format('M d, Y h:i A') }})
                     @endif.
                 </p>
                 @if($order->cancellation_reason || $order->delivery?->cancellation_reason)
@@ -478,7 +478,7 @@
                     </div>
                     @if($order->delivery?->arrived_at)
                         <div class="mt-2 pt-2 border-t border-sky-200/60 flex items-center text-[11px] text-emerald-700 font-semibold">
-                            <i class="bi bi-geo-alt-fill mr-1 text-emerald-600"></i> Arrived at Destination ({{ $order->delivery->arrived_at->format('h:i A') }})
+                            <i class="bi bi-geo-alt-fill mr-1 text-emerald-600"></i> Arrived at Destination ({{ $order->delivery->arrived_at->timezone('Asia/Manila')->format('h:i A') }})
                         </div>
                     @endif
                 </div>

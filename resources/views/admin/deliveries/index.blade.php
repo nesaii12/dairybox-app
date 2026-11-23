@@ -129,6 +129,8 @@
                     $rider = $delivery->rider;
                     $isPostArrivalCancel = $delivery->cancelled_after_arrival;
                     $isCustomerRestricted = $customer->status === 'restricted' && $customer->restricted_until && $customer->restricted_until->isFuture();
+                    $displayCustomerName = $order->reservation?->customer_name ?? $customer->name;
+                    $displayCustomerPhone = $order->reservation?->contact_number ?? $customer->phone;
                 @endphp
                 <tr id="delivery-{{ $delivery->id }}" data-record-id="delivery-{{ $delivery->id }}" data-record-number="{{ $order->order_number }}" class="hover:bg-slate-50/50 transition-colors record-highlight-target {{ $isPostArrivalCancel && !$delivery->admin_verified_at ? 'bg-rose-50/30' : '' }}">
                     <!-- Order Info -->
@@ -140,6 +142,15 @@
                             <span class="text-[10px] text-slate-500">
                                 ₱{{ number_format($order->total_amount, 2) }} &bull; {{ $order->orderItems->count() }} item(s)
                             </span>
+                            @if($order->isReservationOrder())
+                                <span class="inline-flex items-center w-max px-1.5 py-0.5 rounded text-[9px] font-bold {{ $order->hasPendingBalance() ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
+                                    @if($order->hasPendingBalance())
+                                        Reservation COD: ₱{{ number_format($order->collectibleCodAmount(), 2) }}
+                                    @else
+                                        Reservation Fully Paid
+                                    @endif
+                                </span>
+                            @endif
                             <span class="text-[9px] text-slate-400">
                                 Scheduled: {{ \Carbon\Carbon::parse($order->schedule_date)->format('M d, Y') }}
                             </span>
@@ -150,14 +161,14 @@
                     <td class="px-6 py-4">
                         <div class="flex flex-col space-y-1 max-w-xs">
                             <div class="flex items-center gap-1.5">
-                                <span class="font-bold text-slate-900">{{ $customer->name }}</span>
+                                <span class="font-bold text-slate-900">{{ $displayCustomerName }}</span>
                                 @if($isCustomerRestricted)
                                     <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-100 text-rose-700 border border-rose-200">
                                         Restricted (3-Day Ban)
                                     </span>
                                 @endif
                             </div>
-                            <span class="text-[10px] text-slate-500 font-mono">{{ $customer->phone ?? 'No phone' }}</span>
+                            <span class="text-[10px] text-slate-500 font-mono">{{ $displayCustomerPhone ?? 'No phone' }}</span>
                             <p class="text-[11px] text-slate-600 truncate" title="{{ $order->delivery_address }}">
                                 <i class="bi bi-geo-alt text-slate-400 mr-0.5"></i>{{ $order->delivery_address }}
                             </p>
@@ -186,12 +197,12 @@
                         <div class="flex flex-col space-y-1 text-[11px]">
                             <div class="flex items-center gap-1.5 text-slate-600">
                                 <i class="bi bi-box-arrow-right text-slate-400 text-[10px]"></i>
-                                <span>Dispatched: {{ $delivery->created_at->format('M d, h:i A') }}</span>
+                                <span>Dispatched: {{ $delivery->created_at->timezone('Asia/Manila')->format('M d, h:i A') }}</span>
                             </div>
                             @if($delivery->arrived_at)
                                 <div class="flex items-center gap-1.5 text-amber-700 font-medium">
                                     <i class="bi bi-geo-alt-fill text-amber-500 text-[10px]"></i>
-                                    <span>Arrived: {{ $delivery->arrived_at->format('M d, h:i A') }}</span>
+                                    <span class="delivery-arrived-time">Arrived: {{ $delivery->arrived_at->timezone('Asia/Manila')->format('M d, h:i A') }}</span>
                                 </div>
                             @else
                                 <div class="flex items-center gap-1.5 text-slate-400 italic">
@@ -202,7 +213,7 @@
                             @if($delivery->delivered_at)
                                 <div class="flex items-center gap-1.5 text-emerald-700 font-medium">
                                     <i class="bi bi-check-circle-fill text-emerald-500 text-[10px]"></i>
-                                    <span>Completed: {{ $delivery->delivered_at->format('M d, h:i A') }}</span>
+                                    <span>Completed: {{ $delivery->delivered_at->timezone('Asia/Manila')->format('M d, h:i A') }}</span>
                                 </div>
                             @endif
                         </div>

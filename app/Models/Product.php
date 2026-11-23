@@ -11,6 +11,11 @@ class Product extends Model
 {
     use HasFactory;
 
+    /**
+     * Maximum physical stock allowed per product to prevent dairy spoilage.
+     */
+    public const MAX_STOCK_LIMIT = 100;
+
     protected $fillable = [
         'category_id',
         'product_name',
@@ -92,6 +97,22 @@ class Product extends Model
     public function getAvailableStockAttribute(): int
     {
         return max(0, (int) ($this->attributes['stock'] ?? 0) - (int) ($this->attributes['reserved_stock'] ?? 0));
+    }
+
+    /**
+     * Remaining stock capacity before reaching the per-product spoilage limit.
+     */
+    public function getRemainingStockCapacityAttribute(): int
+    {
+        return max(0, self::MAX_STOCK_LIMIT - (int) ($this->attributes['stock'] ?? 0));
+    }
+
+    /**
+     * Check if the product has reached or exceeded the maximum stock limit.
+     */
+    public function isAtMaxStock(): bool
+    {
+        return (int) ($this->attributes['stock'] ?? 0) >= self::MAX_STOCK_LIMIT;
     }
 
     /**

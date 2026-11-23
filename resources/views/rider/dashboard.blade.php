@@ -71,6 +71,12 @@
         @php
             $order = $delivery->order;
             $customer = $order->customer;
+            $isReservation = $order->isReservationOrder();
+            $downPaymentPaid = (float) ($order->down_payment_paid ?? 0);
+            $collectibleCod = $order->collectibleCodAmount();
+            $hasPendingBalance = $order->hasPendingBalance();
+            $displayCustomerName = $order->reservation?->customer_name ?? $customer->name;
+            $displayCustomerPhone = $order->reservation?->contact_number ?? $customer->phone;
         @endphp
         <!-- Modern Tactile Card -->
         <div id="delivery-{{ $delivery->id }}" data-record-id="delivery-{{ $delivery->id }}" data-record-number="{{ $order->order_number }}" class="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-200/80 hover:shadow-md transition-all duration-300 record-highlight-target">
@@ -79,12 +85,34 @@
                 <div class="flex items-center space-x-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
                     <div>
-                        <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">ORDER REF</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">{{ $isReservation ? 'RESERVATION DELIVERY' : 'ORDER REF' }}</span>
+                            @if($isReservation)
+                                <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Converted Pickup</span>
+                            @endif
+                        </div>
                         <h3 class="text-xs font-bold text-slate-800 font-mono leading-none mt-0.5">{{ $order->order_number }}</h3>
                     </div>
                 </div>
                 <div class="text-right">
-                    @if($order->isPaid())
+                    @if($isReservation)
+                        @if($hasPendingBalance)
+                            <span class="text-[8px] font-black text-amber-700 uppercase tracking-widest block">COLLECT CASH (COD)</span>
+                            <span class="text-sm font-black text-slate-950 block leading-tight">
+                                ₱{{ number_format($collectibleCod, 2) }}
+                            </span>
+                            <span class="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
+                                Pending Balance
+                            </span>
+                        @else
+                            <span class="text-[8px] font-black text-emerald-600 uppercase tracking-widest block flex items-center justify-end">
+                                <i class="bi bi-check-circle-fill mr-1 text-[8px]"></i> FULLY PAID
+                            </span>
+                            <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg inline-block mt-0.5">
+                                Fully Paid / ₱0.00 to Collect
+                            </span>
+                        @endif
+                    @elseif($order->isPaid())
                         <span class="text-[8px] font-black text-emerald-600 uppercase tracking-widest block flex items-center justify-end">
                             <i class="bi bi-check-circle-fill mr-1 text-[8px]"></i> PAID ONLINE
                         </span>
@@ -94,11 +122,35 @@
                     @else
                         <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">COLLECT CASH</span>
                         <span class="text-sm font-black text-slate-950">
-                            ₱{{ number_format($order->total_amount, 2) }}
+                            ₱{{ number_format($collectibleCod, 2) }}
                         </span>
                     @endif
                 </div>
             </div>
+
+            @if($isReservation)
+                <!-- Explicit Reservation Balance & COD Collection Breakdown -->
+                <div class="mb-4 p-3 rounded-2xl border {{ $hasPendingBalance ? 'bg-amber-50/70 border-amber-200' : 'bg-emerald-50/70 border-emerald-200' }} text-[11px] space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-600 font-medium">Down Payment Paid</span>
+                        <span class="font-bold text-emerald-700">₱{{ number_format($downPaymentPaid, 2) }} Paid</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-600 font-medium">Delivery Fee</span>
+                        <span class="font-bold {{ (float) $order->delivery_fee > 0 ? 'text-slate-800' : 'text-emerald-700' }}">
+                            {{ (float) $order->delivery_fee > 0 ? '₱' . number_format((float) $order->delivery_fee, 2) : 'Free' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between pt-1.5 border-t {{ $hasPendingBalance ? 'border-amber-200/80' : 'border-emerald-200/80' }}">
+                        <span class="font-bold text-slate-800">Remaining / Pending Balance</span>
+                        @if($hasPendingBalance)
+                            <span class="font-black text-amber-800">Collect Cash (COD): ₱{{ number_format($collectibleCod, 2) }}</span>
+                        @else
+                            <span class="font-black text-emerald-700">Fully Paid / ₱0.00 to Collect</span>
+                        @endif
+                    </div>
+                </div>
+            @endif
 
             <!-- Customer & Delivery Specs -->
             <div class="space-y-3.5 mb-4 text-[11px] text-slate-600">
@@ -106,11 +158,11 @@
                 <div class="flex items-center justify-between p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100">
                     <div class="flex items-center space-x-2.5 min-w-0">
                         <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-sky-400 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0 uppercase">
-                            {{ strtoupper(substr($customer->name, 0, 1)) }}
+                            {{ strtoupper(substr($displayCustomerName, 0, 1)) }}
                         </div>
                         <div class="min-w-0">
                             <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Client Name</span>
-                            <span class="text-xs font-bold text-slate-900 truncate block">{{ $customer->name }}</span>
+                            <span class="text-xs font-bold text-slate-900 truncate block">{{ $displayCustomerName }}</span>
                         </div>
                     </div>
                     <button type="button" onclick="showDeliveryCustomerDetails({{ $delivery->id }})" class="shrink-0 text-[10px] font-bold text-sky-700 bg-white hover:bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-xl shadow-2xs transition cursor-pointer flex items-center gap-1">
@@ -127,16 +179,16 @@
                         </div>
                         <div class="min-w-0">
                             <span class="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Contact Phone</span>
-                            <span class="text-xs font-semibold text-slate-800 select-all">{{ $customer->phone ?? 'N/A' }}</span>
+                            <span class="text-xs font-semibold text-slate-800 select-all">{{ $displayCustomerPhone ?? 'N/A' }}</span>
                         </div>
                     </div>
-                    @if($customer->phone)
+                    @if($displayCustomerPhone)
                         <div class="flex items-center space-x-1.5 shrink-0">
-                            <a href="tel:{{ $customer->phone }}" class="p-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="Call Customer">
+                            <a href="tel:{{ $displayCustomerPhone }}" class="p-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="Call Customer">
                                 <i class="bi bi-telephone-fill text-[10px]"></i>
                                 <span class="text-[9px]">Call</span>
                             </a>
-                            <a href="sms:{{ $customer->phone }}" class="p-1.5 px-2 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg border border-sky-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="SMS Customer">
+                            <a href="sms:{{ $displayCustomerPhone }}" class="p-1.5 px-2 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg border border-sky-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="SMS Customer">
                                 <i class="bi bi-chat-dots-fill text-[10px]"></i>
                                 <span class="text-[9px]">SMS</span>
                             </a>
@@ -207,7 +259,7 @@
                             <i class="bi bi-geo-alt-fill text-sky-600"></i>
                             <span>Arrived at Customer Location</span>
                         </span>
-                        <span class="text-[10px] text-sky-700 font-mono">{{ $delivery->arrived_at->format('h:i A') }}</span>
+                        <span class="text-[10px] text-sky-700 font-mono">{{ $delivery->arrived_at->timezone('Asia/Manila')->format('h:i A') }}</span>
                     </div>
                 @endif
 
@@ -406,9 +458,13 @@
                 order_number: @js($delivery->order->order_number),
                 order_status: @js($delivery->order->order_status),
                 order_type: @js($delivery->order->order_type),
+                is_reservation: {{ $delivery->order->isReservationOrder() ? 'true' : 'false' }},
                 payment_method: @js($delivery->order->payment_method),
                 payment_status: @js($delivery->order->payment_status),
-                is_paid: {{ $delivery->order->isPaid() ? 'true' : 'false' }},
+                is_paid: {{ ($delivery->order->isPaid() || !$delivery->order->hasPendingBalance()) ? 'true' : 'false' }},
+                has_pending_balance: {{ $delivery->order->hasPendingBalance() ? 'true' : 'false' }},
+                down_payment_paid: @js(number_format((float) ($delivery->order->down_payment_paid ?? 0), 2)),
+                collectible_cod: @js(number_format($delivery->order->collectibleCodAmount(), 2)),
                 delivery_address: @js($delivery->order->delivery_address),
                 schedule_date: @js($delivery->order->schedule_date ? $delivery->order->schedule_date->format('M d, Y') : null),
                 schedule_time: @js($delivery->order->schedule_time ? \Carbon\Carbon::parse($delivery->order->schedule_time)->format('h:i A') : 'Flexible Window'),
@@ -422,7 +478,7 @@
                         name: @js($item->product ? $item->product->product_name : 'Dairy Product'),
                         size: @js($item->product ? $item->product->size : null),
                         quantity: {{ $item->quantity }},
-                        price: @js(number_format($item->unit_price, 2)),
+                        price: @js(number_format((float) ($item->price ?? $item->unit_price ?? 0), 2)),
                         subtotal: @js(number_format($item->subtotal, 2)),
                     },
                     @endforeach
@@ -430,8 +486,8 @@
             },
             customer: {
                 id: {{ $delivery->order->customer->id }},
-                name: @js($delivery->order->customer->name),
-                phone: @js($delivery->order->customer->phone),
+                name: @js($delivery->order->reservation?->customer_name ?? $delivery->order->customer->name),
+                phone: @js($delivery->order->reservation?->contact_number ?? $delivery->order->customer->phone),
                 email: @js($delivery->order->customer->email),
                 avatar: @js($delivery->order->customer->avatar),
                 member_since: @js($delivery->order->customer->created_at->format('M Y')),

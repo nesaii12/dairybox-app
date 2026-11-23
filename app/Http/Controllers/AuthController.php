@@ -154,6 +154,7 @@ class AuthController extends Controller
                 'cooldown' => $cooldown,
                 'masked_email' => $otpService->maskEmail($normalizedEmail),
                 'masked_phone' => $smsOtpService->maskPhone($pendingData['phone']),
+                'delivery_channel' => $smsOtpService->isGatewayConfigured() ? 'sms' : 'sms_fallback_email',
                 'email' => $normalizedEmail,
                 'phone' => $pendingData['phone'],
             ], 429);
@@ -162,13 +163,10 @@ class AuthController extends Controller
         try {
             $result = $otpService->storeAndSendPendingRegistrationOtp($pendingData);
 
-            $message = "We sent a 6-digit SMS verification code to {$result['masked_phone']}.";
-            $fallbackNotice = null;
-            if ($result['delivery_channel'] === 'sms_fallback_email') {
-                $fallbackNotice = "SMS gateway API key is not configured in .env yet — a copy was also sent to {$result['masked_email']}.";
-            } elseif ($result['delivery_channel'] === 'sms_log') {
-                $fallbackNotice = 'SMS gateway API key is not configured in .env yet — check storage/logs/laravel.log for your verification code.';
-            }
+            $isLiveSms = $result['delivery_channel'] === 'sms';
+            $message = $isLiveSms
+                ? "We sent a 6-digit SMS verification code to {$result['masked_phone']}."
+                : "We sent a 6-digit verification code to {$result['masked_email']}.";
 
             return response()->json([
                 'success' => true,
@@ -178,7 +176,6 @@ class AuthController extends Controller
                 'masked_phone' => $result['masked_phone'],
                 'delivery_channel' => $result['delivery_channel'],
                 'sms_provider' => $result['sms_provider'],
-                'fallback_notice' => $fallbackNotice,
                 'cooldown' => $result['cooldown'],
                 'expires_in' => $result['expires_in'],
                 'message' => $message,

@@ -277,7 +277,7 @@ class ReservationManagementTest extends TestCase
             'contact_number' => '09189998888',
             'product_id' => $this->freshMilk->id,
             'size' => 'Medium',
-            'quantity' => 10,
+            'quantity' => 15,
             'unit_price' => 50.00,
             'reservation_date' => '2026-11-21',
             'pickup_date' => '2026-12-20',
@@ -379,7 +379,7 @@ class ReservationManagementTest extends TestCase
             'contact_number' => '09998887777',
             'product_id' => $this->freshMilk->id,
             'size' => 'Medium',
-            'quantity' => 5,
+            'quantity' => 15,
             'unit_price' => 50.00,
             'reservation_date' => '2026-11-21',
             'pickup_date' => '2026-11-27',
@@ -416,12 +416,196 @@ class ReservationManagementTest extends TestCase
 
         // Existing admin pages continue working cleanly with Reservation Management integrated
         $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertStatus(200)->assertSee('Reservation Management');
-        $this->actingAs($this->admin)->get(route('admin.inventory.index'))->assertStatus(200)->assertSee('Stock Breakdown');
+        $this->actingAs($this->admin)->get(route('admin.inventory.index'))->assertStatus(200)->assertSee('Stock Breakdown')->assertSee('Expired');
+        $this->actingAs($this->admin)->get(route('admin.inventory.index', ['filter' => 'expired']))->assertStatus(200)->assertSee('No products with expired batches found.');
         $this->actingAs($this->admin)->get(route('admin.walkInSales.create'))->assertStatus(200);
         $this->actingAs($this->admin)->get(route('admin.reports.index'))->assertStatus(200);
 
         // Non-admin customer is blocked (redirected on web, 403 on JSON)
         $this->actingAs($this->customer)->get(route('admin.reservations.index'))->assertRedirect(route('customer.catalog'));
         $this->actingAs($this->customer)->getJson(route('admin.reservations.index'))->assertStatus(403);
+    }
+
+    public function test_expired_products_and_pre_pickup_expiring_batches_are_blocked_even_on_pending(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-21 11:00:00', 'Asia/Manila'));
+
+        try {
+            $category = Category::firstOrFail();
+
+            // 1. Product with 66 physical stock solely in an expired batch (Nov 08 < Nov 21)
+            $expiredMango = Product::create([
+                'category_id' => $category->id,
+                'product_name' => 'Pasteurized Mango Milk',
+                'description' => 'Expired batch test',
+                'milk_type' => 'Cow',
+                'size' => 'Medium',
+                'price' => 50.00,
+                'stock' => 0,
+                'reserved_stock' => 0,
+                'manufacturing_date' => '2026-11-08',
+                'expiration_date' => '2026-11-08',
+                'status' => 'active',
+            ]);
+            InventoryService::addStock($expiredMango->id, 66, '2026-11-08', 'Batch #71', '2026-11-08');
+            $expiredMango->refresh();
+
+            $this->assertEquals(66, $expiredMango->stock);
+            $this->assertEquals(0, InventoryService::getNonExpiredStock($expiredMango));
+            $this->assertEquals(0, InventoryService::getReservableStockForDate($expiredMango, '2026-11-22'));
+
+            // Attempting to create even a Pending reservation for expired product must be blocked
+            $pendingExpiredRes = $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+                'customer_name' => 'Macky',
+                'contact_number' => '09123456789',
+                'product_id' => $expiredMango->id,
+                'size' => 'Medium',
+                'quantity' => 15,
+                'unit_price' => 50.00,
+                'reservation_date' => '2026-11-21',
+                'pickup_date' => '2026-11-22',
+                'down_payment' => 100.00,
+                'payment_status' => 'Partially Paid',
+                'status' => 'Pending',
+            ]);
+            $pendingExpiredRes->assertSessionHas('error');
+            $this->assertEquals(0, Reservation::count());
+
+            // Create page renders expired product as disabled & labeled Expired (Not Reservable)
+            $this->actingAs($this->admin)
+                ->get(route('admin.reservations.create'))
+                ->assertStatus(200)
+                ->assertSee('Pasteurized Mango Milk (Medium) — Expired (Not Reservable)')
+                ->assertDontSee('<option value="Unpaid"', false);
+
+            // 2. Mixed batches: 10 expired (Nov 08) + 20 expiring Nov 25 + 15 expiring Dec 10 (Physical = 45)
+            // For pickup Nov 27, only 15 pcs are valid & reservable!
+            $mixedMilk = Product::create([
+                'category_id' => $category->id,
+                'product_name' => 'Mixed Batch Milk',
+                'description' => 'Multi-batch test',
+                'milk_type' => 'Cow',
+                'size' => 'Medium',
+                'price' => 50.00,
+                'stock' => 0,
+                'reserved_stock' => 0,
+                'manufacturing_date' => '2026-11-08',
+                'expiration_date' => '2026-11-08',
+                'status' => 'active',
+            ]);
+            InventoryService::addStock($mixedMilk->id, 10, '2026-11-08', 'Expired batch', '2026-11-08');
+            InventoryService::addStock($mixedMilk->id, 20, '2026-11-25', 'Soon expiring batch', '2026-11-18');
+            InventoryService::addStock($mixedMilk->id, 15, '2026-12-10', 'Fresh batch', '2026-11-20');
+            $mixedMilk->refresh();
+
+            $this->assertEquals(45, $mixedMilk->stock);
+            $this->assertEquals(15, InventoryService::getReservableStockForDate($mixedMilk, '2026-11-27'));
+
+            // Reserving 20 pcs for Nov 27 must fail (only 15 non-expiring pcs valid on Nov 27)
+            $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+                'customer_name' => 'Elena Cruz',
+                'contact_number' => '09175554444',
+                'product_id' => $mixedMilk->id,
+                'size' => 'Medium',
+                'quantity' => 20,
+                'unit_price' => 50.00,
+                'reservation_date' => '2026-11-21',
+                'pickup_date' => '2026-11-27',
+                'down_payment' => 200.00,
+                'payment_status' => 'Partially Paid',
+                'status' => 'Pending',
+            ])->assertSessionHas('error');
+            $this->assertEquals(0, Reservation::count());
+
+            // Reserving 15 pcs for Nov 27 with down payment succeeds
+            $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+                'customer_name' => 'Elena Cruz',
+                'contact_number' => '09175554444',
+                'product_id' => $mixedMilk->id,
+                'size' => 'Medium',
+                'quantity' => 15,
+                'unit_price' => 50.00,
+                'reservation_date' => '2026-11-21',
+                'pickup_date' => '2026-11-27',
+                'down_payment' => 200.00,
+                'payment_status' => 'Partially Paid',
+                'status' => 'Confirmed',
+            ])->assertSessionHas('success');
+            $this->assertEquals(1, Reservation::count());
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_down_payment_greater_than_zero_is_strictly_required(): void
+    {
+        // 1. Down payment = 0 is blocked
+        $zeroDpResponse = $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+            'customer_name' => 'No Deposit User',
+            'contact_number' => '09170009999',
+            'product_id' => $this->freshMilk->id,
+            'size' => 'Medium',
+            'quantity' => 15,
+            'unit_price' => 50.00,
+            'reservation_date' => '2026-11-21',
+            'pickup_date' => '2026-11-27',
+            'down_payment' => 0,
+            'payment_status' => 'Partially Paid',
+            'status' => 'Pending',
+        ]);
+        $zeroDpResponse->assertSessionHasErrors('down_payment');
+        $this->assertEquals(0, Reservation::count());
+
+        // 2. Payment status = Unpaid is blocked
+        $unpaidResponse = $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+            'customer_name' => 'Unpaid User',
+            'contact_number' => '09170009999',
+            'product_id' => $this->freshMilk->id,
+            'size' => 'Medium',
+            'quantity' => 15,
+            'unit_price' => 50.00,
+            'reservation_date' => '2026-11-21',
+            'pickup_date' => '2026-11-27',
+            'down_payment' => 100.00,
+            'payment_status' => 'Unpaid',
+            'status' => 'Pending',
+        ]);
+        $unpaidResponse->assertSessionHasErrors('payment_status');
+        $this->assertEquals(0, Reservation::count());
+
+        // 3. Down payment exceeding total amount is blocked
+        $overpayResponse = $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+            'customer_name' => 'Overpay User',
+            'contact_number' => '09170009999',
+            'product_id' => $this->freshMilk->id,
+            'size' => 'Medium',
+            'quantity' => 15,
+            'unit_price' => 50.00,
+            'reservation_date' => '2026-11-21',
+            'pickup_date' => '2026-11-27',
+            'down_payment' => 800.00, // total is 750.00
+            'payment_status' => 'Partially Paid',
+            'status' => 'Pending',
+        ]);
+        $overpayResponse->assertSessionHas('error');
+        $this->assertEquals(0, Reservation::count());
+
+        // 4. Valid down payment > 0 (up to total amount) succeeds
+        $validResponse = $this->actingAs($this->admin)->post(route('admin.reservations.store'), [
+            'customer_name' => 'Valid Deposit User',
+            'contact_number' => '09170009999',
+            'product_id' => $this->freshMilk->id,
+            'size' => 'Medium',
+            'quantity' => 15,
+            'unit_price' => 50.00,
+            'reservation_date' => '2026-11-21',
+            'pickup_date' => '2026-11-27',
+            'down_payment' => 750.00,
+            'payment_status' => 'Fully Paid',
+            'status' => 'Pending',
+        ]);
+        $validResponse->assertSessionHas('success');
+        $this->assertEquals(1, Reservation::count());
+        $this->assertEquals('Fully Paid', Reservation::first()->payment_status);
     }
 }

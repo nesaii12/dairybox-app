@@ -8,10 +8,24 @@
 <div class="bg-gradient-to-tr from-sky-600 via-indigo-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-md shadow-sky-100/30 mb-8">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div class="max-w-3xl">
-            <span class="bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Historical Trend & Seasonal Demand Intelligence</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight mt-3">Sales Trend & Demand Forecasting</h2>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                <span class="bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Historical Trend & Seasonal Demand Intelligence</span>
+                <span class="bg-amber-400/25 text-amber-200 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-amber-400/30">
+                    <i class="bi bi-arrow-repeat mr-1"></i> Rolling YoY Restart
+                </span>
+                @if($rollingWindow['is_archived_2025'])
+                    <span class="bg-rose-400/25 text-rose-200 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-rose-400/30">
+                        2025 Data Archived
+                    </span>
+                @else
+                    <span class="bg-sky-400/25 text-sky-200 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-sky-400/30">
+                        2025 Active (Auto-archives in 2027)
+                    </span>
+                @endif
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">Sales Trend & Demand Forecasting</h2>
             <p class="text-xs sm:text-sm text-sky-100/90 mt-2.5 leading-relaxed">
-                Analyzes historical sales records across previous months and years to identify sales trends, seasonal demand patterns, and consistently high-performing periods. Use these projections to anticipate future demand, identify products requiring additional stock, and make informed inventory planning decisions for <strong>{{ $targetMonthLabel }}</strong>.
+                Prediction logic operates on a <strong>rolling, year-over-year restart</strong> model: currently using <strong>{{ $rollingWindow['basis_label'] }}</strong> as the foundational basis to predict <strong>{{ $rollingWindow['target_label'] }}</strong>. Once 2027 arrives, 2025 historical data is automatically archived, switching the primary forecast basis to 2026 Full-Year Sales to predict 2028 Demand.
             </p>
         </div>
 
@@ -263,9 +277,25 @@
             <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-50/20">
                 <div>
                     <h3 class="text-sm font-bold text-slate-950">Product Demand Forecast & Inventory Planning</h3>
-                    <p class="text-xs text-slate-500">Anticipate future demand for <strong>{{ $targetMonthLabel }}</strong> based on {{ $lastMonthStats['reference_label'] ?? 'last month' }} sales momentum and seasonal patterns.</p>
+                    <p class="text-xs text-slate-500">Anticipate future demand for <strong>{{ $targetMonthLabel }}</strong> based on <strong>{{ $rollingWindow['basis_label'] }}</strong> baseline and seasonal patterns.</p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
+                    <!-- Target Month Selection -->
+                    <div class="flex items-center space-x-1.5 text-xs text-slate-500">
+                        <span class="font-bold text-[11px] text-slate-600">Horizon:</span>
+                        <select onchange="window.location.href = updateQueryStringParameter(window.location.href, 'target_month', this.value)" class="bg-white border border-indigo-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-indigo-700 cursor-pointer text-xs shadow-2xs transition-all">
+                            @for($m = 1; $m <= 12; $m++)
+                                @php
+                                    $optVal = sprintf('%04d-%02d', $rollingWindow['target_year'], $m);
+                                    $optLabel = \Carbon\Carbon::createFromFormat('Y-m', $optVal)->format('F Y');
+                                @endphp
+                                <option value="{{ $optVal }}" {{ $targetMonth === $optVal ? 'selected' : '' }}>
+                                    {{ $optLabel }} ({{ $rollingWindow['target_label'] }})
+                                </option>
+                            @endfor
+                        </select>
+                    </div>
+
                     <!-- Rows per page selection -->
                     <div class="flex items-center space-x-2 text-xs text-slate-500">
                         <span>Rows:</span>
@@ -279,8 +309,9 @@
                     </div>
                     <!-- Bulk Regenerate All Button -->
                     <form action="{{ route('admin.forecast.generateAll') }}" method="POST"
-                          data-confirm-message="This will refresh demand forecasts for all active products at once. Continue?">
+                          data-confirm-message="This will refresh demand forecasts for all active products for {{ $targetMonthLabel }}. Continue?">
                         @csrf
+                        <input type="hidden" name="target_month" value="{{ $targetMonth }}">
                         <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-all font-bold text-xs cursor-pointer shadow-2xs">
                             <i class="bi bi-arrow-repeat"></i>
                             <span>Refresh All</span>
@@ -399,6 +430,7 @@
                                 <form action="{{ route('admin.forecast.generate') }}" method="POST">
                                     @csrf
                                     <input type="hidden" name="product_id" value="{{ $product->id }}">
+                                    <input type="hidden" name="target_month" value="{{ $targetMonth }}">
                                     @if($forecast)
                                         <button type="submit" class="inline-flex items-center space-x-1.5 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-all font-bold text-xs cursor-pointer shadow-2xs">
                                             <i class="bi bi-arrow-repeat text-slate-400"></i>

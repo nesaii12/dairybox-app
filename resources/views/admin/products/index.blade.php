@@ -114,9 +114,16 @@
                         ₱{{ number_format($product->price, 2) }}
                     </td>
                     <!-- Current Stock -->
+                    @php
+                        $maxStockLimit = \App\Models\Product::MAX_STOCK_LIMIT;
+                        $isOverLimit = $product->stock > $maxStockLimit;
+                        $isAtLimit = $product->stock === $maxStockLimit;
+                    @endphp
                     <td class="px-3 py-3 whitespace-nowrap">
                         <div class="flex flex-col space-y-0.5">
-                            <span class="text-xs font-bold {{ $isOutOfStock ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : 'text-slate-900') }}">{{ $product->stock }} units</span>
+                            <span class="text-xs font-bold {{ $isOutOfStock ? 'text-slate-400' : ($isLowStock ? 'text-rose-600' : ($isOverLimit ? 'text-amber-700' : 'text-slate-900')) }}">
+                                {{ $product->stock }} <span class="text-[10px] font-medium text-slate-400">/ {{ $maxStockLimit }}</span>
+                            </span>
                             @if($isOutOfStock)
                                 <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                                     <i class="bi bi-x-octagon mr-0.5"></i> Out of Stock
@@ -124,6 +131,14 @@
                             @elseif($isLowStock)
                                 <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
                                     <i class="bi bi-exclamation-triangle mr-0.5"></i> Low Stock
+                                </span>
+                            @elseif($isOverLimit)
+                                <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Exceeds {{ $maxStockLimit }}-unit spoilage limit">
+                                    <i class="bi bi-exclamation-circle mr-0.5"></i> Over Limit
+                                </span>
+                            @elseif($isAtLimit)
+                                <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                    <i class="bi bi-shield-check mr-0.5"></i> At Limit
                                 </span>
                             @else
                                 <span class="inline-flex items-center w-max px-1.5 py-0.25 rounded text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
