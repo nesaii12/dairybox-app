@@ -77,6 +77,205 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
+    /**
+     * Step 1 of Customer Registration:
+     * Validate registration details, store hashed 6-digit OTP + pending registration payload
+     * in encrypted cache (5-minute TTL, max 5 attempts), and email the verification code.
+     */
+    public function sendRegistrationOtp(Request $request, OtpService $otpService, SmsOtpService $smsOtpService)
+    {
+        $normalizedEmail = $otpService->normalizeEmail((string) $request->input('email', ''));
+        $isResendOnly = $request->boolean('resend') && !$request->filled('password');
+
+        if ($isResendOnly) {
+            if (!filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please enter a valid email address.',
+                ], 422);
+            }
+
+            if (User::where('email', $normalizedEmail)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This email address is already registered. Please log in instead.',
+                ], 422);
+            }
+
+            $existing = $otpService->getPendingRegistrationRecord($normalizedEmail);
+            if (!$existing || empty($existing['pending_user'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your registration session expired. Please submit the registration form again.',
+                    'expired_session' => true,
+                ], 422);
+            }
+
+            $pendingData = $existing['pending_user'];
+        } else {
+            $normalizedPhone = $smsOtpService->normalizePhone((string) $request->input('phone', ''));
+            $request->merge([
+                'email' => $normalizedEmail,
+                'phone' => $normalizedPhone,
+            ]);
+
+            $validator = Validator::make($request->all(), [
+                'name'     => 'required|string|max:255',
+                'email'    => 'required|string|email|max:255|unique:users,email',
+                'phone'    => ['required', 'string', 'regex:/^09\d{9}$/', 'unique:users,phone'],
+                'password' => ['required', 'string', 'confirmed', Password::defaults()],
+            ], [
+                'email.unique' => 'This email address is already registered. Please log in or use a different email.',
+                'phone.regex'  => 'Please enter a valid 11-digit Philippine mobile number starting with 09.',
+                'phone.unique' => 'This phone number is already registered. Please use a different phone number.',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $pendingData = [
+                'name' => trim((string) $request->input('name')),
+                'email' => $normalizedEmail,
+                'phone' => $normalizedPhone,
+                'password_hash' => Hash::make((string) $request->input('password')),
+            ];
+        }
+
+        $cooldown = $otpService->getPendingRegistrationCooldownSeconds($normalizedEmail);
+        if ($cooldown > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Please wait {$cooldown} seconds before requesting another verification code.",
+                'cooldown' => $cooldown,
+                'masked_email' => $otpService->maskEmail($normalizedEmail),
+                'masked_phone' => $smsOtpService->maskPhone($pendingData['phone']),
+                'email' => $normalizedEmail,
+                'phone' => $pendingData['phone'],
+            ], 429);
+        }
+
+        try {
+            $result = $otpService->storeAndSendPendingRegistrationOtp($pendingData);
+
+            $message = "We sent a 6-digit SMS verification code to {$result['masked_phone']}.";
+            $fallbackNotice = null;
+            if ($result['delivery_channel'] === 'sms_fallback_email') {
+                $fallbackNotice = "SMS gateway API key is not configured in .env yet — a copy was also sent to {$result['masked_email']}.";
+            } elseif ($result['delivery_channel'] === 'sms_log') {
+                $fallbackNotice = 'SMS gateway API key is not configured in .env yet — check storage/logs/laravel.log for your verification code.';
+            }
+
+            return response()->json([
+                'success' => true,
+                'email' => $result['email'],
+                'masked_email' => $result['masked_email'],
+                'phone' => $result['phone'],
+                'masked_phone' => $result['masked_phone'],
+                'delivery_channel' => $result['delivery_channel'],
+                'sms_provider' => $result['sms_provider'],
+                'fallback_notice' => $fallbackNotice,
+                'cooldown' => $result['cooldown'],
+                'expires_in' => $result['expires_in'],
+                'message' => $message,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Registration OTP SMS dispatch failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage() ?: 'Failed to send SMS verification code. Please check your phone number and try again.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Step 2 of Customer Registration:
+     * Verify submitted 6-digit OTP against encrypted hashed store, finalize User creation
+     * with email_verified_at set, delete used OTP, log customer in, and redirect to Customer Home.
+     */
+    public function verifyRegistrationOtp(Request $request, OtpService $otpService)
+    {
+        $normalizedEmail = $otpService->normalizeEmail((string) $request->input('email', ''));
+        $submittedOtp = (string) ($request->input('otp') ?? $request->input('code') ?? '');
+
+        $validator = Validator::make([
+            'email' => $normalizedEmail,
+            'otp' => preg_replace('/\D+/', '', trim($submittedOtp)),
+        ], [
+            'email' => 'required|email',
+            'otp'   => 'required|digits:6',
+        ], [
+            'otp.digits' => 'Please enter the 6-digit numeric verification code.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $verification = $otpService->verifyPendingRegistrationOtp($normalizedEmail, $submittedOtp);
+
+        if (!$verification['valid']) {
+            return response()->json([
+                'success' => false,
+                'reason' => $verification['reason'] ?? 'invalid',
+                'attempts_remaining' => $verification['attempts_remaining'] ?? null,
+                'message' => $verification['message'] ?? 'Invalid or expired OTP code. Please try again.',
+                'errors' => [
+                    'otp' => [$verification['message'] ?? 'Invalid or expired OTP code. Please try again.'],
+                ],
+            ], 422);
+        }
+
+        $pending = $verification['pending_user'];
+
+        if (User::where('email', $pending['email'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This email address is already registered. Please log in instead.',
+            ], 422);
+        }
+
+        if (User::where('phone', $pending['phone'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This phone number is already registered. Please use a different phone number.',
+            ], 422);
+        }
+
+        $user = User::create([
+            'name' => $pending['name'],
+            'email' => $pending['email'],
+            'password' => $pending['password_hash'],
+            'phone' => $pending['phone'],
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+
+        $user->forceFill([
+            'email_verified_at' => now(),
+        ])->save();
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        session()->flash('success', 'Email verified and account created! Welcome to DairyBox.');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified and account created! Welcome to DairyBox.',
+            'redirect' => route('home'),
+        ]);
+    }
+
     public function sendEmailOtp(Request $request, OtpService $otpService)
     {
         $rawEmail = (string) $request->input('email', '');

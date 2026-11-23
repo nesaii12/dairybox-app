@@ -67,6 +67,50 @@ class SmsOtpService
     }
 
     /**
+     * Send a pre-generated 6-digit OTP via SMS to the given phone number without
+     * overwriting legacy plaintext cache keys. Used by the encrypted registration OTP flow.
+     *
+     * @return array{phone: string, sent_via: string, is_live_sms: bool}
+     */
+    public function sendRegistrationOtpSms(string $phone, string $otp, int $expiresMinutes = 5): array
+    {
+        $normalized = $this->normalizePhone($phone);
+        $message = "Your DairyBox verification code is {$otp}. Valid for {$expiresMinutes} minutes. Do not share this code with anyone.";
+
+        if ($this->isGatewayConfigured()) {
+            $sentVia = $this->dispatchSms($normalized, $message, $otp, null);
+            return [
+                'phone' => $normalized,
+                'sent_via' => $sentVia,
+                'is_live_sms' => true,
+            ];
+        }
+
+        Log::info("[DairyBox SMS OTP] To {$normalized}: {$message}");
+
+        return [
+            'phone' => $normalized,
+            'sent_via' => 'log',
+            'is_live_sms' => false,
+        ];
+    }
+
+    /**
+     * Mask a Philippine mobile number for UI display (e.g. "09171234567" -> "0917***4567").
+     */
+    public function maskPhone(string $phone): string
+    {
+        $normalized = $this->normalizePhone($phone);
+        $len = strlen($normalized);
+
+        if ($len <= 6) {
+            return $normalized;
+        }
+
+        return substr($normalized, 0, 4) . '***' . substr($normalized, -4);
+    }
+
+    /**
      * Generate a 6-digit OTP and send it via SMS to the given phone number.
      *
      * @return array{otp: string, sent_via: string, cooldown: int}
