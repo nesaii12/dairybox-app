@@ -455,7 +455,7 @@
                     </button>
 
                     <!-- Dropdown Menu -->
-                    <div id="adminUserDropdownMenu" class="absolute right-0 mt-2 w-64 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all">
+                    <div id="adminUserDropdownMenu" class="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all">
                         <!-- Dropdown Header -->
                         <div class="p-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-xl bg-slate-900 text-sky-400 font-bold border border-slate-800 flex items-center justify-center text-xs tracking-wider shadow-2xs flex-shrink-0">
@@ -1183,6 +1183,9 @@
             }
         });
     </script>
+    @auth
+        <x-transaction-chat-drawer />
+    @endauth
     @yield('scripts')
 </body>
 </html>

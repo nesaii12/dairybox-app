@@ -277,6 +277,14 @@
                             <!-- Actions -->
                             <td class="px-4 py-3.5 whitespace-nowrap text-center">
                                 <div class="inline-flex items-center justify-center gap-1 flex-wrap">
+                                    <x-chat-button
+                                        type="reservation"
+                                        :id="$reservation->id"
+                                        :label="$reservation->reservation_code"
+                                        :unread="$reservation->unreadChatCountFor('admin')"
+                                        size="xs"
+                                        variant="indigo" />
+
                                     <a href="{{ route('admin.reservations.show', $reservation->id) }}"
                                        class="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
                                        title="View Details">

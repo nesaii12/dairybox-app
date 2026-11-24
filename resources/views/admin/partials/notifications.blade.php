@@ -5,8 +5,8 @@
     $btnId = $isMobile ? 'adminMobileNotifBtn' : 'adminNotifBtn';
     $modalId = $isMobile ? 'adminMobileNotifModal' : 'adminNotifModal';
     $modalClass = $isMobile 
-        ? 'fixed inset-x-4 top-16 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-100 shadow-2xl overflow-hidden hidden z-50 flex flex-col max-w-sm mx-auto'
-        : 'absolute right-0 mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col';
+        ? 'fixed inset-x-3 top-16 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden hidden z-50 flex flex-col max-w-sm mx-auto'
+        : 'absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col';
 @endphp
 
 <div class="relative" id="{{ $wrapperId }}">
@@ -20,7 +20,7 @@
     <!-- Dropdown Modal -->
     <div id="{{ $modalId }}" class="{{ $modalClass }}">
         <!-- Header -->
-        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/90">
             <div class="flex items-center space-x-2">
                 <h3 class="text-xs font-bold text-slate-900">Notifications</h3>
                 <span class="{{ ($adminNotifCount ?? 0) > 0 ? '' : 'hidden' }} admin-notif-header-badge text-[10px] font-bold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-100">
@@ -36,7 +36,7 @@
         </div>
 
         <!-- Body (Scrollable list) -->
-        <div class="admin-notif-list overflow-y-auto divide-y divide-slate-100 max-h-[360px]">
+        <div class="admin-notif-list overflow-y-auto divide-y divide-slate-100 max-h-[360px] bg-white">
             @forelse($adminNotifications ?? [] as $notif)
                 @php
                     $isExpiryAlert = str_contains(strtolower($notif->title), 'expir');

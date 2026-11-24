@@ -21,9 +21,8 @@ class SettingController extends Controller
         $user = auth()->user();
         $settings = SettingService::all();
         $cancellationPolicy = SettingService::getReservationCancellationPolicy();
-        $xenditConfigured = app(\App\Services\XenditService::class)->isConfigured();
 
-        return view('admin.settings.index', compact('user', 'settings', 'cancellationPolicy', 'xenditConfigured'));
+        return view('admin.settings.index', compact('user', 'settings', 'cancellationPolicy'));
     }
 
     /**

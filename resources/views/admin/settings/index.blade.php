@@ -486,73 +486,7 @@
             </div>
         </form>
     </div>
-
-    <!-- 4. Payment Gateway (Xendit) Status Card -->
-    <div class="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden lg:col-span-2">
-        <div class="p-6 border-b border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100 flex-shrink-0">
-                    <i class="bi bi-credit-card-2-front text-base"></i>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-slate-900">Payment Gateway Configuration (Xendit)</h3>
-                    <p class="text-[11px] text-slate-500">Enable seamless customer checkout via GCash, Maya, Debit/Credit Card, and QR Ph.</p>
-                </div>
-            </div>
-            <div>
-                @if($xenditConfigured)
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                        Gateway Active
-                    </span>
-                @else
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs">
-                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5"></span>
-                        Credentials Pending in .env
-                    </span>
-                @endif
-            </div>
-        </div>
-
-        <div class="p-6 space-y-5">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Supported Channels</span>
-                    <div class="flex flex-wrap gap-1.5 mt-1.5">
-                        <span class="px-2 py-0.5 rounded bg-white text-[10px] font-bold text-sky-600 border border-slate-200">GCash</span>
-                        <span class="px-2 py-0.5 rounded bg-white text-[10px] font-bold text-emerald-600 border border-slate-200">Maya</span>
-                        <span class="px-2 py-0.5 rounded bg-white text-[10px] font-bold text-slate-700 border border-slate-200">Visa / Mastercard</span>
-                        <span class="px-2 py-0.5 rounded bg-white text-[10px] font-bold text-slate-700 border border-slate-200">QR Ph</span>
-                        <span class="px-2 py-0.5 rounded bg-white text-[10px] font-bold text-slate-700 border border-slate-200">GrabPay</span>
-                    </div>
-                </div>
-
-                <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80 md:col-span-2">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Xendit Webhook Endpoint</span>
-                    <p class="text-[10px] text-slate-500 mb-2">Configure this callback URL in your Xendit Dashboard &rarr; Settings &rarr; Webhooks (Invoices):</p>
-                    <div class="flex items-center space-x-2">
-                        <input type="text" readonly value="{{ url('/api/webhooks/xendit') }}" id="xenditWebhookInput"
-                            class="block w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-800 select-all focus:outline-none">
-                        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('xenditWebhookInput').value); Swal.fire({ icon: 'success', title: 'Copied!', text: 'Webhook URL copied to clipboard.', timer: 1500, showConfirmButton: false });"
-                            class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer flex-shrink-0">
-                            <i class="bi bi-clipboard"></i>
-                            <span>Copy</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 text-xs text-slate-600 space-y-2">
-                <span class="font-bold text-slate-800 block">Configuration Instructions:</span>
-                <p class="text-[11px] text-slate-500 leading-relaxed">
-                    To activate live or test payments, obtain your Secret Key and Webhook Verification Token from your <a href="https://dashboard.xendit.co" target="_blank" class="text-sky-600 font-bold hover:underline">Xendit Dashboard</a> and set them in your project's <code class="font-mono bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-800">.env</code> file:
-                </p>
-                <pre class="bg-slate-900 text-sky-300 p-3 rounded-xl font-mono text-[11px] overflow-x-auto leading-relaxed">XENDIT_SECRET_KEY=xnd_development_...
-XENDIT_PUBLIC_KEY=xnd_public_development_...
-XENDIT_WEBHOOK_TOKEN=your_webhook_verification_token</pre>
-            </div>
-        </div>
-    </div>
+</div>
 </div>
 @endsection
 

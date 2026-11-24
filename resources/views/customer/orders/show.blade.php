@@ -13,12 +13,22 @@
             <p class="text-xs text-slate-500">Placed on {{ $order->created_at->format('M d, Y h:i A') }}</p>
         </div>
         
-        @if($order->order_status === 'Pending')
-            <button type="button" onclick="openCustomerCancellationModal()" class="inline-flex items-center justify-center space-x-1.5 py-2 px-4 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 transition-all cursor-pointer">
-                <i class="bi bi-trash"></i>
-                <span>Cancel Order</span>
-            </button>
-        @endif
+        <div class="flex items-center gap-2 flex-wrap">
+            <x-chat-button
+                type="order"
+                :id="$order->id"
+                :label="'Order #' . $order->order_number"
+                :unread="$order->unreadChatCountFor('customer')"
+                size="md">
+                Chat with Rider / Admin
+            </x-chat-button>
+            @if($order->order_status === 'Pending')
+                <button type="button" onclick="openCustomerCancellationModal()" class="inline-flex items-center justify-center space-x-1.5 py-2 px-4 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 transition-all cursor-pointer">
+                    <i class="bi bi-trash"></i>
+                    <span>Cancel Order</span>
+                </button>
+            @endif
+        </div>
     </div>
 </div>
 
@@ -38,7 +48,7 @@
         $isDelivered = in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted']);
         $effectiveStatus = $isDelivered ? 'Delivered' : $order->order_status;
         $currentIdx = array_search($effectiveStatus, $statuses);
-        $isCancelled = $order->order_status === 'Cancelled';
+        $isCancelled = in_array($order->order_status, ['Cancelled', 'Cancelled by Customer']) || $order->isCancelled();
     @endphp
 
     @if($isCancelled)

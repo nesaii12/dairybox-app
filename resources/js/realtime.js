@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (emptyState) emptyState.remove();
 
                     const item = document.createElement('div');
-                    item.className = 'group relative p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/40 bg-sky-50/20';
+                    item.className = 'group relative p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/50 bg-sky-50/30';
                     item.innerHTML = `
                         <a href="/notifications/${notif.id}/go" class="flex space-x-2.5 flex-1 min-w-0 pr-2 block">
                             <div class="mt-1 flex-shrink-0">
@@ -169,8 +169,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <h4 class="text-xs font-bold text-slate-900 group-hover:text-sky-600 transition-colors truncate">
                                     ${escapeHtml(notif.title)}
                                 </h4>
-                                <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed break-words">${escapeHtml(notif.message)}</p>
-                                <span class="block text-[8px] text-slate-400 font-medium mt-1">Just now</span>
+                                <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed break-words">${escapeHtml(notif.message)}</p>
+                                <span class="block text-[9px] text-slate-400 font-medium mt-1">Just now</span>
                             </div>
                         </a>
                     `;

@@ -60,7 +60,23 @@ class CustomerController extends Controller
 
         $request->validate([
             'reason' => 'required|string|max:255',
+            'order_id' => 'nullable|integer|exists:orders,id',
         ]);
+
+        // Policy Enforcement:
+        // A 3-day restriction should only be applied when the order has already been marked as "Dispatched" before cancellation.
+        $order = null;
+        if ($request->filled('order_id')) {
+            $order = Order::find($request->order_id);
+        } elseif ($request->filled('reason') && preg_match('/Order\s*#?([A-Za-z0-9\-]+)/i', $request->reason, $matches)) {
+            $orderRef = $matches[1];
+            $order = Order::where('order_number', $orderRef)->orWhere('id', $orderRef)->first();
+        }
+
+        if ($order && !$order->isDispatched()) {
+            return redirect()->back(fallback: route('admin.customers.index'))
+                ->with('error', "Cannot restrict customer: Order #{$order->order_number} has not been dispatched. A 3-day restriction can only be applied after an order is marked as Dispatched.");
+        }
 
         $banDurationDays = 3;
         $until = now()->addDays($banDurationDays);

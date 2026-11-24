@@ -13,16 +13,27 @@
             <h2 class="text-2xl font-black text-slate-900">Order #{{ $order->order_number }}</h2>
             <span class="bg-sky-50 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold border border-sky-100">Fulfillment Panel</span>
         </div>
-        @if($order->order_type === 'Delivery')
-            <a href="{{ route('admin.deliveries.index', ['search' => $order->order_number]) }}" class="inline-flex items-center text-xs font-semibold text-sky-700 hover:text-sky-900 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-200 transition-colors">
-                <i class="bi bi-truck mr-1.5"></i> Track in Delivery Monitor
-            </a>
-        @endif
+        <div class="flex items-center gap-2 flex-wrap">
+            <x-chat-button
+                type="order"
+                :id="$order->id"
+                :label="'Order #' . $order->order_number"
+                :unread="$order->unreadChatCountFor('admin')"
+                size="md"
+                variant="indigo">
+                Live Chat
+            </x-chat-button>
+            @if($order->order_type === 'Delivery')
+                <a href="{{ route('admin.deliveries.index', ['search' => $order->order_number]) }}" class="inline-flex items-center text-xs font-semibold text-sky-700 hover:text-sky-900 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-200 transition-colors">
+                    <i class="bi bi-truck mr-1.5"></i> Track in Delivery Monitor
+                </a>
+            @endif
+        </div>
     </div>
     <p class="text-xs text-slate-500">Processing dashboard for administrator review.</p>
 </div>
 
-@if($order->order_status === 'Cancelled' && !$order->cancelled_after_arrival && !($order->delivery && $order->delivery->cancelled_after_arrival))
+@if($order->isCancelled() && !$order->cancelled_after_arrival && !($order->delivery && $order->delivery->cancelled_after_arrival))
 <div class="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-5 shadow-xs">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex items-start space-x-3.5">
@@ -31,12 +42,16 @@
             </div>
             <div>
                 <div class="flex items-center gap-2">
-                    <h3 class="text-sm font-bold text-rose-900">Order Cancelled</h3>
+                    <h3 class="text-sm font-bold text-rose-900">
+                        {{ $order->isCancelledByCustomer() ? 'Order Cancelled by Customer' : 'Order Cancelled' }}
+                    </h3>
                     @if($order->customer->isRestricted())
                         <span class="text-[10px] font-bold uppercase tracking-wider bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full">Customer Restricted (3-Day Ban)</span>
                     @endif
                 </div>
-                <p class="text-xs text-rose-700 mt-0.5">This order has been cancelled and stock has been restored to inventory.</p>
+                <p class="text-xs text-rose-700 mt-0.5">
+                    {{ $order->isCancelledByCustomer() ? 'This order was cancelled by the customer prior to dispatch. Stock has been restored to inventory.' : 'This order has been cancelled and stock has been restored to inventory.' }}
+                </p>
                 @if($order->cancellation_reason || $order->delivery?->cancellation_reason)
                     <p class="text-xs text-rose-800 font-medium mt-1">
                         <span class="font-bold">Cancellation Reason:</span> "{{ $order->cancellation_reason ?? $order->delivery->cancellation_reason }}"
@@ -47,9 +62,13 @@
                         <span class="inline-flex items-center text-rose-900 font-semibold">
                             <i class="bi bi-person-x-fill mr-1"></i> Customer is restricted from ordering until {{ $order->customer->restricted_until->format('M d, Y h:i A') }}
                         </span>
-                    @else
+                    @elseif($order->isDispatched())
                         <span class="text-slate-600">
-                            Per store policy, admins can temporarily restrict this customer from placing orders for three (3) days.
+                            Per store policy, orders cancelled after dispatch permit temporarily restricting this customer from placing orders for three (3) days.
+                        </span>
+                    @else
+                        <span class="inline-flex items-center text-slate-600">
+                            <i class="bi bi-info-circle mr-1 text-slate-400"></i> No restriction applied: Order was not dispatched. Per store policy, restrictions only apply if cancelled after dispatch.
                         </span>
                     @endif
                 </div>
@@ -64,9 +83,10 @@
                         <i class="bi bi-arrow-counterclockwise mr-1.5"></i> Lift Restriction
                     </button>
                 </form>
-            @else
+            @elseif($order->isDispatched())
                 <form action="{{ route('admin.customers.restrict', $order->customer->id) }}" method="POST" onsubmit="return confirmRestrictCustomer(this, '{{ addslashes($order->customer->name) }}', '{{ addslashes('Cancelled Order #' . $order->order_number . ': ' . ($order->cancellation_reason ?? 'Customer cancellation')) }}');">
                     @csrf
+                    <input type="hidden" name="order_id" value="{{ $order->id }}">
                     <input type="hidden" name="reason" value="Cancelled Order #{{ $order->order_number }}: {{ $order->cancellation_reason ?? 'Customer cancellation' }}">
                     <button type="submit" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center">
                         <i class="bi bi-shield-slash mr-1.5"></i> Restrict Customer (3 Days)
@@ -325,10 +345,10 @@
                     ];
                     $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
                 @endphp
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border {{ $color }} mt-1">
-                    {{ $order->order_status }}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border {{ $order->statusBadgeClasses() }} mt-1">
+                    {{ $order->statusBadgeLabel() }}
                 </span>
-                @if($order->order_status === 'Cancelled' && ($order->cancellation_reason || $order->delivery?->cancellation_reason))
+                @if($order->isCancelled() && ($order->cancellation_reason || $order->delivery?->cancellation_reason))
                     <div class="mt-2 text-xs text-rose-800 bg-rose-50 border border-rose-100 p-2.5 rounded-xl">
                         <span class="font-bold block text-[10px] uppercase tracking-wider text-rose-500">Cancellation Reason</span>
                         <span class="italic font-medium">"{{ $order->cancellation_reason ?? $order->delivery->cancellation_reason }}"</span>
@@ -337,7 +357,7 @@
             </div>
 
             <!-- Progression Form -->
-            @if(!in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled']))
+            @if(!in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled', 'Cancelled by Customer']))
             <form id="adminStatusUpdateForm" action="{{ route('admin.orders.updateStatus', $order->id) }}" method="POST" onsubmit="return validateAdminStatusUpdate(event)" class="space-y-4 pt-4 border-t border-slate-100">
                 @csrf
                 @if($order->order_type === 'Delivery' && !$order->rider_id)
@@ -404,11 +424,18 @@
                         class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 text-xs transition-all focus:bg-white resize-none font-medium"></textarea>
 
                     <div class="pt-2 flex items-center space-x-2 border-t border-slate-100">
-                        <input type="checkbox" name="restrict_customer" id="admin_restrict_customer" value="1"
-                            class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer">
-                        <label for="admin_restrict_customer" class="text-xs font-semibold text-rose-800 cursor-pointer">
-                            Restrict customer from ordering for 3 days
-                        </label>
+                        @if($order->isDispatched())
+                            <input type="checkbox" name="restrict_customer" id="admin_restrict_customer" value="1"
+                                class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer">
+                            <label for="admin_restrict_customer" class="text-xs font-semibold text-rose-800 cursor-pointer">
+                                Restrict customer from ordering for 3 days
+                            </label>
+                        @else
+                            <div class="flex items-center text-xs text-slate-500 gap-1.5 italic py-1">
+                                <i class="bi bi-info-circle text-slate-400"></i>
+                                <span>3-day restriction unavailable (only applies after order has been dispatched)</span>
+                            </div>
+                        @endif
                     </div>
                 </div>
                 
@@ -456,7 +483,7 @@
         </div>
 
         <!-- Rider Assignment Panel (For Delivery orders only) -->
-        @if($order->order_type === 'Delivery' && !in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled']))
+        @if($order->order_type === 'Delivery' && !in_array($order->order_status, ['Delivered', 'Delivered - Pending Remittance', 'Paid & Remitted', 'Cancelled', 'Cancelled by Customer']))
         <div id="assign_rider_card" class="bg-white rounded-2xl border {{ $errors->has('rider_id') ? 'border-rose-400 ring-2 ring-rose-500/15' : 'border-slate-200/80' }} p-6 shadow-sm transition-all">
             <h3 class="text-sm font-bold text-slate-950 pb-3 border-b border-slate-100 mb-4 flex items-center justify-between">
                 <span>Assign Delivery Rider</span>

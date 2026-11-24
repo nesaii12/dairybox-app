@@ -19,7 +19,7 @@
             Live overview of sales revenue, inventory thresholds, and incoming customer fulfillment.
         </p>
     </div>
-    <div class="flex items-center gap-2 relative z-10 shrink-0 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+    <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 relative z-10 shrink-0 w-full sm:w-auto">
         <button type="button" onclick="openWalkInModal()" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-600 transition-all shadow-2xs active:scale-95 cursor-pointer">
             <i class="bi bi-plus-circle-fill"></i>
             <span>New Walk-in Sale</span>
@@ -163,7 +163,7 @@
     </div>
 
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-100 text-xs">
+        <table class="min-w-[640px] w-full divide-y divide-slate-100 text-xs">
             <thead class="bg-slate-50">
                 <tr>
                     <th scope="col" class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Order No</th>
@@ -200,19 +200,7 @@
                     </td>
                     <td class="px-6 py-3.5 font-black text-slate-950">₱{{ number_format($order->total_amount, 2) }}</td>
                     <td class="px-6 py-3.5">
-                        @php
-                            $statusColors = [
-                                'Pending' => 'bg-amber-50 text-amber-700',
-                                'Confirmed' => 'bg-sky-50 text-sky-700',
-                                'Preparing' => 'bg-indigo-50 text-indigo-700',
-                                'Ready for Pickup' => 'bg-emerald-50 text-emerald-700',
-                                'Out for Delivery' => 'bg-purple-50 text-purple-700',
-                                'Delivered' => 'bg-emerald-500/10 text-emerald-700',
-                                'Cancelled' => 'bg-rose-50 text-rose-600',
-                            ];
-                            $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
-                        @endphp
-                        <span class="inline-flex px-2 py-0.5 rounded-full font-semibold {{ $color }}">{{ $order->order_status }}</span>
+                        <span class="inline-flex px-2 py-0.5 rounded-full font-semibold border {{ $order->statusBadgeClasses() }}">{{ $order->statusBadgeLabel() }}</span>
                     </td>
                     <td class="px-6 py-3.5 text-center">
                         <a href="{{ route('admin.orders.show', $order->id) }}" class="text-sky-600 hover:text-sky-500 font-bold">Process</a>
@@ -251,7 +239,7 @@
     </div>
 
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-100 text-xs">
+        <table class="min-w-[760px] w-full divide-y divide-slate-100 text-xs">
             <thead class="bg-slate-50">
                 <tr>
                     <th class="px-6 py-3 text-left font-bold text-slate-500 uppercase">Reservation ID</th>
@@ -464,7 +452,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-xs text-left">
+                    <table class="min-w-[480px] w-full text-xs text-left">
                         <thead>
                             <tr class="bg-slate-50/60 border-b border-slate-100 text-[9px] font-bold uppercase tracking-wider text-slate-400">
                                 <th class="px-5 py-3">Product</th>
@@ -526,7 +514,7 @@
                             <p class="text-[10px] text-slate-400">No products are at risk of running out based on current forecasts.</p>
                         </div>
                     @else
-                        <table class="w-full text-xs text-left">
+                        <table class="min-w-[480px] w-full text-xs text-left">
                             <thead>
                                 <tr class="bg-slate-50/60 border-b border-slate-100 text-[9px] font-bold uppercase tracking-wider text-slate-400">
                                     <th class="px-5 py-3">Product</th>
@@ -896,34 +884,40 @@
                 <div class="modal-size-pills flex items-center gap-1 flex-wrap pt-0.5"></div>
             </div>
 
-            <!-- Quantity -->
-            <div class="sm:col-span-2 pt-0.5">
-                <label class="block sm:hidden text-[9px] font-bold uppercase text-slate-400 mb-1">Quantity</label>
-                <div class="flex items-center">
-                    <input type="number" name="items[${modalRowCounter}][quantity]" value="${quantity}" min="1" required oninput="calculateModalTotals()" class="modal-qty-input w-full text-xs font-bold text-center rounded-xl border-slate-200 bg-white py-1.5 px-2 focus:border-emerald-500 focus:ring-emerald-500 shadow-2xs">
+            <!-- Quantity & Price Container (2-col grid on mobile, flattened on sm+) -->
+            <div class="sm:col-span-4 grid grid-cols-2 gap-2 sm:contents">
+                <!-- Quantity -->
+                <div class="sm:col-span-2 pt-0.5">
+                    <label class="block sm:hidden text-[9px] font-bold uppercase text-slate-400 mb-1">Quantity</label>
+                    <div class="flex items-center">
+                        <input type="number" name="items[${modalRowCounter}][quantity]" value="${quantity}" min="1" required oninput="calculateModalTotals()" class="modal-qty-input w-full text-xs font-bold text-center rounded-xl border-slate-200 bg-white py-1.5 px-2 focus:border-emerald-500 focus:ring-emerald-500 shadow-2xs">
+                    </div>
+                </div>
+
+                <!-- Unit Price -->
+                <div class="sm:col-span-2 pt-0.5">
+                    <label class="block sm:hidden text-[9px] font-bold uppercase text-slate-400 mb-1">Price (₱)</label>
+                    <div class="relative">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₱</span>
+                        <input type="number" step="0.01" min="0" name="items[${modalRowCounter}][price]" value="${customPrice}" required oninput="calculateModalTotals()" class="modal-price-input w-full text-xs font-bold rounded-xl border-slate-200 bg-white py-1.5 pl-6 pr-2 focus:border-emerald-500 focus:ring-emerald-500 shadow-2xs">
+                    </div>
                 </div>
             </div>
 
-            <!-- Unit Price -->
-            <div class="sm:col-span-2 pt-0.5">
-                <label class="block sm:hidden text-[9px] font-bold uppercase text-slate-400 mb-1">Price (₱)</label>
-                <div class="relative">
-                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₱</span>
-                    <input type="number" step="0.01" min="0" name="items[${modalRowCounter}][price]" value="${customPrice}" required oninput="calculateModalTotals()" class="modal-price-input w-full text-xs font-bold rounded-xl border-slate-200 bg-white py-1.5 pl-6 pr-2 focus:border-emerald-500 focus:ring-emerald-500 shadow-2xs">
+            <!-- Subtotal & Action (Row on mobile, flattened on sm+) -->
+            <div class="flex items-center justify-between sm:contents pt-1 sm:pt-0">
+                <!-- Subtotal -->
+                <div class="sm:col-span-2 flex items-center justify-between sm:justify-end sm:pt-2">
+                    <span class="block sm:hidden text-[9px] font-bold uppercase text-slate-400 mr-2">Subtotal:</span>
+                    <span class="modal-subtotal-display text-xs sm:text-sm font-black text-slate-900">₱0.00</span>
                 </div>
-            </div>
 
-            <!-- Subtotal -->
-            <div class="sm:col-span-2 flex items-center justify-between sm:justify-end pt-2">
-                <span class="block sm:hidden text-[9px] font-bold uppercase text-slate-400">Subtotal</span>
-                <span class="modal-subtotal-display text-xs sm:text-sm font-black text-slate-900">₱0.00</span>
-            </div>
-
-            <!-- Action -->
-            <div class="sm:col-span-1 text-right sm:text-center pt-1">
-                <button type="button" onclick="removeModalProductRow('${rowId}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer" title="Remove item">
-                    <i class="bi bi-trash3 text-xs"></i>
-                </button>
+                <!-- Action -->
+                <div class="sm:col-span-1 text-right sm:text-center sm:pt-1">
+                    <button type="button" onclick="removeModalProductRow('${rowId}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer" title="Remove item">
+                        <i class="bi bi-trash3 text-xs"></i>
+                    </button>
+                </div>
             </div>
         `;
 

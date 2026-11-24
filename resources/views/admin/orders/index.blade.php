@@ -29,6 +29,7 @@
                     <option value="Delivered - Pending Remittance" {{ request('status') === 'Delivered - Pending Remittance' ? 'selected' : '' }}>Delivered - Pending Remittance</option>
                     <option value="Paid & Remitted" {{ request('status') === 'Paid & Remitted' ? 'selected' : '' }}>Paid & Remitted</option>
                     <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
+                    <option value="Cancelled by Customer" {{ request('status') === 'Cancelled by Customer' ? 'selected' : '' }}>Cancelled by Customer</option>
                 </select>
             </div>
 
@@ -138,22 +139,8 @@
                     </td>
                     <!-- Status Badge -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        @php
-                            $statusColors = [
-                                'Pending' => 'bg-amber-50 text-amber-700 border-amber-100',
-                                'Confirmed' => 'bg-sky-50 text-sky-700 border-sky-100',
-                                'Preparing' => 'bg-indigo-50 text-indigo-700 border-indigo-100',
-                                'Ready for Pickup' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                'Out for Delivery' => 'bg-purple-50 text-purple-700 border-purple-100',
-                                'Delivered' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-                                'Delivered - Pending Remittance' => 'bg-amber-50 text-amber-800 border-amber-200',
-                                'Paid & Remitted' => 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold',
-                                'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100',
-                            ];
-                            $color = $statusColors[$order->order_status] ?? 'bg-slate-50 text-slate-600';
-                        @endphp
-                        <span class="order-status-badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border {{ $color }}">
-                            {{ $order->order_status }}
+                        <span class="order-status-badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border {{ $order->statusBadgeClasses() }}">
+                            {{ $order->statusBadgeLabel() }}
                         </span>
                     </td>
                     <!-- Rider -->
@@ -166,10 +153,19 @@
                     </td>
                     <!-- Actions -->
                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <a href="{{ route('admin.orders.show', $order->id) }}" class="inline-flex items-center space-x-1 py-1.5 px-3 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 transition-all border border-sky-100">
-                            <span>Process Order</span>
-                            <i class="bi bi-arrow-right-short text-base"></i>
-                        </a>
+                        <div class="inline-flex items-center justify-center gap-1.5">
+                            <x-chat-button
+                                type="order"
+                                :id="$order->id"
+                                :label="'Order #' . $order->order_number"
+                                :unread="$order->unreadChatCountFor('admin')"
+                                size="xs"
+                                variant="indigo" />
+                            <a href="{{ route('admin.orders.show', $order->id) }}" class="inline-flex items-center space-x-1 py-1.5 px-3 rounded-lg text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 transition-all border border-sky-100">
+                                <span>Process Order</span>
+                                <i class="bi bi-arrow-right-short text-base"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 @empty

@@ -67,7 +67,7 @@
                     <i class="bi bi-info-circle-fill text-amber-600"></i>
                     <span>Local Test Shortcut:</span>
                 </div>
-                <p class="text-[11px] text-amber-800 mb-2.5">Since email sending is set to local log, you can test directly by clicking below:</p>
+                <p class="text-[11px] text-amber-800 mb-2.5">For local development and testing, you can access the password reset form directly:</p>
                 <a href="{{ session('dev_reset_url') }}" class="inline-flex items-center gap-1.5 font-bold text-sky-700 bg-white px-3 py-1.5 rounded-lg border border-amber-200 shadow-2xs hover:bg-amber-50 hover:text-sky-800 transition-colors">
                     <span>Open Reset Password Form</span>
                     <i class="bi bi-arrow-right text-xs"></i>

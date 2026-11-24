@@ -13,14 +13,20 @@
             <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block">ORDER FULFILLMENT</span>
             <h2 class="text-base font-black text-slate-900 font-mono leading-tight">#{{ $order->order_number }}</h2>
         </div>
-        <span class="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full border
-            @if($order->order_status === 'Delivered' || $order->order_status === 'Delivered - Pending Remittance' || $order->order_status === 'Paid & Remitted') bg-emerald-50 text-emerald-700 border-emerald-200
-            @elseif($order->order_status === 'Out for Delivery') bg-sky-50 text-sky-700 border-sky-200 animate-pulse
-            @elseif($order->order_status === 'Cancelled') bg-rose-50 text-rose-700 border-rose-200
-            @else bg-amber-50 text-amber-700 border-amber-200
-            @endif">
-            {{ $order->order_status }}
-        </span>
+        <div class="flex items-center gap-2">
+            @if((int) $order->rider_id === (int) auth()->id())
+                <x-chat-button
+                    type="order"
+                    :id="$order->id"
+                    :label="'Order #' . $order->order_number"
+                    :unread="$order->unreadChatCountFor('rider')"
+                    size="xs"
+                    variant="amber" />
+            @endif
+            <span class="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full border {{ $order->statusBadgeClasses() }}">
+                {{ $order->statusBadgeLabel() }}
+            </span>
+        </div>
     </div>
 </div>
 

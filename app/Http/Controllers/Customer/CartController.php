@@ -12,7 +12,6 @@ use App\Models\AppNotification;
 use App\Models\User;
 use App\Models\AuditLog;
 use App\Services\InventoryService;
-use App\Services\XenditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -438,15 +437,14 @@ class CartController extends Controller
 
         $subtotal = $items->sum('subtotal');
         $deliveryFee = Order::calculateDeliveryFee((float) $subtotal, 'Delivery');
-        $xenditConfigured = app(XenditService::class)->isConfigured();
 
         $selectedBatch = $cart;
         $batchNumber = 1;
 
-        return view('customer.checkout', compact('cart', 'selectedBatch', 'batchNumber', 'items', 'subtotal', 'deliveryFee', 'xenditConfigured'));
+        return view('customer.checkout', compact('cart', 'selectedBatch', 'batchNumber', 'items', 'subtotal', 'deliveryFee'));
     }
 
-    public function placeOrder(Request $request, XenditService $xenditService)
+    public function placeOrder(Request $request)
     {
         $nowInManila = Carbon::now('Asia/Manila');
         $todayStr = $nowInManila->format('Y-m-d');
@@ -457,7 +455,7 @@ class CartController extends Controller
             'delivery_address' => 'required_if:order_type,Delivery|nullable|string|max:255',
             'schedule_date' => 'required|date|after_or_equal:' . $todayStr,
             'schedule_time' => 'required|in:08:00:00,13:00:00',
-            'payment_method' => 'required|in:cod,xendit',
+            'payment_method' => 'required|in:cod',
         ]);
 
         // Validate time slot cutoff if schedule_date is today
@@ -557,7 +555,7 @@ class CartController extends Controller
                 'order_number' => $orderNumber,
                 'customer_id' => auth()->id(),
                 'order_type' => $request->order_type,
-                'payment_method' => $request->payment_method,
+                'payment_method' => 'cod',
                 'payment_status' => 'pending',
                 'delivery_address' => ($request->order_type === 'Delivery') ? $request->delivery_address : null,
                 'schedule_date' => $request->schedule_date,
@@ -598,34 +596,15 @@ class CartController extends Controller
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'action' => 'ORDER_PLACED',
-                'details' => "Order {$orderNumber} placed with " . $cartItems->sum('quantity') . " items (Total: ₱" . number_format($totalAmount, 2) . ", Method: " . strtoupper($request->payment_method) . ")",
+                'details' => "Order {$orderNumber} placed with " . $cartItems->sum('quantity') . " items (Total: ₱" . number_format($totalAmount, 2) . ", Method: COD)",
                 'ip_address' => $request->ip(),
             ]);
-
-            // Handle Xendit Online Payment initiation
-            $xenditInvoiceUrl = null;
-            if ($request->payment_method === 'xendit') {
-                if (!$xenditService->isConfigured()) {
-                    throw new \Exception("Xendit payment gateway is not yet configured with an API key. Please choose Cash on Delivery or contact store support.");
-                }
-
-                $invoice = $xenditService->createInvoice($order);
-
-                $order->update([
-                    'xendit_invoice_id' => $invoice['id'],
-                    'xendit_invoice_url' => $invoice['invoice_url'],
-                ]);
-
-                $xenditInvoiceUrl = $invoice['invoice_url'];
-            }
 
             // Create notification for customer
             AppNotification::create([
                 'user_id' => auth()->id(),
                 'title' => 'Order Received',
-                'message' => ($request->payment_method === 'xendit')
-                    ? "Your order {$orderNumber} has been received. Please complete online payment via Xendit."
-                    : "Your order {$orderNumber} has been received and is pending admin approval.",
+                'message' => "Your order {$orderNumber} has been received and is pending admin approval.",
                 'link' => route('customer.orders.show', $order->id),
                 'is_read' => false,
             ]);
@@ -636,7 +615,7 @@ class CartController extends Controller
                 AppNotification::create([
                     'user_id' => $admin->id,
                     'title' => 'New Order Received',
-                    'message' => "New order {$orderNumber} placed by " . auth()->user()->name . " (₱" . number_format($totalAmount, 2) . " via " . strtoupper($request->payment_method) . ").",
+                    'message' => "New order {$orderNumber} placed by " . auth()->user()->name . " (₱" . number_format($totalAmount, 2) . " via COD).",
                     'link' => route('admin.orders.show', $order->id),
                     'is_read' => false,
                 ]);
@@ -657,10 +636,6 @@ class CartController extends Controller
             }
 
             DB::commit();
-
-            if ($request->payment_method === 'xendit' && !empty($xenditInvoiceUrl)) {
-                return redirect()->away($xenditInvoiceUrl);
-            }
 
             return redirect()->route('customer.orders.index')->with('success', "Order placed successfully! Order Number: {$orderNumber}");
 

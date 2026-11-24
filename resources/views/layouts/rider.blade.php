@@ -123,10 +123,10 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @yield('styles')
 </head>
-<body class="h-full min-h-[100dvh] flex flex-col items-center justify-center p-0 md:p-6 text-slate-800 antialiased overflow-hidden">
+<body class="min-h-[100dvh] flex flex-col items-center justify-center p-0 md:p-4 lg:p-6 text-slate-800 antialiased overflow-x-hidden md:overflow-y-auto bg-slate-100/70">
 
     <!-- Smartphone Device Container Mockup (Fits beautifully centered on desktop, natively full-screen on mobile) -->
-    <div class="w-full h-[100dvh] md:h-[820px] md:w-[380px] md:rounded-[48px] md:border-[12px] md:border-slate-800 md:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] md:ring-1 md:ring-slate-300/40 md:relative md:flex md:flex-col overflow-hidden bg-white">
+    <div class="w-full h-[100dvh] md:h-[min(820px,calc(100dvh-2rem))] md:w-[380px] md:rounded-[44px] md:border-[10px] md:border-slate-800 md:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] md:ring-1 md:ring-slate-300/40 md:relative md:flex md:flex-col overflow-hidden bg-white shrink-0 my-auto">
         
         <!-- Simulated Hardware notch/Status bar (Desktop only) -->
         <div class="hidden md:flex bg-slate-50 h-7 px-6 items-center justify-between text-[10px] text-slate-500 select-none z-50 sticky top-0 border-b border-slate-100">
@@ -868,6 +868,9 @@
             setInterval(checkLiveUpdates, 7000);
         })();
     </script>
+    @auth
+        <x-transaction-chat-drawer />
+    @endauth
     @yield('scripts')
 </body>
 </html>

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Reservation extends Model
 {
@@ -167,6 +168,20 @@ class Reservation extends Model
     public function cashLedgerEntries(): HasMany
     {
         return $this->hasMany(CashLedgerEntry::class, 'reservation_id');
+    }
+
+    public function chatThread(): MorphOne
+    {
+        return $this->morphOne(ChatThread::class, 'chatable');
+    }
+
+    public function unreadChatCountFor(string $viewerRole): int
+    {
+        if (!$this->relationLoaded('chatThread')) {
+            $this->load('chatThread');
+        }
+
+        return $this->chatThread ? $this->chatThread->unreadCountForRole($viewerRole) : 0;
     }
 
     public static function generateReservationCode(): string

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ChatThread;
 use App\Models\Order;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -31,4 +32,9 @@ Broadcast::channel('orders.{orderId}', function ($user, $orderId) {
 
 Broadcast::channel('rider.deliveries.{riderId}', function ($user, $riderId) {
     return (int) $user->id === (int) $riderId && $user->role === 'rider';
+});
+
+Broadcast::channel('transaction.chat.{threadId}', function ($user, $threadId) {
+    $thread = ChatThread::with('chatable')->find($threadId);
+    return $thread ? $thread->canAccess($user) : false;
 });

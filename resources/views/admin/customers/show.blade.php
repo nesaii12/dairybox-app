@@ -146,12 +146,8 @@
                             <td class="px-6 py-3 text-slate-600">{{ $order->order_type }}</td>
                             <td class="px-6 py-3 font-semibold text-slate-800">₱{{ number_format($order->total_amount, 2) }}</td>
                             <td class="px-6 py-3">
-                                <span class="inline-flex items-center px-2 py-0.25 rounded text-[10px] font-semibold
-                                    @if($order->order_status === 'Delivered') bg-emerald-50 text-emerald-700
-                                    @elseif($order->order_status === 'Cancelled') bg-rose-50 text-rose-700
-                                    @else bg-amber-50 text-amber-700
-                                    @endif">
-                                    {{ $order->order_status }}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border {{ $order->statusBadgeClasses() }}">
+                                    {{ $order->statusBadgeLabel() }}
                                 </span>
                             </td>
                             <td class="px-6 py-3 text-center">

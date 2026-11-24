@@ -41,6 +41,16 @@
 
         <!-- Action Buttons -->
         <div class="flex items-center gap-2 flex-wrap">
+            <x-chat-button
+                type="reservation"
+                :id="$reservation->id"
+                :label="$reservation->reservation_code"
+                :unread="$reservation->unreadChatCountFor('admin')"
+                size="md"
+                variant="indigo">
+                Live Chat
+            </x-chat-button>
+
             @if($reservation->canEdit())
                 <a href="{{ route('admin.reservations.edit', $reservation->id) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition-all shadow-2xs">
                     <i class="bi bi-pencil-square"></i>

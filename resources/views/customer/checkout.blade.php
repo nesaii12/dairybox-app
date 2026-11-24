@@ -149,58 +149,63 @@
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Option 1: Xendit Online Payment -->
-                    <label id="payment-xendit-card" class="relative border-2 border-sky-500 bg-sky-50/30 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all select-none">
-                        <input type="radio" name="payment_method" value="xendit" checked onchange="togglePaymentMethod()" class="absolute right-4 top-4 h-4 w-4 text-sky-500 border-slate-300 focus:ring-sky-500">
+                    <!-- Primary Option: Cash on Delivery (Default Selected) -->
+                    <label id="payment-cod-card" class="relative border-2 border-sky-500 bg-sky-50/30 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all select-none">
+                        <input type="radio" name="payment_method" value="cod" checked class="absolute right-4 top-4 h-4 w-4 text-sky-600 border-slate-300 focus:ring-sky-500 accent-sky-600">
                         
                         <div>
                             <div class="flex items-center space-x-2.5 mb-2">
                                 <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-sky-600 text-white flex items-center justify-center text-base shadow-sm">
-                                    <i class="bi bi-credit-card-2-front"></i>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-black text-slate-900 block leading-tight">Online Payment</span>
-                                    <span class="text-[9px] font-bold text-sky-600 uppercase tracking-wider">Powered by Xendit</span>
-                                </div>
-                            </div>
-                            <p class="text-xs text-slate-600 leading-relaxed mt-2.5">
-                                Pay instantly using GCash, Maya, Debit/Credit Card, QR Ph, or GrabPay.
-                            </p>
-                        </div>
-
-                        <!-- Brand logos preview -->
-                        <div class="flex items-center space-x-1.5 mt-4 pt-3 border-t border-sky-100/70 text-[10px]">
-                            <span class="px-2 py-0.5 rounded bg-white font-black text-sky-600 border border-slate-200 shadow-2xs">GCash</span>
-                            <span class="px-2 py-0.5 rounded bg-white font-black text-emerald-600 border border-slate-200 shadow-2xs">Maya</span>
-                            <span class="px-2 py-0.5 rounded bg-white font-bold text-slate-700 border border-slate-200 shadow-2xs">Cards</span>
-                            <span class="px-2 py-0.5 rounded bg-white font-bold text-slate-700 border border-slate-200 shadow-2xs">QR Ph</span>
-                        </div>
-                    </label>
-
-                    <!-- Option 2: Cash on Delivery / Store Pickup -->
-                    <label id="payment-cod-card" class="relative border border-slate-200 rounded-2xl p-5 flex flex-col justify-between cursor-pointer hover:bg-slate-50/50 transition-all select-none">
-                        <input type="radio" name="payment_method" value="cod" onchange="togglePaymentMethod()" class="absolute right-4 top-4 h-4 w-4 text-sky-500 border-slate-300 focus:ring-sky-500">
-                        
-                        <div>
-                            <div class="flex items-center space-x-2.5 mb-2">
-                                <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-base">
                                     <i class="bi bi-cash-stack"></i>
                                 </div>
                                 <div>
-                                    <span class="text-sm font-bold text-slate-800 block leading-tight">Cash on Delivery</span>
-                                    <span class="text-[9px] font-semibold text-slate-400" id="cod-label-subtitle">Pay upon Delivery</span>
+                                    <span class="text-sm font-black text-slate-900 block leading-tight">Cash on Delivery</span>
+                                    <span class="text-[9px] font-bold text-sky-600 uppercase tracking-wider" id="cod-label-subtitle">Pay upon Delivery</span>
                                 </div>
                             </div>
-                            <p class="text-xs text-slate-500 leading-relaxed mt-2.5" id="cod-desc">
+                            <p class="text-xs text-slate-600 leading-relaxed mt-2.5" id="cod-desc">
                                 Prepare exact cash payment upon receiving your order from the dispatch rider.
                             </p>
                         </div>
 
-                        <div class="flex items-center space-x-2 mt-4 pt-3 border-t border-slate-100 text-[10px] text-slate-500">
-                            <i class="bi bi-wallet2 text-slate-400"></i>
-                            <span class="font-medium">Cash transaction</span>
+                        <div class="flex items-center space-x-2 mt-4 pt-3 border-t border-sky-100/70 text-[10px] text-sky-800 font-semibold">
+                            <i class="bi bi-check-circle-fill text-sky-600"></i>
+                            <span>Default checkout payment method</span>
                         </div>
                     </label>
+
+                    <!-- Secondary Info Card: Online Payment via GCash QR (Live Chat Redirect) -->
+                    <div class="relative border border-slate-200/90 bg-white rounded-2xl p-5 flex flex-col justify-between shadow-2xs hover:border-sky-300 transition-all">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center space-x-2.5">
+                                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-base shadow-sm">
+                                        <i class="bi bi-qr-code-scan"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-sm font-black text-slate-900 block leading-tight">Online Payment via GCash QR</span>
+                                        <span class="text-[9px] font-bold text-sky-600 uppercase tracking-wider">Live Chat Assistance</span>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold">
+                                    Info
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-600 leading-relaxed mt-2.5">
+                                Want to pay via GCash QR? Place your order as Cash on Delivery first, or contact our Admin in Live Chat to request the GCash QR code and verify your payment.
+                            </p>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-slate-100">
+                            <button type="button"
+                                    id="btn-contact-admin-chat"
+                                    onclick="contactAdminForGcashQR()"
+                                    class="w-full py-2.5 px-3.5 rounded-xl bg-sky-50 hover:bg-sky-100 active:scale-[0.98] text-sky-700 hover:text-sky-800 border border-sky-200 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer">
+                                <i class="bi bi-chat-dots-fill text-sky-600"></i>
+                                <span>Contact Admin via Live Chat</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -292,20 +297,20 @@
                     </div>
                 </div>
 
-                <!-- Selected Payment Method Indicator -->
-                <div id="payment-method-indicator" class="mb-6 p-3.5 bg-sky-50/70 border border-sky-100 rounded-2xl text-[11px] text-slate-700 space-y-1">
-                    <div class="flex items-center justify-between font-bold text-sky-900">
-                        <span class="flex items-center"><i class="bi bi-shield-lock-fill text-sky-600 mr-1.5"></i> Payment Gateway</span>
-                        <span id="gateway-tag" class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white border border-sky-200 text-sky-700 font-bold">Xendit Secure</span>
+                <!-- Cash on Delivery Payment Badge / Notice Box -->
+                <div id="payment-method-indicator" class="mb-6 p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl text-[11px] text-slate-700 space-y-1.5">
+                    <div class="flex items-center justify-between font-bold text-slate-900">
+                        <span class="flex items-center"><i class="bi bi-cash-stack text-sky-600 mr-1.5"></i> Payment Method</span>
+                        <span id="gateway-tag" class="text-[9px] uppercase px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-bold">Cash on Delivery</span>
                     </div>
                     <p class="text-[10px] text-slate-500 leading-relaxed" id="payment-hint-text">
-                        You will be redirected to Xendit's secure payment portal to complete payment via GCash, Maya, or Card.
+                        Payment Method: Cash on Delivery — Pay upon delivery or coordinate GCash QR with Admin via Live Chat.
                     </p>
                 </div>
 
                 <button type="submit" id="submit-order-btn" class="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-black text-white bg-sky-500 hover:bg-sky-600 shadow-md shadow-sky-500/20 transition-all cursor-pointer">
-                    <i class="bi bi-lock-fill text-xs" id="submit-btn-icon"></i>
-                    <span id="submit-btn-text">Pay ₱{{ number_format($subtotal + $deliveryFee, 2) }} with Xendit</span>
+                    <i class="bi bi-check2-circle text-base" id="submit-btn-icon"></i>
+                    <span id="submit-btn-text">Place Order (COD) — ₱{{ number_format($subtotal + $deliveryFee, 2) }}</span>
                 </button>
             </div>
         </div>
@@ -323,7 +328,6 @@
     const addressInput = document.getElementById('delivery_address');
     const deliveryCard = document.getElementById('delivery-card');
     const pickupCard = document.getElementById('pickup-card');
-    const paymentXenditCard = document.getElementById('payment-xendit-card');
     const paymentCodCard = document.getElementById('payment-cod-card');
     const paymentHintText = document.getElementById('payment-hint-text');
     const gatewayTag = document.getElementById('gateway-tag');
@@ -354,7 +358,8 @@
             
             deliveryFeeDisplay.textContent = '₱0.00';
             deliveryFeeDisplay.className = 'font-semibold text-slate-900';
-            totalAmountDisplay.textContent = '₱' + formatCurrency(subtotal);
+            const totalText = '₱' + formatCurrency(subtotal);
+            totalAmountDisplay.textContent = totalText;
 
             if (summaryFulfillmentMode) summaryFulfillmentMode.textContent = 'Store Pickup';
             if (summaryAddressRow) summaryAddressRow.style.display = 'none';
@@ -369,8 +374,10 @@
             deliveryCard.querySelector('i').className = "bi bi-truck text-3xl text-slate-400 mb-2";
             deliveryCard.querySelector('span.text-sm').className = "text-sm font-bold text-slate-700";
 
-            codLabelSubtitle.textContent = "Pay upon Store Pickup";
-            codDesc.textContent = "Pay cash directly at the store counter upon picking up your order.";
+            if (codLabelSubtitle) codLabelSubtitle.textContent = "Pay upon Store Pickup";
+            if (codDesc) codDesc.textContent = "Pay cash directly at the store counter upon picking up your order.";
+            if (paymentHintText) paymentHintText.textContent = "Payment Method: Cash on Delivery — Pay upon store pickup or coordinate GCash QR with Admin via Live Chat.";
+            if (submitBtnText) submitBtnText.textContent = `Place Order (COD) — ${totalText}`;
         } else {
             addressSection.style.display = 'block';
             addressInput.setAttribute('required', 'required');
@@ -382,7 +389,8 @@
                 deliveryFeeDisplay.textContent = '₱' + formatCurrency(calculatedDeliveryFee);
                 deliveryFeeDisplay.className = 'font-semibold text-slate-900';
             }
-            totalAmountDisplay.textContent = '₱' + formatCurrency(subtotal + calculatedDeliveryFee);
+            const totalText = '₱' + formatCurrency(subtotal + calculatedDeliveryFee);
+            totalAmountDisplay.textContent = totalText;
 
             if (summaryFulfillmentMode) summaryFulfillmentMode.textContent = 'Home Delivery';
             if (summaryAddressRow) summaryAddressRow.style.display = 'flex';
@@ -398,38 +406,26 @@
             pickupCard.querySelector('i').className = "bi bi-shop text-3xl text-slate-400 mb-2";
             pickupCard.querySelector('span.text-sm').className = "text-sm font-bold text-slate-700";
 
-            codLabelSubtitle.textContent = "Pay upon Delivery";
-            codDesc.textContent = "Prepare exact cash payment upon receiving your order from the dispatch rider.";
+            if (codLabelSubtitle) codLabelSubtitle.textContent = "Pay upon Delivery";
+            if (codDesc) codDesc.textContent = "Prepare exact cash payment upon receiving your order from the dispatch rider.";
+            if (paymentHintText) paymentHintText.textContent = "Payment Method: Cash on Delivery — Pay upon delivery or coordinate GCash QR with Admin via Live Chat.";
+            if (submitBtnText) submitBtnText.textContent = `Place Order (COD) — ${totalText}`;
         }
-
-        togglePaymentMethod();
     }
 
-    function togglePaymentMethod() {
-        const paymentMethod = document.querySelector('input[name="payment_method"]:checked').value;
-        const totalText = totalAmountDisplay.textContent;
-        const isPickup = document.querySelector('input[name="order_type"]:checked').value === 'Pickup';
-
-        if (paymentMethod === 'xendit') {
-            paymentXenditCard.className = "relative border-2 border-sky-500 bg-sky-50/30 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all select-none";
-            paymentCodCard.className = "relative border border-slate-200 rounded-2xl p-5 flex flex-col justify-between cursor-pointer hover:bg-slate-50/50 transition-all select-none";
-            
-            gatewayTag.textContent = "Xendit Secure";
-            gatewayTag.className = "text-[9px] uppercase px-1.5 py-0.5 rounded bg-white border border-sky-200 text-sky-700 font-bold";
-            paymentHintText.textContent = "You will be redirected to Xendit's secure payment portal to complete payment via GCash, Maya, or Card.";
-            submitBtnText.textContent = `Pay ${totalText} with Xendit`;
-            submitBtnIcon.className = "bi bi-lock-fill text-xs";
+    function contactAdminForGcashQR() {
+        const prefillMessage = "Hi Admin, I would like to pay for my order via GCash QR.";
+        if (typeof window.openLiveChat === 'function') {
+            window.openLiveChat(prefillMessage);
         } else {
-            paymentCodCard.className = "relative border-2 border-sky-500 bg-sky-50/30 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all select-none";
-            paymentXenditCard.className = "relative border border-slate-200 rounded-2xl p-5 flex flex-col justify-between cursor-pointer hover:bg-slate-50/50 transition-all select-none";
-            
-            gatewayTag.textContent = "Cash on Delivery";
-            gatewayTag.className = "text-[9px] uppercase px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-bold";
-            paymentHintText.textContent = isPickup 
-                ? "Pay cash directly at the store counter upon picking up your order."
-                : "Pay cash directly to the dispatch rider upon receiving your order at your delivery address.";
-            submitBtnText.textContent = isPickup ? "Place Order (Cash on Pickup)" : "Place Order (Cash on Delivery)";
-            submitBtnIcon.className = "bi bi-check2-square text-xs";
+            const bubble = document.getElementById('floatingChatBubble');
+            if (bubble) bubble.click();
+            const input = document.getElementById('chatMessageInput');
+            if (input) {
+                input.value = prefillMessage;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                setTimeout(() => input.focus(), 200);
+            }
         }
     }
 

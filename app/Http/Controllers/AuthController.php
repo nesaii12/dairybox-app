@@ -646,10 +646,31 @@ class AuthController extends Controller
         }
 
         $token = PasswordBroker::broker()->createToken($user);
-        $user->sendPasswordResetNotification($token);
+        $resetUrl = route('password.reset', ['token' => $token, 'email' => $user->email]);
 
-        if (config('mail.default') === 'log' && app()->environment('local')) {
-            session()->flash('dev_reset_url', route('password.reset', ['token' => $token, 'email' => $user->email]));
+        $mailSent = false;
+        try {
+            $user->sendPasswordResetNotification($token);
+            $mailSent = true;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Password reset email sending failed: ' . $e->getMessage(), [
+                'email' => $user->email,
+            ]);
+            $mailSent = false;
+        }
+
+        if (app()->environment('local', 'testing')) {
+            session()->flash('dev_reset_url', $resetUrl);
+        }
+
+        if (!$mailSent) {
+            if (app()->environment('local', 'testing')) {
+                return back()->with('status', 'A reset link was generated! (Email delivery failed due to SMTP credentials; you can use the test shortcut below to test).');
+            }
+
+            return back()->withErrors([
+                'email' => 'Unable to send password reset email at this moment. Please check your email configuration or try again later.',
+            ])->onlyInput('email');
         }
 
         return back()->with('status', 'We have emailed your password reset link!');

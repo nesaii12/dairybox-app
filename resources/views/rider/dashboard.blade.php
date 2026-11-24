@@ -182,8 +182,15 @@
                             <span class="text-xs font-semibold text-slate-800 select-all">{{ $displayCustomerPhone ?? 'N/A' }}</span>
                         </div>
                     </div>
-                    @if($displayCustomerPhone)
-                        <div class="flex items-center space-x-1.5 shrink-0">
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <x-chat-button
+                            type="order"
+                            :id="$order->id"
+                            :label="'Order #' . $order->order_number"
+                            :unread="$order->unreadChatCountFor('rider')"
+                            size="xs"
+                            variant="amber" />
+                        @if($displayCustomerPhone)
                             <a href="tel:{{ $displayCustomerPhone }}" class="p-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 text-xs font-bold transition flex items-center gap-1 shadow-2xs" title="Call Customer">
                                 <i class="bi bi-telephone-fill text-[10px]"></i>
                                 <span class="text-[9px]">Call</span>
@@ -192,8 +199,8 @@
                                 <i class="bi bi-chat-dots-fill text-[10px]"></i>
                                 <span class="text-[9px]">SMS</span>
                             </a>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Destination Address & Directions -->

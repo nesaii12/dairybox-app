@@ -190,9 +190,9 @@
                                 </button>
 
                                 <!-- Notifications Dropdown -->
-                                <div id="notificationsModal" class="absolute right-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl border border-slate-100 shadow-xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
+                                <div id="notificationsModal" class="fixed inset-x-3 top-16 mx-auto sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 w-auto sm:w-96 max-w-sm bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden hidden z-50 transform origin-top-right transition-all flex flex-col">
                                     <!-- Header -->
-                                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/90">
                                         <div>
                                             <h3 class="text-xs font-bold text-slate-900">Notifications</h3>
                                         </div>
@@ -209,9 +209,9 @@
                                     </div>
 
                                     <!-- Body (Scrollable list) -->
-                                    <div class="overflow-y-auto divide-y divide-slate-100 max-h-[350px]">
+                                    <div class="overflow-y-auto divide-y divide-slate-100 max-h-[350px] bg-white">
                                         @forelse($allNotifications as $notif)
-                                        <div class="group relative p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/40 {{ !$notif->is_read ? 'bg-sky-50/15' : '' }}">
+                                        <div class="group relative p-3.5 flex items-start justify-between gap-3 transition-all hover:bg-sky-50/50 {{ !$notif->is_read ? 'bg-sky-50/30' : 'bg-white' }}">
                                             <a href="{{ route('notifications.readAndRedirect', $notif->id) }}" class="flex space-x-2.5 flex-1 min-w-0 pr-2 block">
                                                 <!-- Read indicator dot -->
                                                 <div class="mt-1 flex-shrink-0">
@@ -226,12 +226,12 @@
                                                         <h4 class="text-xs font-bold {{ !$notif->is_read ? 'text-slate-900 group-hover:text-sky-600' : 'text-slate-700 group-hover:text-sky-600' }} transition-colors">
                                                             {{ $notif->title }}
                                                         </h4>
-                                                        <i class="bi bi-arrow-right text-[10px] text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all ml-1 flex-shrink-0"></i>
+                                                        <i class="bi bi-arrow-right text-[10px] text-slate-400 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all ml-1 flex-shrink-0"></i>
                                                     </div>
-                                                    <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed break-words">{{ $notif->message }}</p>
+                                                    <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed break-words">{{ $notif->message }}</p>
                                                     <div class="flex items-center space-x-2 mt-1">
-                                                        <span class="block text-[8px] text-slate-400 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
-                                                        <span class="text-[8px] font-semibold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">View details &rarr;</span>
+                                                        <span class="block text-[9px] text-slate-400 font-medium">{{ $notif->created_at->diffForHumans() }}</span>
+                                                        <span class="text-[9px] font-semibold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">View details &rarr;</span>
                                                     </div>
                                                 </div>
                                             </a>
@@ -239,7 +239,7 @@
                                             @if(!$notif->is_read)
                                             <form action="{{ route('customer.notifications.read', $notif->id) }}" method="POST" class="flex-shrink-0 z-10" onclick="event.stopPropagation();">
                                                 @csrf
-                                                <button type="submit" class="p-1 px-1.5 border border-slate-200 rounded-lg text-[8px] font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 transition-all shadow-2xs cursor-pointer" title="Mark as read without redirecting">
+                                                <button type="submit" class="p-1 px-1.5 border border-slate-200 rounded-lg text-[9px] font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 transition-all shadow-2xs cursor-pointer" title="Mark as read without redirecting">
                                                     Mark read
                                                 </button>
                                             </form>
@@ -247,9 +247,9 @@
                                         </div>
                                         @empty
                                         <div class="py-10 text-center">
-                                            <i class="bi bi-bell-slash text-3xl text-slate-200 mb-2 block"></i>
+                                            <i class="bi bi-bell-slash text-3xl text-slate-300 mb-2 block"></i>
                                             <p class="text-xs font-semibold text-slate-800">All caught up!</p>
-                                            <p class="text-[10px] text-slate-400">You have no new notifications.</p>
+                                            <p class="text-[11px] text-slate-500">You have no new notifications.</p>
                                         </div>
                                         @endforelse
                                     </div>
@@ -636,6 +636,9 @@
             }
         });
     </script>
+    @auth
+        <x-transaction-chat-drawer />
+    @endauth
     @yield('scripts')
 </body>
 </html>

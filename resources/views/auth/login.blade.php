@@ -121,8 +121,12 @@
                 @endif
 
                 <!-- Login Form -->
-                <form class="space-y-5" action="{{ route('login') }}" method="POST">
+                <form class="space-y-5" action="{{ route('login') }}" method="POST" autocomplete="off">
                     @csrf
+
+                    <!-- Hidden decoy inputs to absorb aggressive browser credential autofill -->
+                    <input type="text" name="_fake_username" tabindex="-1" aria-hidden="true" autocomplete="off" class="sr-only" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
+                    <input type="password" name="_fake_password" tabindex="-1" aria-hidden="true" autocomplete="new-password" class="sr-only" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
 
                     <!-- Email Input -->
                     <div>
@@ -132,9 +136,9 @@
                         <input id="email" 
                                name="email" 
                                type="email" 
-                               autocomplete="email" 
+                               autocomplete="off" 
                                required 
-                               value="{{ old('email') }}"
+                               value="{{ old('email', '') }}"
                                class="auth-glass-input"
                                placeholder="you@example.com">
                         @error('email')
@@ -151,8 +155,9 @@
                             <input id="password" 
                                    name="password" 
                                    type="password" 
-                                   autocomplete="current-password" 
+                                   autocomplete="new-password" 
                                    required
+                                   value=""
                                    class="auth-glass-input pr-10"
                                    placeholder="••••••••">
                             <button type="button" 
@@ -235,6 +240,7 @@
             const toggleBtn = document.getElementById('togglePassword');
             const passwordInput = document.getElementById('password');
             const toggleIcon = document.getElementById('togglePasswordIcon');
+            const emailInput = document.getElementById('email');
 
             if (toggleBtn && passwordInput && toggleIcon) {
                 toggleBtn.addEventListener('click', function () {
@@ -243,6 +249,37 @@
                     toggleIcon.className = isPassword ? 'bi bi-eye-slash text-sm' : 'bi bi-eye text-sm';
                 });
             }
+
+            // Prevent browser password manager from automatically pre-filling admin credentials on initial visit
+            let userHasTyped = false;
+            if (emailInput) {
+                emailInput.addEventListener('input', function () { userHasTyped = true; });
+                emailInput.addEventListener('keydown', function () { userHasTyped = true; });
+            }
+            if (passwordInput) {
+                passwordInput.addEventListener('input', function () { userHasTyped = true; });
+                passwordInput.addEventListener('keydown', function () { userHasTyped = true; });
+            }
+
+            @if(!old('email') && !$errors->any())
+            function clearAutofilledCredentials() {
+                if (!userHasTyped) {
+                    if (emailInput && emailInput.value !== '') {
+                        emailInput.value = '';
+                    }
+                    if (passwordInput && passwordInput.value !== '') {
+                        passwordInput.value = '';
+                    }
+                }
+            }
+
+            clearAutofilledCredentials();
+            window.addEventListener('pageshow', clearAutofilledCredentials);
+            setTimeout(clearAutofilledCredentials, 50);
+            setTimeout(clearAutofilledCredentials, 150);
+            setTimeout(clearAutofilledCredentials, 300);
+            setTimeout(clearAutofilledCredentials, 600);
+            @endif
 
             // Shuffled 10-second background slideshow matching homepage
             const heroSlides = [

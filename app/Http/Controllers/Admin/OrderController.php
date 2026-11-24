@@ -21,7 +21,11 @@ class OrderController extends Controller
 
         // Apply filters
         if ($request->filled('status')) {
-            $query->where('order_status', $request->status);
+            if ($request->status === 'Cancelled') {
+                $query->whereIn('order_status', ['Cancelled', 'Cancelled by Customer']);
+            } else {
+                $query->where('order_status', $request->status);
+            }
         }
 
         if ($request->filled('type')) {
@@ -49,7 +53,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order)
     {
         $request->validate([
-            'order_status' => 'required|in:Pending,Confirmed,Preparing,Ready for Pickup,Out for Delivery,Delivered,Delivered - Pending Remittance,Paid & Remitted,Cancelled',
+            'order_status' => 'required|in:Pending,Confirmed,Preparing,Ready for Pickup,Out for Delivery,Delivered,Delivered - Pending Remittance,Paid & Remitted,Cancelled,Cancelled by Customer',
             'cancellation_reason' => 'nullable|string|max:255',
         ]);
 
@@ -71,7 +75,7 @@ class OrderController extends Controller
             DB::beginTransaction();
 
             $orderData = ['order_status' => $newStatus];
-            if ($newStatus === 'Cancelled') {
+            if (in_array($newStatus, ['Cancelled', 'Cancelled by Customer'])) {
                 $orderData['cancellation_reason'] = $cancellationReason;
             }
             $order->update($orderData);
@@ -96,7 +100,7 @@ class OrderController extends Controller
             }
 
             // If cancelled, return the inventory back using FIFO additions
-            if ($newStatus === 'Cancelled') {
+            if (in_array($newStatus, ['Cancelled', 'Cancelled by Customer'])) {
                 if ($order->delivery) {
                     $order->delivery->update([
                         'delivery_status' => 'Cancelled',
@@ -115,27 +119,31 @@ class OrderController extends Controller
 
                 // If admin requested restricting customer upon cancellation
                 if ($request->boolean('restrict_customer')) {
-                    $banDurationDays = 3;
-                    $until = now()->addDays($banDurationDays);
-                    $order->customer->update([
-                        'status' => 'restricted',
-                        'restricted_until' => $until,
-                    ]);
+                    if (!$order->isDispatched()) {
+                        session()->flash('warning', "Order status updated to {$newStatus}. Customer was NOT restricted because this order has not been dispatched. Policy only permits restrictions after dispatch.");
+                    } else {
+                        $banDurationDays = 3;
+                        $until = now()->addDays($banDurationDays);
+                        $order->customer->update([
+                            'status' => 'restricted',
+                            'restricted_until' => $until,
+                        ]);
 
-                    AppNotification::create([
-                        'user_id' => $order->customer_id,
-                        'title' => 'Ordering Privileges Suspended (3 Days)',
-                        'message' => "Your ordering privileges have been suspended for {$banDurationDays} days until " . $until->format('M d, Y h:i A') . ". Reason: Order #{$order->order_number} cancellation ({$cancellationReason}).",
-                        'link' => route('customer.orders.index'),
-                        'is_read' => false,
-                    ]);
+                        AppNotification::create([
+                            'user_id' => $order->customer_id,
+                            'title' => 'Ordering Privileges Suspended (3 Days)',
+                            'message' => "Your ordering privileges have been suspended for {$banDurationDays} days until " . $until->format('M d, Y h:i A') . ". Reason: Order #{$order->order_number} cancellation ({$cancellationReason}).",
+                            'link' => route('customer.orders.index'),
+                            'is_read' => false,
+                        ]);
 
-                    AuditLog::create([
-                        'user_id' => auth()->id(),
-                        'action' => 'CUSTOMER_RESTRICTED',
-                        'details' => "Restricted customer {$order->customer->name} for {$banDurationDays} days due to cancellation of Order #{$order->order_number}",
-                        'ip_address' => $request->ip(),
-                    ]);
+                        AuditLog::create([
+                            'user_id' => auth()->id(),
+                            'action' => 'CUSTOMER_RESTRICTED',
+                            'details' => "Restricted customer {$order->customer->name} for {$banDurationDays} days due to post-dispatch cancellation of Order #{$order->order_number}",
+                            'ip_address' => $request->ip(),
+                        ]);
+                    }
                 }
             }
 
@@ -161,8 +169,8 @@ class OrderController extends Controller
             }
 
             // Create notification for customer
-            $customerMsg = ($newStatus === 'Cancelled')
-                ? "Your order {$order->order_number} has been cancelled by store administration. Reason: {$cancellationReason}"
+            $customerMsg = in_array($newStatus, ['Cancelled', 'Cancelled by Customer'])
+                ? "Your order {$order->order_number} has been marked as {$newStatus}. Reason: {$cancellationReason}"
                 : "Your order {$order->order_number} status has been updated to '{$newStatus}'.";
 
             AppNotification::create([
@@ -176,7 +184,7 @@ class OrderController extends Controller
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'action' => 'ORDER_STATUS_CHANGED',
-                'details' => "Updated order {$order->order_number} status from {$oldStatus} to {$newStatus}" . ($newStatus === 'Cancelled' ? ". Reason: {$cancellationReason}" : ""),
+                'details' => "Updated order {$order->order_number} status from {$oldStatus} to {$newStatus}" . (in_array($newStatus, ['Cancelled', 'Cancelled by Customer']) ? ". Reason: {$cancellationReason}" : ""),
                 'ip_address' => $request->ip(),
             ]);
 

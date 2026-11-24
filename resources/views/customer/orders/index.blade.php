@@ -23,6 +23,7 @@
                     'Delivered - Pending Remittance' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
                     'Paid & Remitted' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
                     'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100/50',
+                    'Cancelled by Customer' => 'bg-rose-50 text-rose-600 border-rose-100/50',
                 ];
                 $displayStatus = in_array($order->order_status, ['Delivered - Pending Remittance', 'Paid & Remitted']) ? 'Delivered' : $order->order_status;
                 $color = $statusColors[$displayStatus] ?? 'bg-slate-50 text-slate-600';
@@ -62,7 +63,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 pt-0.5">
                     <span class="text-[11px]">
                         <i class="bi bi-calendar3 mr-1 text-slate-400"></i>
                         {{ \Carbon\Carbon::parse($order->schedule_date)->format('M d, Y') }}
@@ -70,7 +71,13 @@
                             &bull; {{ \Carbon\Carbon::parse($order->schedule_time)->format('h:i A') }}
                         @endif
                     </span>
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
+                        <x-chat-button
+                            type="order"
+                            :id="$order->id"
+                            :label="'Order #' . $order->order_number"
+                            :unread="$order->unreadChatCountFor('customer')"
+                            size="sm" />
                         @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup', 'Delivered - Pending Remittance', 'Paid & Remitted']))
                             <a href="{{ route('customer.orders.show', $order->id) }}#review-products" class="inline-flex items-center space-x-1 py-1.5 px-2.5 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all border border-amber-200/80 shadow-2xs">
                                 <i class="bi bi-star-fill text-amber-400 text-[10px]"></i>
@@ -147,6 +154,7 @@
                                 'Delivered - Pending Remittance' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
                                 'Paid & Remitted' => 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
                                 'Cancelled' => 'bg-rose-50 text-rose-600 border-rose-100/50',
+                                'Cancelled by Customer' => 'bg-rose-50 text-rose-600 border-rose-100/50',
                             ];
                             $displayStatus = in_array($order->order_status, ['Delivered - Pending Remittance', 'Paid & Remitted']) ? 'Delivered' : $order->order_status;
                             $color = $statusColors[$displayStatus] ?? 'bg-slate-50 text-slate-600';
@@ -162,6 +170,12 @@
                     </td>
                     <td class="py-4 px-6 text-center">
                         <div class="inline-flex items-center justify-center gap-2">
+                            <x-chat-button
+                                type="order"
+                                :id="$order->id"
+                                :label="'Order #' . $order->order_number"
+                                :unread="$order->unreadChatCountFor('customer')"
+                                size="sm" />
                             @if(in_array($order->order_status, ['Delivered', 'Ready for Pickup', 'Delivered - Pending Remittance', 'Paid & Remitted']))
                                 <a href="{{ route('customer.orders.show', $order->id) }}#review-products" class="inline-flex items-center space-x-1.5 py-1.5 px-3 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all border border-amber-200/80 shadow-2xs hover:shadow-xs cursor-pointer">
                                     <i class="bi bi-star-fill text-amber-400 text-[10px]"></i>

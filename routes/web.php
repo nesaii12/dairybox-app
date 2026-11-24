@@ -30,6 +30,7 @@ Route::middleware('guest')->group(function () {
     Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
     Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email')->middleware('throttle:5,1');
     Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 });
 
 // OTP Email Verification Routes
@@ -183,6 +184,19 @@ Route::post('/api/webhooks/xendit', [\App\Http\Controllers\Webhook\XenditWebhook
 // Global Authenticated Notification Click & Redirect Route (Applies to Admin, Customer, and Rider)
 Route::middleware('auth')->get('/notifications/{notification}/go', [\App\Http\Controllers\NotificationClickController::class, 'handleClick'])
     ->name('notifications.readAndRedirect');
+
+// Transaction-Scoped Live Chat (Customer, Rider, Admin)
+Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
+    Route::get('/threads', [\App\Http\Controllers\ChatController::class, 'threads'])
+        ->name('threads');
+    Route::get('/thread/{type}/{id}', [\App\Http\Controllers\ChatController::class, 'showThread'])
+        ->whereIn('type', ['order', 'reservation'])
+        ->whereNumber('id')
+        ->name('thread');
+    Route::post('/thread/{thread}/messages', [\App\Http\Controllers\ChatController::class, 'storeMessage'])
+        ->whereNumber('thread')
+        ->name('messages.store');
+});
 
 // Rider Routes (Role: rider)
 Route::middleware(['auth', 'role:rider'])->prefix('rider')->name('rider.')->group(function () {
