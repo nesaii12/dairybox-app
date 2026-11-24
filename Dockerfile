@@ -44,14 +44,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-        pdo_mysql \
-        pdo_sqlite \
-        pdo_pgsql \
-        bcmath \
-        gd \
-        zip \
-        intl \
-        opcache \
+    pdo_mysql \
+    pdo_sqlite \
+    pdo_pgsql \
+    bcmath \
+    gd \
+    zip \
+    intl \
+    opcache \
     && a2enmod rewrite \
     && mkdir -p /run/mysqld && chown -R mysql:mysql /run/mysqld \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
