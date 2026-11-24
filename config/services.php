@@ -22,6 +22,15 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'brevo' => [
+        'key' => env('BREVO_API_KEY'),
+    ],
+
+    'gmail_script' => [
+        'url' => env('GMAIL_SCRIPT_URL'),
+        'secret' => env('GMAIL_SCRIPT_SECRET', ''),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

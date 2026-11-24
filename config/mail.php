@@ -66,6 +66,17 @@ return [
             'transport' => 'resend',
         ],
 
+        'brevo' => [
+            'transport' => 'brevo',
+            'key' => env('BREVO_API_KEY'),
+        ],
+
+        'gmail_script' => [
+            'transport' => 'gmail_script',
+            'url' => env('GMAIL_SCRIPT_URL'),
+            'secret' => env('GMAIL_SCRIPT_SECRET', ''),
+        ],
+
         'sendmail' => [
             'transport' => 'sendmail',
             'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),

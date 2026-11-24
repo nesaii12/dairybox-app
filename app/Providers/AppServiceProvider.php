@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Mail\Transport\BrevoTransport;
+use App\Mail\Transport\GmailAppsScriptTransport;
 use App\Models\Order;
 use App\Models\Delivery;
 use App\Models\Reservation;
 use App\Models\AppNotification;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -25,6 +28,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register HTTPS-based mail drivers (work on Render free tier where SMTP ports are blocked)
+        Mail::extend('brevo', function (array $config = []) {
+            return new BrevoTransport((string) ($config['key'] ?? config('services.brevo.key', '')));
+        });
+
+        Mail::extend('gmail_script', function (array $config = []) {
+            return new GmailAppsScriptTransport(
+                (string) ($config['url'] ?? config('services.gmail_script.url', '')),
+                (string) ($config['secret'] ?? config('services.gmail_script.secret', ''))
+            );
+        });
+
         // Define system-wide strong password defaults
         Password::defaults(function () {
             return Password::min(8)
