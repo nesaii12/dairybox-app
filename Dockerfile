@@ -28,10 +28,11 @@ WORKDIR /var/www/html
 # Prevent interactive prompts during apt-get
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system libraries and PHP extensions needed for Laravel, Excel, and QR codes
+# Install system libraries, embedded MariaDB (for self-contained Render deploys), and PHP extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
+    mariadb-server \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
@@ -52,6 +53,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         intl \
         opcache \
     && a2enmod rewrite \
+    && mkdir -p /run/mysqld && chown -R mysql:mysql /run/mysqld \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Composer from official image
@@ -70,13 +72,16 @@ COPY --from=node-builder /app/public/build ./public/build
 # Generate optimized Composer autoloader
 RUN composer dump-autoload --optimize --no-dev
 
-# Copy Apache configuration, PHP settings, and entrypoint script
+# Copy Apache configuration, low-memory MariaDB config, PHP settings, and entrypoint script
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/mpm_prefork.conf /etc/apache2/mods-available/mpm_prefork.conf
+COPY docker/mariadb-lowmem.cnf /etc/mysql/mariadb.conf.d/99-render-lowmem.cnf
 COPY docker/php.ini /usr/local/etc/php/conf.d/custom-php.ini
 COPY docker/entrypoint.sh /entrypoint.sh
 
 # Ensure Linux line endings (prevent CRLF issues from Windows git) and set permissions
-RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh /etc/mysql/mariadb.conf.d/99-render-lowmem.cnf /etc/apache2/mods-available/mpm_prefork.conf \
+    && chmod +x /entrypoint.sh
 
 # Set directory ownership and permissions for Laravel writable directories
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
